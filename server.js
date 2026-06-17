@@ -131,7 +131,65 @@ function page(title, body, active = '') {
     ['rdash', '/dashboard/rider', 'Rider Dashboard'],
   ].map(([key, href, label]) => `<a class="${active === key ? 'active' : ''}" href="${href}">${label}</a>`).join('');
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant • Rider • Admin OS</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Admin OS • Stable MVP</div></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant • Rider • Admin OS</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Admin OS • Stable MVP</div></main>
+<script>
+(function(){
+  const host = location.hostname.toLowerCase();
+
+  function type(){
+    if(host.startsWith("admin.")) return "admin";
+    if(host.startsWith("rider.")) return "rider";
+    if(host.startsWith("merchant.")) return "merchant";
+    return "public";
+  }
+
+  const t = type();
+
+  document.querySelectorAll("a").forEach(a=>{
+    const text = (a.textContent || "").toLowerCase();
+    const href = (a.getAttribute("href") || "").toLowerCase();
+
+    let keep = true;
+
+    if(t === "admin"){
+      keep =
+        href.includes("/admin") ||
+        text.includes("admin") ||
+        href.includes("/shops") ||
+        text.includes("shop");
+    }
+
+    if(t === "rider"){
+      keep =
+        href.includes("/rider") ||
+        text.includes("rider");
+    }
+
+    if(t === "merchant"){
+      keep =
+        href.includes("/merchant") ||
+        href.includes("/shops") ||
+        href.includes("/shop") ||
+        href.includes("/order") ||
+        text.includes("merchant") ||
+        text.includes("shop") ||
+        text.includes("delivery") ||
+        text.includes("order");
+
+      if(href.includes("/admin") || text.includes("admin") || href.includes("/rider") || text.includes("rider")){
+        keep = false;
+      }
+    }
+
+    if(!keep){
+      a.style.display = "none";
+      a.setAttribute("data-govo-hidden", "1");
+    }
+  });
+})();
+</script>
+
+</body></html>`;
 }
 
 function submittedPage(type, href) {
@@ -276,6 +334,48 @@ async function listRiders(req, res) {
 }
 
 // ---------- routes ----------
+
+/* ================= GOVO DOMAIN UI SPLIT V2 ================= */
+
+function domainType(req){
+  const host = String((req.headers && req.headers.host) || "").split(":")[0].toLowerCase();
+  if (host.startsWith("admin.")) return "admin";
+  if (host.startsWith("rider.")) return "rider";
+  if (host.startsWith("merchant.")) return "merchant";
+  return "public";
+}
+
+app.use((req,res,next)=>{
+  if (req.path !== "/") return next();
+
+  const type = domainType(req);
+
+  if (type === "admin") return res.redirect("/admin/os");
+  if (type === "rider") return res.redirect("/rider");
+  if (type === "merchant") return res.redirect("/shops");
+
+  return next();
+});
+
+app.get("/admin/os", (req,res)=>{
+  const pin = encodeURIComponent((req.query && req.query.pin) || process.env.ADMIN_PIN || "");
+  res.send(page("GOVO Admin OS", `
+    <div class="card">
+      <h1>GOVO Admin OS</h1>
+      <p>Merchant, Rider, Order sob ek jaigai manage korun.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+        <a class="btn" href="/admin/leads?pin=${pin}">Merchant Leads</a>
+        <a class="btn" href="/admin/riders?pin=${pin}">Rider Leads</a>
+        <a class="btn" href="/admin/orders?pin=${pin}">Orders</a>
+        <a class="btn" href="/shops">View Shops</a>
+      </div>
+    </div>
+  `));
+});
+
+/* ================= /GOVO DOMAIN UI SPLIT V2 ================= */
+
+
 app.get('/', (req, res) => res.redirect('/merchant'));
 app.get('/health', (req, res) => res.json({ ok: true, service: 'govo-portal', version: 'admin-os' }));
 app.get('/admin', (req, res) => res.redirect(`/admin/leads?${pinQuery(req)}`));
@@ -364,6 +464,563 @@ app.use((err, req, res, next) => {
   console.error('GOVO error:', err);
   res.status(500).send(page('Server Error', `<section class="card"><h1>Server Error</h1><p>${esc(err.message || 'Unknown error')}</p></section>`));
 });
+
+
+/* ================= GOVO ORDER MODULE ================= */
+
+async function ensureOrderTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS govo_orders (
+        id SERIAL PRIMARY KEY,
+        customer_name TEXT,
+        customer_phone TEXT,
+        pickup_location TEXT,
+        drop_location TEXT,
+        item_details TEXT,
+        note TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log("Order table ready");
+  } catch(e) {
+    console.log("Order table setup error:", e.message);
+  }
+}
+
+const orderAdminCss = `
+<style>
+.order-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:18px}
+.order-card{border:1px solid #243044;background:#0f172a;border-radius:18px;padding:16px}
+.order-card h3{margin:0 0 8px;color:#22c55e}
+.order-meta{font-size:13px;color:#cbd5e1;line-height:1.5}
+.status-pill{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;text-transform:uppercase}
+.status-pill.pending{background:#334155;color:#e2e8f0}
+.status-pill.accepted{background:#1e3a8a;color:#bfdbfe}
+.status-pill.completed{background:#14532d;color:#bbf7d0}
+.status-pill.cancelled{background:#7f1d1d;color:#fecaca}
+.order-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.small-btn{padding:8px 10px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px}
+.small-btn.accept{background:#3b82f6;color:#fff}
+.small-btn.done{background:#22c55e;color:#052e16}
+.small-btn.cancel{background:#ef4444;color:#fff}
+.order-form-grid{display:grid;grid-template-columns:1fr;gap:12px}
+</style>
+`;
+
+app.get("/order", (req,res)=>{
+  res.send(page("GOVO Order", `
+    <div class="card">
+      <h1>GOVO Order Request</h1>
+      <form method="POST" action="/order" class="order-form-grid">
+        <label>Customer Name</label>
+        <input name="customer_name" required>
+
+        <label>Customer Phone</label>
+        <input name="customer_phone" required>
+
+        <label>Pickup Location</label>
+        <input name="pickup_location" required>
+
+        <label>Drop Location</label>
+        <input name="drop_location" required>
+
+        <label>Product / Service Details</label>
+        <textarea name="item_details" required></textarea>
+
+        <label>Note</label>
+        <textarea name="note"></textarea>
+
+        <button>Submit Order</button>
+      </form>
+    </div>
+  `));
+});
+
+app.post("/order", async (req,res)=>{
+  try {
+    const order = {
+      customer_name: req.body.customer_name,
+      customer_phone: req.body.customer_phone,
+      pickup_location: req.body.pickup_location,
+      drop_location: req.body.drop_location,
+      item_details: req.body.item_details,
+      note: req.body.note || ""
+    };
+
+    const r = await pool.query(`
+      INSERT INTO govo_orders
+      (customer_name, customer_phone, pickup_location, drop_location, item_details, note)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING id
+    `, [
+      order.customer_name,
+      order.customer_phone,
+      order.pickup_location,
+      order.drop_location,
+      order.item_details,
+      order.note
+    ]);
+
+    const orderId = r.rows[0].id;
+
+    if (typeof sendTelegram === "function") {
+      sendTelegram([
+        "🧾 New GOVO Order",
+        "",
+        `ID: ${orderId}`,
+        `Customer: ${order.customer_name || ""}`,
+        `Phone: ${order.customer_phone || ""}`,
+        `Pickup: ${order.pickup_location || ""}`,
+        `Drop: ${order.drop_location || ""}`,
+        `Details: ${order.item_details || ""}`,
+        `Note: ${order.note || ""}`,
+        `Time: ${new Date().toLocaleString("en-GB", {timeZone:"Asia/Dhaka"})}`
+      ].join("\n")).catch(()=>{});
+    }
+
+    res.send(page("Order Submitted", `
+      <div class="card ok">
+        <h1>✅ Order Submitted</h1>
+        <p>GOVO team order receive koreche.</p>
+        <p><b>Order ID:</b> ${esc(String(orderId))}</p>
+        <a class="btn" href="/order">Add Another Order</a>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Order submit error:", e.message);
+    res.status(500).send(page("Order Error", `
+      <div class="card"><h1>Order Error</h1><p>${esc(String(e.message))}</p></div>
+    `));
+  }
+});
+
+app.get("/admin/orders", async (req,res)=>{
+  if(!pinok(req,res)) return;
+
+  try {
+    const pin = encodeURIComponent((req.query && req.query.pin) || ADMIN_PIN || "");
+    const r = await pool.query(`
+      SELECT id, customer_name, customer_phone, pickup_location, drop_location,
+             item_details, note, COALESCE(status,'pending') AS status, created_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const cards = r.rows.map(x=>{
+      const st = String(x.status || "pending").toLowerCase();
+
+      let actions = "";
+      if (st === "pending") {
+        actions = `
+          <a class="small-btn accept" href="/admin/order/${x.id}/accept?pin=${pin}">Accept</a>
+          <a class="small-btn cancel" href="/admin/order/${x.id}/cancel?pin=${pin}">Cancel</a>
+        `;
+      } else if (st === "accepted") {
+        actions = `
+          <a class="small-btn done" href="/admin/order/${x.id}/complete?pin=${pin}">Complete</a>
+          <a class="small-btn cancel" href="/admin/order/${x.id}/cancel?pin=${pin}">Cancel</a>
+        `;
+      } else if (st === "completed") {
+        actions = `<span class="mini-note">Done</span>`;
+      } else {
+        actions = `<a class="small-btn accept" href="/admin/order/${x.id}/accept?pin=${pin}">Re-Accept</a>`;
+      }
+
+      const time = x.created_at ? new Date(x.created_at).toLocaleString("en-GB", {
+        timeZone:"Asia/Dhaka",
+        day:"2-digit",
+        month:"short",
+        year:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit"
+      }) : "";
+
+      return `
+        <div class="order-card">
+          <h3>#${esc(String(x.id))} ${esc(String(x.customer_name || ""))}</h3>
+          <div class="order-meta">
+            <div><b>Phone:</b> ${esc(String(x.customer_phone || ""))}</div>
+            <div><b>Pickup:</b> ${esc(String(x.pickup_location || ""))}</div>
+            <div><b>Drop:</b> ${esc(String(x.drop_location || ""))}</div>
+            <div><b>Details:</b> ${esc(String(x.item_details || ""))}</div>
+            <div><b>Note:</b> ${esc(String(x.note || ""))}</div>
+            <div><b>Time:</b> ${esc(String(time))}</div>
+            <div style="margin-top:8px"><span class="status-pill ${esc(st)}">${esc(st)}</span></div>
+          </div>
+          <div class="order-actions">${actions}</div>
+        </div>
+      `;
+    }).join("");
+
+    res.send(page("Admin Orders", `
+      ${orderAdminCss}
+      <div class="card">
+        <h1>GOVO Orders</h1>
+        <p class="mini-note">New customer orders, delivery requests, and service requests.</p>
+        <div class="order-grid">${cards || "<p>No orders found.</p>"}</div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Admin orders error:", e.message);
+    res.status(500).send(page("Admin Orders Error", `
+      <div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>
+    `));
+  }
+});
+
+app.get("/admin/order/:id/:action", async (req,res)=>{
+  if(!pinok(req,res)) return;
+
+  const action = req.params.action;
+  const status =
+    action === "accept" ? "accepted" :
+    action === "complete" ? "completed" :
+    action === "cancel" ? "cancelled" :
+    "pending";
+
+  try {
+    await pool.query("UPDATE govo_orders SET status=$1 WHERE id=$2", [status, req.params.id]);
+
+    if (typeof sendTelegram === "function") {
+      sendTelegram(`📦 GOVO Order ${status.toUpperCase()}\nID: ${req.params.id}`).catch(()=>{});
+    }
+
+    res.redirect("/admin/orders?pin=" + encodeURIComponent((req.query && req.query.pin) || ADMIN_PIN || ""));
+  } catch(e) {
+    console.log("Order status update error:", e.message);
+    res.status(500).send(page("Order Status Error", `
+      <div class="card"><h1>Order Status Error</h1><p>${esc(String(e.message))}</p></div>
+    `));
+  }
+});
+
+/* ================= /GOVO ORDER MODULE ================= */
+
+
+
+/* ================= GOVO MERCHANT MARKETPLACE MODULE ================= */
+
+async function ensureMerchantStoreTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS govo_merchant_profiles (
+        id SERIAL PRIMARY KEY,
+        merchant_lead_id INTEGER,
+        shop_name TEXT,
+        owner_name TEXT,
+        phone TEXT UNIQUE,
+        location TEXT,
+        category TEXT,
+        delivery_needed TEXT,
+        description TEXT,
+        opening_hours TEXT,
+        delivery_area TEXT,
+        logo_image TEXT,
+        cover_image TEXT,
+        whatsapp TEXT,
+        status TEXT DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS govo_shop_items (
+        id SERIAL PRIMARY KEY,
+        merchant_phone TEXT,
+        item_name TEXT,
+        price TEXT,
+        details TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS govo_orders (
+        id SERIAL PRIMARY KEY,
+        customer_name TEXT,
+        customer_phone TEXT,
+        pickup_location TEXT,
+        drop_location TEXT,
+        item_details TEXT,
+        note TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_lead_id INTEGER");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_phone TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS shop_name TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'delivery'");
+
+    console.log("Merchant marketplace tables ready");
+  } catch(e) {
+    console.log("Merchant marketplace setup error:", e.message);
+  }
+}
+
+const marketCss = `
+<style>
+.market-hero{display:grid;gap:12px;margin-bottom:18px}.market-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.shop-card{border:1px solid #243044;background:#0f172a;border-radius:18px;padding:16px}.shop-card h3{margin:0 0 8px;color:#22c55e}.shop-meta{font-size:13px;color:#cbd5e1;line-height:1.55}.pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#163b26;color:#86efac;font-size:12px;font-weight:800}.store-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.store-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border-radius:12px;background:#22c55e;color:#052e16;font-weight:900;text-decoration:none}.store-btn.outline{background:transparent;border:1px solid #22c55e;color:#86efac}.mini-muted{font-size:12px;color:#94a3b8}.item-list{display:grid;gap:10px}.item-box{border:1px solid #263244;border-radius:14px;padding:12px;background:#111827}.top-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 20px}.field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}@media(max-width:700px){.market-grid{grid-template-columns:1fr}.store-actions{flex-direction:column}.store-btn{width:100%}}
+</style>
+`;
+
+async function getApprovedMerchantByPhone(phone) {
+  const r = await pool.query(`
+    SELECT * FROM govo_merchant_leads
+    WHERE phone=$1
+    ORDER BY id DESC
+    LIMIT 1
+  `, [phone]);
+  const lead = r.rows[0];
+  if (!lead) return { lead: null, approved: false, reason: "No merchant registration found" };
+  const approved = String(lead.status || "pending").toLowerCase() === "approved";
+  return { lead, approved, reason: approved ? "approved" : `Merchant status is ${lead.status || 'pending'}` };
+}
+
+app.get("/shops", async (req,res)=>{
+  try {
+    const r = await pool.query(`
+      SELECT id, shop_name, owner_name, phone, location, category, delivery_needed,
+             COALESCE(status,'pending') AS status,
+             created_at
+      FROM govo_merchant_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const shopCss = `
+    <style>
+      .shop-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+      .shop-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+      .shop-card{background:#0f172a;border:1px solid #243044;border-radius:20px;padding:18px}
+      .shop-card h3{margin:8px 0;color:#22c55e;font-size:22px}
+      .shop-meta{color:#cbd5e1;font-size:14px;line-height:1.6}
+      .shop-tag{display:inline-block;background:#052e16;color:#bbf7d0;border:1px solid #22c55e;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}
+      .shop-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+      .shop-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border-radius:12px;text-decoration:none;font-weight:900}
+      .shop-btn.primary{background:#22c55e;color:#052e16}
+      .shop-btn.ghost{border:1px solid #22c55e;color:#bbf7d0}
+      .muted{color:#94a3b8}
+    </style>`;
+
+    const cards = r.rows.map(x=>`
+      <div class="shop-card">
+        <span class="shop-tag">${esc(String(x.category || "Shop"))}</span>
+        <h3>${esc(String(x.shop_name || ""))}</h3>
+        <div class="shop-meta">
+          <div><b>Owner:</b> ${esc(String(x.owner_name || ""))}</div>
+          <div><b>Phone:</b> ${esc(String(x.phone || ""))}</div>
+          <div><b>Location:</b> ${esc(String(x.location || ""))}</div>
+          <div><b>Delivery:</b> ${esc(String(x.delivery_needed || ""))}</div>
+        </div>
+        <div class="shop-actions">
+          <a class="shop-btn primary" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
+          <a class="shop-btn ghost" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || "")}">Shop Dashboard</a>
+        </div>
+      </div>
+    `).join("");
+
+    res.send(page("GOVO Shops", `
+      ${shopCss}
+      <div class="card">
+        <div class="shop-head">
+          <div>
+            <h1>GOVO Shops</h1>
+            <p class="muted">Approved merchant shops. Customer ekhane theke delivery book korte parbe.</p>
+          </div>
+          <a class="btn" href="/merchant/dashboard">Merchant Login</a>
+        </div>
+        <div class="shop-grid">${cards || "<p>No approved shop found. Admin theke merchant approve korun.</p>"}</div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Safe shops error:", e.message);
+    res.status(500).send(page("Shops Error", `<div class="card"><h1>Shops Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/shop/:id", async (req,res)=>{
+  try {
+    const r = await pool.query(`
+      SELECT l.id AS lead_id,
+             COALESCE(p.shop_name,l.shop_name) AS shop_name,
+             COALESCE(p.owner_name,l.owner_name) AS owner_name,
+             l.phone,
+             COALESCE(p.location,l.location) AS location,
+             COALESCE(p.category,l.category) AS category,
+             COALESCE(p.delivery_needed,l.delivery_needed) AS delivery_needed,
+             p.description, p.opening_hours, p.delivery_area, p.whatsapp
+      FROM govo_merchant_leads l
+      LEFT JOIN govo_merchant_profiles p ON p.phone=l.phone
+      WHERE l.id=$1 AND LOWER(COALESCE(l.status,'pending'))='approved'
+      LIMIT 1
+    `, [req.params.id]);
+    const shop = r.rows[0];
+    if (!shop) return res.status(404).send(page("Shop Not Found", `<div class="card"><h1>Shop Not Found</h1><p>This shop is not approved or not found.</p></div>`));
+
+    const items = await pool.query(`
+      SELECT id,item_name,price,details FROM govo_shop_items
+      WHERE merchant_phone=$1 AND is_active=true
+      ORDER BY id DESC LIMIT 50
+    `, [shop.phone]);
+
+    const itemHtml = items.rows.map(i=>`
+      <div class="item-box"><b>${esc(String(i.item_name || 'Item'))}</b><br><span>${esc(String(i.price || ''))}</span><br><span class="mini-muted">${esc(String(i.details || ''))}</span></div>
+    `).join("");
+
+    res.send(page(shop.shop_name || "GOVO Shop", `${marketCss}<div class="card"><a class="btn" href="/shops">← Shops</a><h1>${esc(String(shop.shop_name || 'GOVO Shop'))}</h1><p>${esc(String(shop.description || ''))}</p><div class="shop-meta"><div><b>Owner:</b> ${esc(String(shop.owner_name || ''))}</div><div><b>Phone:</b> ${esc(String(shop.phone || ''))}</div><div><b>Location:</b> ${esc(String(shop.location || ''))}</div><div><b>Category:</b> ${esc(String(shop.category || ''))}</div><div><b>Open:</b> ${esc(String(shop.opening_hours || ''))}</div><div><b>Area:</b> ${esc(String(shop.delivery_area || ''))}</div></div><div class="store-actions"><a class="store-btn" href="/book/${shop.lead_id}">📦 Book Delivery</a></div></div><div class="card"><h2>Products / Services</h2><div class="item-list">${itemHtml || '<p>No product added yet.</p>'}</div></div>`));
+  } catch(e) {
+    console.log("Shop detail error:", e.message);
+    res.status(500).send(page("Shop Error", `<div class="card"><h1>Shop Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/book/:id", async (req,res)=>{
+  try {
+    const r = await pool.query(`
+      SELECT l.id AS lead_id, COALESCE(p.shop_name,l.shop_name) AS shop_name, l.phone,
+             COALESCE(p.location,l.location) AS location
+      FROM govo_merchant_leads l
+      LEFT JOIN govo_merchant_profiles p ON p.phone=l.phone
+      WHERE l.id=$1 AND LOWER(COALESCE(l.status,'pending'))='approved'
+      LIMIT 1
+    `, [req.params.id]);
+    const shop = r.rows[0];
+    if (!shop) return res.status(404).send(page("Booking Not Found", `<div class="card"><h1>Booking Not Found</h1><p>Shop not approved or not found.</p></div>`));
+
+    res.send(page("Book Delivery", `${marketCss}<div class="card"><h1>Book Delivery</h1><p>Shop: <b>${esc(String(shop.shop_name || ''))}</b></p><form method="POST" action="/book/${shop.lead_id}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Drop Location</label><input name="drop_location" required><label>Product / Details</label><textarea name="item_details" required></textarea><label>Note</label><textarea name="note"></textarea><button>Confirm Booking</button></form></div>`));
+  } catch(e) {
+    console.log("Book form error:", e.message);
+    res.status(500).send(page("Booking Error", `<div class="card"><h1>Booking Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.post("/book/:id", async (req,res)=>{
+  try {
+    const r = await pool.query(`
+      SELECT l.id AS lead_id, COALESCE(p.shop_name,l.shop_name) AS shop_name, l.phone,
+             COALESCE(p.location,l.location) AS location
+      FROM govo_merchant_leads l
+      LEFT JOIN govo_merchant_profiles p ON p.phone=l.phone
+      WHERE l.id=$1 AND LOWER(COALESCE(l.status,'pending'))='approved'
+      LIMIT 1
+    `, [req.params.id]);
+    const shop = r.rows[0];
+    if (!shop) return res.status(404).send(page("Booking Not Found", `<div class="card"><h1>Booking Not Found</h1></div>`));
+
+    const order = {
+      customer_name: req.body.customer_name,
+      customer_phone: req.body.customer_phone,
+      pickup_location: shop.location || shop.shop_name || "Merchant Shop",
+      drop_location: req.body.drop_location,
+      item_details: req.body.item_details,
+      note: req.body.note || "",
+      merchant_lead_id: shop.lead_id,
+      merchant_phone: shop.phone,
+      shop_name: shop.shop_name
+    };
+
+    const saved = await pool.query(`
+      INSERT INTO govo_orders
+      (customer_name, customer_phone, pickup_location, drop_location, item_details, note, merchant_lead_id, merchant_phone, shop_name, order_type)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'shop_delivery')
+      RETURNING id
+    `, [order.customer_name, order.customer_phone, order.pickup_location, order.drop_location, order.item_details, order.note, order.merchant_lead_id, order.merchant_phone, order.shop_name]);
+
+    const orderId = saved.rows[0].id;
+    if (typeof sendTelegram === "function") {
+      sendTelegram(["📦 New GOVO Shop Delivery", "", `Order ID: ${orderId}`, `Shop: ${order.shop_name || ''}`, `Merchant Phone: ${order.merchant_phone || ''}`, `Customer: ${order.customer_name || ''}`, `Phone: ${order.customer_phone || ''}`, `Drop: ${order.drop_location || ''}`, `Details: ${order.item_details || ''}`].join("\n")).catch(()=>{});
+    }
+
+    res.send(page("Booking Submitted", `<div class="card ok"><h1>✅ Booking Submitted</h1><p>GOVO team order receive koreche.</p><p><b>Order ID:</b> ${esc(String(orderId))}</p><a class="btn" href="/shops">Back to Shops</a></div>`));
+  } catch(e) {
+    console.log("Book submit error:", e.message);
+    res.status(500).send(page("Booking Error", `<div class="card"><h1>Booking Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/merchant/dashboard", async (req,res)=>{
+  const phone = String((req.query && req.query.phone) || "").trim();
+  if (!phone) {
+    return res.send(page("Merchant Dashboard", `${marketCss}<div class="card"><h1>Merchant Dashboard</h1><p class="mini-muted">Approved merchant phone number diye login/check korun.</p><form method="GET" action="/merchant/dashboard"><label>Phone</label><input name="phone" required><button>Open Dashboard</button></form></div>`));
+  }
+
+  try {
+    const check = await getApprovedMerchantByPhone(phone);
+    if (!check.lead) return res.send(page("Merchant Dashboard", `${marketCss}<div class="card"><h1>No merchant found</h1><p>${esc(check.reason)}</p><a class="btn" href="/merchant">Register Merchant</a></div>`));
+    if (!check.approved) return res.send(page("Merchant Dashboard", `${marketCss}<div class="card"><h1>Merchant Pending</h1><p>${esc(check.reason)}</p><p>Admin approve korle dashboard active hobe.</p></div>`));
+
+    await pool.query(`
+      INSERT INTO govo_merchant_profiles (merchant_lead_id, shop_name, owner_name, phone, location, category, delivery_needed, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'published')
+      ON CONFLICT (phone) DO NOTHING
+    `, [check.lead.id, check.lead.shop_name, check.lead.owner_name, check.lead.phone, check.lead.location, check.lead.category, check.lead.delivery_needed]);
+
+    const prof = (await pool.query("SELECT * FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1", [phone])).rows[0] || {};
+    const items = await pool.query("SELECT id,item_name,price,details FROM govo_shop_items WHERE merchant_phone=$1 AND is_active=true ORDER BY id DESC LIMIT 50", [phone]);
+    const itemHtml = items.rows.map(i=>`<div class="item-box"><b>${esc(String(i.item_name||''))}</b> — ${esc(String(i.price||''))}<br><span class="mini-muted">${esc(String(i.details||''))}</span> <a class="btn" href="/merchant/item/${i.id}/delete?phone=${encodeURIComponent(phone)}">Remove</a></div>`).join("");
+
+    res.send(page("Merchant Dashboard", `${marketCss}<div class="card"><h1>Merchant Dashboard</h1><p class="mini-muted">Phone: ${esc(phone)} | Public shop: <a class="btn" href="/shop/${check.lead.id}">View Shop</a></p><form method="POST" action="/merchant/profile"><input type="hidden" name="phone" value="${esc(phone)}"><div class="field-grid"><div><label>Shop Name</label><input name="shop_name" value="${esc(String(prof.shop_name||''))}" required></div><div><label>Owner Name</label><input name="owner_name" value="${esc(String(prof.owner_name||''))}"></div><div><label>Location</label><input name="location" value="${esc(String(prof.location||''))}"></div><div><label>Category</label><input name="category" value="${esc(String(prof.category||''))}"></div><div><label>Opening Hours</label><input name="opening_hours" value="${esc(String(prof.opening_hours||''))}" placeholder="9 AM - 10 PM"></div><div><label>Delivery Area</label><input name="delivery_area" value="${esc(String(prof.delivery_area||''))}" placeholder="Meherpur, Gangni"></div><div><label>WhatsApp</label><input name="whatsapp" value="${esc(String(prof.whatsapp||''))}"></div></div><label>Description</label><textarea name="description">${esc(String(prof.description||''))}</textarea><button>Save Shop Info</button></form></div><div class="card"><h2>Add Product / Service</h2><form method="POST" action="/merchant/item"><input type="hidden" name="phone" value="${esc(phone)}"><label>Item Name</label><input name="item_name" required><label>Price</label><input name="price" placeholder="৳100"><label>Details</label><textarea name="details"></textarea><button>Add Item</button></form><h2>Current Items</h2><div class="item-list">${itemHtml || '<p>No item added yet.</p>'}</div></div>`));
+  } catch(e) {
+    console.log("Merchant dashboard error:", e.message);
+    res.status(500).send(page("Merchant Dashboard Error", `<div class="card"><h1>Merchant Dashboard Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.post("/merchant/profile", async (req,res)=>{
+  const phone = String(req.body.phone || "").trim();
+  try {
+    const check = await getApprovedMerchantByPhone(phone);
+    if (!check.approved) return res.status(403).send(page("Not Approved", `<div class="card"><h1>Not Approved</h1><p>${esc(check.reason)}</p></div>`));
+    await pool.query(`
+      INSERT INTO govo_merchant_profiles
+      (merchant_lead_id, shop_name, owner_name, phone, location, category, description, opening_hours, delivery_area, whatsapp, status, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'published',NOW())
+      ON CONFLICT (phone) DO UPDATE SET
+        shop_name=EXCLUDED.shop_name, owner_name=EXCLUDED.owner_name, location=EXCLUDED.location,
+        category=EXCLUDED.category, description=EXCLUDED.description, opening_hours=EXCLUDED.opening_hours,
+        delivery_area=EXCLUDED.delivery_area, whatsapp=EXCLUDED.whatsapp, status='published', updated_at=NOW()
+    `, [check.lead.id, req.body.shop_name, req.body.owner_name, phone, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp]);
+    res.redirect("/merchant/dashboard?phone=" + encodeURIComponent(phone));
+  } catch(e) {
+    console.log("Merchant profile save error:", e.message);
+    res.status(500).send(page("Profile Save Error", `<div class="card"><h1>Profile Save Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.post("/merchant/item", async (req,res)=>{
+  const phone = String(req.body.phone || "").trim();
+  try {
+    const check = await getApprovedMerchantByPhone(phone);
+    if (!check.approved) return res.status(403).send(page("Not Approved", `<div class="card"><h1>Not Approved</h1></div>`));
+    await pool.query("INSERT INTO govo_shop_items (merchant_phone,item_name,price,details) VALUES ($1,$2,$3,$4)", [phone, req.body.item_name, req.body.price, req.body.details]);
+    res.redirect("/merchant/dashboard?phone=" + encodeURIComponent(phone));
+  } catch(e) {
+    console.log("Merchant item add error:", e.message);
+    res.status(500).send(page("Item Add Error", `<div class="card"><h1>Item Add Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/merchant/item/:id/delete", async (req,res)=>{
+  const phone = String((req.query && req.query.phone) || "").trim();
+  try {
+    await pool.query("UPDATE govo_shop_items SET is_active=false WHERE id=$1 AND merchant_phone=$2", [req.params.id, phone]);
+    res.redirect("/merchant/dashboard?phone=" + encodeURIComponent(phone));
+  } catch(e) {
+    console.log("Merchant item delete error:", e.message);
+    res.status(500).send(page("Item Delete Error", `<div class="card"><h1>Item Delete Error</h1></div>`));
+  }
+});
+
+/* ================= /GOVO MERCHANT MARKETPLACE MODULE ================= */
+
 
 initDb().then(() => {
   app.listen(PORT, () => console.log('GOVO Admin OS running on', PORT));
