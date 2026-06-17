@@ -1,10 +1,46 @@
+
+// --- GOVO ENV LOADER ---
+try {
+  const fs = require("fs");
+  const path = require("path");
+  const envPath = path.join(__dirname, ".env");
+  if (fs.existsSync(envPath)) {
+    fs.readFileSync(envPath, "utf8").split(/\r?\n/).forEach(line => {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    });
+  }
+} catch(e) {
+  console.log("ENV load skipped:", e.message);
+}
+// --- /GOVO ENV LOADER ---
+
+
+// --- GOVO_ENV_LOADER ---
+try {
+  const __fs = require("fs");
+  const __path = require("path");
+  const __envPath = __path.join(__dirname, ".env");
+  if (__fs.existsSync(__envPath)) {
+    __fs.readFileSync(__envPath, "utf8").split(/\r?\n/).forEach(line => {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (m && !process.env[m[1]]) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      }
+    });
+  }
+} catch(e) {
+  console.log("ENV loader skipped:", e.message);
+}
+// --- /GOVO_ENV_LOADER ---
+
 const express = require("express");
 const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PIN = process.env.ADMIN_PIN || "govo1234";
-const N8N_WEBHOOK = process.env.N8N_WEBHOOK || "http://abu_n8n:5678/webhook/govo-merchant";
+const N8N_WEBHOOK = process.env.N8N_WEBHOOK || "http://127.0.0.1:3000/health";
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -73,6 +109,50 @@ function pinOk(req, res) {
   return true;
 }
 
+
+async function sendTelegram(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId) {
+    console.log("Telegram skipped: token/chat id missing");
+    return;
+  }
+
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true
+      })
+    });
+
+    if (!resp.ok) {
+      console.log("Telegram failed:", await resp.text());
+    }
+  } catch(e) {
+    console.log("Telegram error:", e.message);
+  }
+}
+
+
+
+function pinok(req,res){
+  const pin = (req.query && req.query.pin) || (req.body && req.body.pin) || "";
+  if (!ADMIN_PIN || pin === ADMIN_PIN) return true;
+
+  res.status(403).send(page("Admin Locked", `
+    <div class="card">
+      <h1>Admin Locked</h1>
+      <p>Invalid or missing admin pin.</p>
+    </div>
+  `));
+  return false;
+}
+
 app.get("/", (req,res)=>res.redirect("/merchant"));
 app.get("/health", (req,res)=>res.json({ok:true, service:"govo-portal"}));
 
@@ -101,20 +181,59 @@ app.post("/merchant", async (req,res)=>{
     category:req.body.category, delivery_needed:req.body.delivery_needed
   };
 
-  await fetch(N8N_WEBHOOK, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(lead)
-  });
+
+  await pool.query(`INSERT INTO govo_merchant_leads (shop_name,owner_name,phone,location,category,delivery_needed) VALUES ($1,$2,$3,$4,$5,$6)`, [
+    lead.shop_name,
+    lead.owner_name,
+    lead.phone,
+    lead.location,
+    lead.category,
+    lead.delivery_needed
+  ]);
+
+  console.log("N8N webhook disabled for merchant lead");
+
+  
+  sendTelegram([
+    "🟢 New GOVO Merchant Lead",
+    "",
+    `Shop: ${lead.shop_name || ""}`,
+    `Owner: ${lead.owner_name || ""}`,
+    `Phone: ${lead.phone || ""}`,
+    `Location: ${lead.location || ""}`,
+    `Category: ${lead.category || ""}`,
+    `Delivery: ${lead.delivery_needed || ""}`,
+    `Time: ${new Date().toLocaleString("en-GB", {timeZone:"Asia/Dhaka"})}`
+  ].join("\n")).catch(()=>{});
 
   res.send(page("Submitted", `<div class="card ok"><h1>✅ Merchant Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="/merchant">Add Another</a></div>`));
 });
 
 app.get("/admin/leads", async (req,res)=>{
-  if(!pinOk(req,res)) return;
-  const r = await pool.query(`SELECT id,shop_name,owner_name,phone,location,category,delivery_needed,created_at FROM govo_merchant_leads ORDER BY id DESC LIMIT 100`);
-  const rows = r.rows.map(x=>`<tr><td>${x.id}</td><td>${esc(x.shop_name)}</td><td>${esc(x.owner_name)}</td><td>${esc(x.phone)}</td><td>${esc(x.location)}</td><td>${esc(x.category)}</td><td>${esc(x.delivery_needed)}</td><td>${esc(x.created_at)}</td></tr>`).join("");
-  res.send(page("Admin Leads", `<div class="card"><h1>📋 Merchant Leads</h1><table><tr><th>ID</th><th>Shop</th><th>Owner</th><th>Phone</th><th>Location</th><th>Category</th><th>Delivery</th><th>Time</th></tr>${rows}</table></div>`));
+  if(!pinok(req,res)) return;
+  try {
+    const pin = encodeURIComponent((req.query && req.query.pin) || ADMIN_PIN || "");
+    const r = await pool.query(`SELECT id,shop_name,owner_name,phone,location,category,delivery_needed,COALESCE(status,'pending') AS status,created_at FROM govo_merchant_leads ORDER BY id DESC LIMIT 100`);
+    const rows = r.rows.map(x=>{
+      const actions = `<a class="btn" href="/admin/merchant/${x.id}/approve?pin=${pin}">Approve</a> <a class="btn" href="/admin/merchant/${x.id}/reject?pin=${pin}">Reject</a>`;
+      return `<tr>
+        <td>${esc(String(x.id || ""))}</td>
+        <td>${esc(String(x.shop_name || ""))}</td>
+        <td>${esc(String(x.owner_name || ""))}</td>
+        <td>${esc(String(x.phone || ""))}</td>
+        <td>${esc(String(x.location || ""))}</td>
+        <td>${esc(String(x.category || ""))}</td>
+        <td>${esc(String(x.delivery_needed || ""))}</td>
+        <td><b>${esc(String(x.status || "pending"))}</b></td>
+        <td>${actions}</td>
+        <td>${esc(String(x.created_at || ""))}</td>
+      </tr>`;
+    }).join("");
+    res.send(page("Admin Leads", `<div class="card"><h1>Merchant Leads</h1><table><tr><th>ID</th><th>Shop</th><th>Owner</th><th>Phone</th><th>Location</th><th>Category</th><th>Delivery</th><th>Status</th><th>Action</th><th>Time</th></tr>${rows}</table></div>`));
+  } catch(e) {
+    console.log("Admin leads error:", e.message);
+    res.status(500).send(page("Admin Leads Error", `<div class="card"><h1>Admin Leads Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
 });
 
 app.get("/rider", (req,res)=>{
@@ -136,14 +255,45 @@ app.post("/rider", async (req,res)=>{
   await pool.query(`INSERT INTO govo_rider_leads (rider_name,phone,location,vehicle_type,experience) VALUES ($1,$2,$3,$4,$5)`, [
     req.body.rider_name, req.body.phone, req.body.location, req.body.vehicle_type, req.body.experience
   ]);
+  
+  sendTelegram([
+    "🛵 New GOVO Rider Lead",
+    "",
+    `Name: ${req.body.rider_name || ""}`,
+    `Phone: ${req.body.phone || ""}`,
+    `Location: ${req.body.location || ""}`,
+    `Vehicle: ${req.body.vehicle_type || ""}`,
+    `Experience: ${req.body.experience || ""}`,
+    `Time: ${new Date().toLocaleString("en-GB", {timeZone:"Asia/Dhaka"})}`
+  ].join("\n")).catch(()=>{});
+
   res.send(page("Rider Submitted", `<div class="card ok"><h1>✅ Rider Submitted</h1><p>Rider info receive hoyeche.</p><a class="btn" href="/rider">Add Another</a></div>`));
 });
 
 app.get("/admin/riders", async (req,res)=>{
-  if(!pinOk(req,res)) return;
-  const r = await pool.query(`SELECT * FROM govo_rider_leads ORDER BY id DESC LIMIT 100`);
-  const rows = r.rows.map(x=>`<tr><td>${x.id}</td><td>${esc(x.rider_name)}</td><td>${esc(x.phone)}</td><td>${esc(x.location)}</td><td>${esc(x.vehicle_type)}</td><td>${esc(x.experience)}</td><td>${esc(x.created_at)}</td></tr>`).join("");
-  res.send(page("Admin Riders", `<div class="card"><h1>🏍️ Rider Leads</h1><table><tr><th>ID</th><th>Name</th><th>Phone</th><th>Location</th><th>Vehicle</th><th>Experience</th><th>Time</th></tr>${rows}</table></div>`));
+  if(!pinok(req,res)) return;
+  try {
+    const pin = encodeURIComponent((req.query && req.query.pin) || ADMIN_PIN || "");
+    const r = await pool.query(`SELECT id,rider_name,phone,location,vehicle_type,experience,COALESCE(status,'pending') AS status,created_at FROM govo_rider_leads ORDER BY id DESC LIMIT 100`);
+    const rows = r.rows.map(x=>{
+      const actions = `<a class="btn" href="/admin/rider/${x.id}/approve?pin=${pin}">Approve</a> <a class="btn" href="/admin/rider/${x.id}/reject?pin=${pin}">Reject</a>`;
+      return `<tr>
+        <td>${esc(String(x.id || ""))}</td>
+        <td>${esc(String(x.rider_name || ""))}</td>
+        <td>${esc(String(x.phone || ""))}</td>
+        <td>${esc(String(x.location || ""))}</td>
+        <td>${esc(String(x.vehicle_type || ""))}</td>
+        <td>${esc(String(x.experience || ""))}</td>
+        <td><b>${esc(String(x.status || "pending"))}</b></td>
+        <td>${actions}</td>
+        <td>${esc(String(x.created_at || ""))}</td>
+      </tr>`;
+    }).join("");
+    res.send(page("Admin Riders", `<div class="card"><h1>Rider Leads</h1><table><tr><th>ID</th><th>Name</th><th>Phone</th><th>Location</th><th>Vehicle</th><th>Experience</th><th>Status</th><th>Action</th><th>Time</th></tr>${rows}</table></div>`));
+  } catch(e) {
+    console.log("Admin riders error:", e.message);
+    res.status(500).send(page("Admin Riders Error", `<div class="card"><h1>Admin Riders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
 });
 
 app.get("/dashboard/merchant", async (req,res)=>{
@@ -166,4 +316,36 @@ app.get("/dashboard/rider", async (req,res)=>{
   res.send(page("Rider Dashboard", body));
 });
 
-initDb().then(()=>app.listen(PORT, ()=>console.log("GOVO Portal running on", PORT)));
+
+async function ensureLeadStatusColumns() {
+  try {
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+    await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+    console.log("Lead status columns ready");
+  } catch(e) {
+    console.log("Status column setup skipped:", e.message);
+  }
+}
+
+
+
+app.get("/admin/merchant/:id/:action", async (req,res)=>{
+  if(!pinok(req,res)) return;
+  const action = req.params.action;
+  const status = action === "approve" ? "approved" : action === "reject" ? "rejected" : "pending";
+  await pool.query("UPDATE govo_merchant_leads SET status=$1 WHERE id=$2", [status, req.params.id]);
+  sendTelegram(`✅ GOVO Merchant ${status.toUpperCase()}\nID: ${req.params.id}`).catch(()=>{});
+  res.redirect("/admin/leads?pin=" + encodeURIComponent(ADMIN_PIN));
+});
+
+app.get("/admin/rider/:id/:action", async (req,res)=>{
+  if(!pinok(req,res)) return;
+  const action = req.params.action;
+  const status = action === "approve" ? "approved" : action === "reject" ? "rejected" : "pending";
+  await pool.query("UPDATE govo_rider_leads SET status=$1 WHERE id=$2", [status, req.params.id]);
+  sendTelegram(`✅ GOVO Rider ${status.toUpperCase()}\nID: ${req.params.id}`).catch(()=>{});
+  res.redirect("/admin/riders?pin=" + encodeURIComponent(ADMIN_PIN));
+});
+
+
+initDb().then(ensureLeadStatusColumns).then(()=>app.listen(PORT, ()=>console.log("GOVO Portal running on", PORT)));
