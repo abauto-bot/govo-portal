@@ -142,13 +142,14 @@ async function sendTelegram(text) {
 
 const css = `
 :root{--bg:#0b1020;--panel:#111827;--line:#263244;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#60a5fa}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed,.badge.unavailable{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.badge.verified{background:#0c4a6e;border-color:#38bdf8;color:#e0f2fe}.badge.trusted{background:#064e3b;border-color:#34d399;color:#d1fae5}.badge.available{background:#052e16;border-color:#22c55e;color:#bbf7d0}.badge.emergency{background:#7c2d12;border-color:#fb923c;color:#ffedd5}.badge.rating{background:#422006;border-color:#facc15;color:#fef9c3}.badge.clear{background:#172554;border-color:#60a5fa;color:#dbeafe}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
-@media(max-width:760px){.app{padding:12px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed,.badge.unavailable{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.badge.verified{background:#0c4a6e;border-color:#38bdf8;color:#e0f2fe}.badge.trusted{background:#064e3b;border-color:#34d399;color:#d1fae5}.badge.available{background:#052e16;border-color:#22c55e;color:#bbf7d0}.badge.emergency{background:#7c2d12;border-color:#fb923c;color:#ffedd5}.badge.rating{background:#422006;border-color:#facc15;color:#fef9c3}.badge.clear{background:#172554;border-color:#60a5fa;color:#dbeafe}.app-hero{background:radial-gradient(circle at 15% 0%,rgba(34,197,94,.28),transparent 34%),linear-gradient(180deg,#102016,#111827);overflow:hidden}.app-hero h1{font-size:clamp(34px,8vw,58px)}.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.quick-grid .btn{min-height:58px;text-align:center}.chips{display:flex;gap:8px;overflow:auto;padding:2px 0 8px;scrollbar-width:none}.chips a{white-space:nowrap}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.bottom-nav{position:sticky;bottom:10px;z-index:8;display:none;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(2,6,23,.94);border:1px solid rgba(34,197,94,.35);border-radius:18px;padding:8px;margin-top:18px;backdrop-filter:blur(12px)}.bottom-nav a{color:#d1fae5;text-decoration:none;text-align:center;font-size:12px;font-weight:900;padding:8px 4px;border-radius:12px}.bottom-nav a.active{background:#22c55e;color:#052e16}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
+@media(max-width:760px){.app{padding:12px 12px 88px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}.bottom-nav{display:grid}}
 `;
 
 function page(title, body, active = '') {
   const pin = ADMIN_PIN ? `?pin=${encodeURIComponent(ADMIN_PIN)}` : '';
   const nav = [
+    ['app', '/app', 'App'],
     ['merchant', '/merchant', 'Merchant'],
     ['rider', '/rider', 'Rider'],
     ['shops', '/shops', 'Shops'],
@@ -157,7 +158,9 @@ function page(title, body, active = '') {
     ['track', '/track', 'Track'],
     ['admin', `/admin/os${pin}`, 'Admin'],
   ].map(([key, href, label]) => `<a class="${active === key ? 'active' : ''}" href="${href}">${label}</a>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div></main></body></html>`;
+  const showBottom = !['admin', 'merchant', 'rider'].includes(active);
+  const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="/track">Track</a><a href="/merchant">Join</a></nav>` : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main></body></html>`;
 }
 
 function badge(status) {
@@ -189,6 +192,18 @@ function trustBadges(x) {
 function listingImage(src, alt, large = false) {
   if (!src) return '';
   return `<img src="${esc(src)}" alt="${esc(alt || 'GOVO image')}" style="width:100%;${large ? 'max-height:260px' : 'height:170px'};object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin:10px 0">`;
+}
+
+function chip(label, href, active = false) {
+  return `<a class="btn ${active ? '' : 'secondary'}" href="${href}">${esc(label)}</a>`;
+}
+
+function compactMerchantCard(x) {
+  return `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="section-head"><h2>${esc(x.shop_name || 'GOVO Shop')}</h2><span class="pill">${esc(x.category || 'Shop')}</span></div>${trustBadges(x)}<p style="color:var(--muted)">${esc(x.shop_address || x.location || 'Meherpur')}</p><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order</a></div></div>`;
+}
+
+function compactProviderCard(x) {
+  return `<div class="card">${listingImage(x.image_url, x.provider_name)}<div class="section-head"><h2>${esc(x.provider_name || 'Provider')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<p style="color:var(--muted)">${esc(x.area || x.address || 'Meherpur')}</p><div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">View Service</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Request Service</a></div></div>`;
 }
 
 function adminTrustControls(type, x, pin) {
@@ -532,7 +547,7 @@ function merchantMatchesCategory(x, cat) {
 }
 
 function merchantCard(x) {
-  return `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || '')}</h2><span class="pill">${esc(x.category || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || 'Details coming soon')}</span></div><div><b>Products</b><span>${esc(x.products || 'Not added yet')}</span></div></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order / Book</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+  return `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || '')}</h2><span class="pill">${esc(x.category || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || 'Details coming soon')}</span></div><div><b>Products</b><span>${esc(x.products || 'Not added yet')}</span></div></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
 }
 
 async function approvedMerchants() {
@@ -555,30 +570,20 @@ app.get('/shops', async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
     const all = await approvedMerchants();
-    const rows = q ? all.rows.filter((x) => merchantSearchText(x).includes(q)) : all.rows.slice(0, 24);
-    const categoryCards = superAppCategories.map((cat) => {
-      const count = all.rows.filter((x) => merchantMatchesCategory(x, cat)).length;
-      return `<div class="card" style="padding:15px"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div><div style="font-size:30px;line-height:1">${cat.icon}</div><h2 style="font-size:21px;margin:10px 0 6px">${esc(cat.title)}</h2></div><span class="pill">${count}</span></div><p style="color:var(--muted);min-height:42px">${esc(cat.desc)}</p><a class="btn" href="/category/${encodeURIComponent(cat.slug)}">View</a></div>`;
-    }).join('');
+    const rows = q ? all.rows.filter((x) => merchantSearchText(x).includes(q)) : all.rows.slice(0, 30);
+    const chips = superAppCategories.slice(0, 12).map((cat) => chip(`${cat.icon} ${cat.title.replace(' / Restaurant', '').replace(' / Mobile', '')}`, `/category/${encodeURIComponent(cat.slug)}`)).join('');
     const cards = rows.map(merchantCard).join('');
-    res.send(page('GOVO Super App', `
-      <section class="card" style="background:linear-gradient(180deg,#102016,#111827)">
-        <span class="pill">GOVO Super App</span>
-        <h1>Find shops, services, delivery and local help</h1>
-        <p style="color:var(--muted);font-size:16px;line-height:1.55">Browse approved GOVO partners by category, search local products and services, then order or book directly.</p>
-        <form method="GET" action="/shops" style="margin-top:14px">
-          <input name="q" value="${esc(q)}" placeholder="Search food, medicine, phone, technician, location, shop name">
-          <button>Search GOVO</button>
-        </form>
+    res.send(page('GOVO Shops', `
+      <section class="card app-hero">
+        <span class="pill">GOVO Shops</span>
+        <h1>Shop, order and discover local partners</h1>
+        <p style="color:var(--muted);font-size:16px;line-height:1.55">Search approved GOVO merchants by shop, product, category, location or phone.</p>
+        <form method="GET" action="/shops" style="margin-top:14px"><input name="q" value="${esc(q)}" placeholder="Search food, grocery, medicine, phone, location"><button>Search Shops</button></form>
+        <div class="toolbar"><a class="btn secondary" href="/app">Home</a><a class="btn secondary" href="/services">Services</a><a class="btn secondary" href="/order">Order</a></div>
       </section>
-      <section class="card">
-        <h2>Explore Categories</h2>
-        <div class="item-grid">${categoryCards}</div>
-      </section>
-      <section class="card">
-        <div class="actions" style="justify-content:space-between"><h2>${q ? 'Search Results' : 'Featured Shops & Services'}</h2><span class="pill">${rows.length} showing</span></div>
-      </section>
-      <section class="cards">${cards || '<div class="card"><h2>No approved shop or service found</h2><p>Try another search or category.</p></div>'}</section>
+      <section class="card"><div class="section-head"><h2>Categories</h2><span class="pill">${superAppCategories.length}</span></div><div class="chips">${chips}</div></section>
+      <section class="card"><div class="section-head"><h2>${q ? 'Shop Search Results' : 'Featured Verified Shops'}</h2><span class="pill">${rows.length} showing</span></div></section>
+      <section class="cards">${cards || '<div class="card"><h2>No shop found</h2><p style="color:var(--muted)">Try another product, location, phone number or category.</p><div class="actions"><a class="btn" href="/shops">Clear Search</a><a class="btn secondary" href="/services">Browse Services</a></div></div>'}</section>
     `, 'shops'));
   } catch (e) { next(e); }
 });
@@ -922,12 +927,44 @@ function serviceCategoryMatches(x, cat) {
 }
 
 function providerCard(x) {
-  return `<div class="card">${listingImage(x.image_url, x.provider_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div><div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+  return `<div class="card">${listingImage(x.image_url, x.provider_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div><div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">View Service</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
 }
 
 async function approvedProviders() {
   return pool.query(`SELECT * FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 500`);
 }
+
+app.get('/app', async (req, res, next) => {
+  try {
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const [merchantResult, providerResult] = await Promise.all([approvedMerchants(), approvedProviders()]);
+    const merchants = merchantResult.rows;
+    const providers = providerResult.rows;
+    const matchedMerchants = q ? merchants.filter((x) => merchantSearchText(x).includes(q)).slice(0, 8) : merchants.filter((x) => boolish(x.is_verified) || boolish(x.is_trusted)).slice(0, 6);
+    const matchedProviders = q ? providers.filter((x) => providerSearchText(x).includes(q)).slice(0, 8) : providers.filter((x) => boolish(x.is_trusted) || boolish(x.is_verified)).slice(0, 6);
+    const emergencyProviders = providers.filter((x) => boolish(x.emergency_available) && boolish(x.is_available)).slice(0, 6);
+    const cats = ['food','grocery','pharmacy','electronics','fashion','agriculture','technician','home-service','doctor','transport','house-rent'].map((slug) => categoryForSlug(slug)).filter(Boolean);
+    const categoryGrid = cats.map((cat) => `<a class="card" style="text-decoration:none;padding:14px" href="/category/${encodeURIComponent(cat.slug)}"><div style="font-size:28px">${cat.icon}</div><h2 style="font-size:18px;margin:8px 0 4px">${esc(cat.title.replace(' / Restaurant','').replace(' / Mobile',''))}</h2><p style="color:var(--muted);margin:0;font-size:13px">${esc(cat.desc)}</p></a>`).join('');
+    res.send(page('GOVO Customer App', `
+      <section class="card app-hero">
+        <span class="pill">Meherpur Super App</span>
+        <h1>GOVO Express — Meherpur Super App</h1>
+        <p style="color:var(--muted);font-size:16px;line-height:1.55">Order food, find local shops, book services, request emergency help and track deliveries from one place.</p>
+        <form method="GET" action="/app" style="margin-top:14px"><input name="q" value="${esc(q)}" placeholder="Search shops, services, products, location"><button>Search GOVO</button></form>
+      </section>
+      <section class="card"><h2>Quick Actions</h2><div class="quick-grid">
+        <a class="btn" href="/shops">Shops</a><a class="btn" href="/services">Services</a><a class="btn secondary" href="/services?q=emergency">Emergency</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/order">Order</a><a class="btn secondary" href="/merchant">Join Merchant</a><a class="btn secondary" href="/provider">Join Provider</a><a class="btn secondary" href="/category/food">Food</a>
+      </div></section>
+      <section class="card"><div class="section-head"><h2>Explore GOVO</h2><span class="pill">Popular</span></div><div class="item-grid">${categoryGrid}</div></section>
+      <section class="card"><div class="section-head"><h2>${q ? 'Search Results: Shops' : 'Featured Verified Shops'}</h2><a class="btn secondary" href="/shops${q ? `?q=${encodeURIComponent(q)}` : ''}">View All</a></div></section>
+      <section class="cards">${matchedMerchants.map(compactMerchantCard).join('') || '<div class="card"><h2>No matching shop</h2><p style="color:var(--muted)">Try searching by product, shop, category or location.</p></div>'}</section>
+      <section class="card"><div class="section-head"><h2>${q ? 'Search Results: Services' : 'Featured Trusted Providers'}</h2><a class="btn secondary" href="/services${q ? `?q=${encodeURIComponent(q)}` : ''}">View All</a></div></section>
+      <section class="cards">${matchedProviders.map(compactProviderCard).join('') || '<div class="card"><h2>No matching service</h2><p style="color:var(--muted)">Try searching by service, area, provider name or phone.</p></div>'}</section>
+      <section class="card"><div class="section-head"><h2>Emergency Available Services</h2><a class="btn secondary" href="/services?q=emergency">View</a></div></section>
+      <section class="cards">${emergencyProviders.map(compactProviderCard).join('') || '<div class="card"><h2>No emergency provider online</h2><p style="color:var(--muted)">Call GOVO or browse all services.</p><a class="btn" href="/services">Browse Services</a></div>'}</section>
+    `, 'app'));
+  } catch (e) { next(e); }
+});
 
 app.all('/provider', imageUpload.single('provider_image'), async (req, res, next) => {
   try {
@@ -975,13 +1012,15 @@ app.get('/services', async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
     const all = await approvedProviders();
-    const rows = q ? all.rows.filter((x) => providerSearchText(x).includes(q)) : all.rows.slice(0, 24);
-    const categoryCards = serviceCategories.map((cat) => {
-      const count = all.rows.filter((x) => serviceCategoryMatches(x, cat)).length;
-      return `<div class="card" style="padding:15px"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div><div style="font-size:30px;line-height:1">${cat.icon}</div><h2 style="font-size:21px;margin:10px 0 6px">${esc(cat.title)}</h2></div><span class="pill">${count}</span></div><p style="color:var(--muted);min-height:42px">${esc(cat.desc)}</p><a class="btn" href="/services?q=${encodeURIComponent(cat.title)}">View</a></div>`;
-    }).join('');
+    let rows = q ? all.rows.filter((x) => providerSearchText(x).includes(q) || (q === 'emergency' && boolish(x.emergency_available))) : all.rows.slice(0, 30);
+    const chips = serviceCategories.map((cat) => chip(`${cat.icon} ${cat.title}`, `/services?q=${encodeURIComponent(cat.title)}`)).join('');
     const cards = rows.map(providerCard).join('');
-    res.send(page('GOVO Services', `<section class="card" style="background:linear-gradient(180deg,#102016,#111827)"><span class="pill">GOVO Services</span><h1>Book trusted local service providers</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Find approved providers for repair, health, agriculture, transport, rent and home service.</p><form method="GET" action="/services"><input name="q" value="${esc(q)}" placeholder="Search service, area, name, phone"><button>Search Services</button></form><div class="actions"><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/provider">Become Provider</a></div></section><section class="card"><h2>Service Categories</h2><div class="item-grid">${categoryCards}</div></section><section class="card"><div class="actions" style="justify-content:space-between"><h2>${q ? 'Search Results' : 'Featured Providers'}</h2><span class="pill">${rows.length} showing</span></div></section><section class="cards">${cards || '<div class="card"><h2>No approved provider found</h2></div>'}</section>`, 'services'));
+    res.send(page('GOVO Services', `
+      <section class="card app-hero"><span class="pill">GOVO Services</span><h1>Book trusted local service providers</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Find approved providers for repair, health, agriculture, transport, rent and home support.</p><form method="GET" action="/services"><input name="q" value="${esc(q)}" placeholder="Search service, area, name, phone"><button>Search Services</button></form><div class="toolbar"><a class="btn secondary" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/provider">Become Provider</a></div></section>
+      <section class="card"><div class="section-head"><h2>Service Categories</h2><span class="pill">${serviceCategories.length}</span></div><div class="chips">${chips}</div></section>
+      <section class="card"><div class="section-head"><h2>${q ? 'Service Search Results' : 'Featured Trusted Providers'}</h2><span class="pill">${rows.length} showing</span></div></section>
+      <section class="cards">${cards || '<div class="card"><h2>No service provider found</h2><p style="color:var(--muted)">Try another service, area, phone number or provider name.</p><div class="actions"><a class="btn" href="/services">Clear Search</a><a class="btn secondary" href="/shops">Browse Shops</a></div></div>'}</section>
+    `, 'services'));
   } catch (e) { next(e); }
 });
 
