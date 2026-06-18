@@ -2465,6 +2465,305 @@ app.get("/admin/orders", async (req,res)=>{
   }
 });
 
+
+/* GOVO RIDER DASHBOARD V2 START */
+
+async function govoEnsureRiderDashboardV2(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_rider_leads (
+      id SERIAL PRIMARY KEY,
+      rider_name TEXT,
+      phone TEXT,
+      location TEXT,
+      vehicle_type TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      merchant_note TEXT,
+      rider_id INT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS phone TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS location TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS vehicle_type TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_id INT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+async function govoRiderNotifyV2(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Rider notify skipped:", e.message);
+  }
+}
+
+app.all("/rider/dashboard", async (req,res)=>{
+  try {
+    await govoEnsureRiderDashboardV2();
+
+    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || "").trim();
+
+    if (!phone) {
+      return res.send(page("Rider Dashboard", `
+        <div class="card">
+          <h1>🛵 Rider Dashboard</h1>
+          <p>Assigned delivery order দেখতে rider phone দিন।</p>
+
+          <form method="GET" action="/rider/dashboard">
+            <label>Rider Phone</label>
+            <input name="phone" placeholder="018xxxxxxxx" required>
+            <button>Open Dashboard</button>
+          </form>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <a class="btn" href="/rider">🛵 Rider Registration</a>
+            <a class="btn" href="/track">🔎 Track Order</a>
+          </div>
+        </div>
+      `));
+    }
+
+    const rider = await pool.query(`
+      SELECT id, rider_name, phone, location, vehicle_type, COALESCE(status,'pending') AS status
+      FROM govo_rider_leads
+      WHERE phone=$1
+      ORDER BY id DESC
+      LIMIT 1
+    `, [phone]);
+
+    if (!rider.rows.length) {
+      return res.send(page("Rider Not Found", `
+        <div class="card">
+          <h1>Rider Not Found</h1>
+          <p>এই phone number দিয়ে rider পাওয়া যায়নি।</p>
+          <a class="btn" href="/rider">Register Rider</a>
+        </div>
+      `));
+    }
+
+    const rd = rider.rows[0];
+
+    if (req.method === "POST") {
+      const id = String(req.body.id || "");
+      const status = String(req.body.status || "picked_up");
+
+      const updated = await pool.query(`
+        UPDATE govo_orders
+        SET status=$1, updated_at=NOW()
+        WHERE id=$2 AND rider_phone=$3
+        RETURNING *
+      `, [status, id, phone]);
+
+      if (updated.rows.length) {
+        const x = updated.rows[0];
+        await govoRiderNotifyV2([
+          "🛵 GOVO Rider Update",
+          "",
+          `Order ID: #${x.id}`,
+          `Status: ${String(x.status || "").toUpperCase()}`,
+          `Rider: ${x.rider_name || ""}`,
+          `Shop: ${x.shop_name || ""}`,
+          `Customer: ${x.customer_name || ""}`,
+          `Drop: ${x.drop_location || ""}`,
+          `Item: ${x.item_details || ""}`
+        ].join("\n"));
+      }
+
+      return res.redirect("/rider/dashboard?phone=" + encodeURIComponent(phone));
+    }
+
+    const status = String((req.query && req.query.status) || "all").trim();
+    const q = String((req.query && req.query.q) || "").trim();
+
+    const conditions = ["rider_phone=$1"];
+    const params = [phone];
+
+    if (status && status !== "all") {
+      params.push(status);
+      conditions.push(`COALESCE(status,'pending')=$${params.length}`);
+    }
+
+    if (q) {
+      params.push("%" + q.toLowerCase() + "%");
+      conditions.push(`
+        LOWER(
+          COALESCE(shop_name,'') || ' ' ||
+          COALESCE(customer_name,'') || ' ' ||
+          COALESCE(customer_phone,'') || ' ' ||
+          COALESCE(pickup_location,'') || ' ' ||
+          COALESCE(drop_location,'') || ' ' ||
+          COALESCE(item_details,'')
+        ) LIKE $${params.length}
+      `);
+    }
+
+    const where = "WHERE " + conditions.join(" AND ");
+
+    const orders = await pool.query(`
+      SELECT *
+      FROM govo_orders
+      ${where}
+      ORDER BY id DESC
+      LIMIT 100
+    `, params);
+
+    const counts = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='assigned')::int AS assigned,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='picked_up')::int AS picked_up,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int AS delivered,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='failed')::int AS failed
+      FROM govo_orders
+      WHERE rider_phone=$1
+    `, [phone]);
+
+    const c = counts.rows[0] || {};
+
+    const link = (label, st, active) => {
+      const sp = new URLSearchParams({ phone });
+      if (st && st !== "all") sp.set("status", st);
+      return `<a class="${active ? "active" : ""}" href="/rider/dashboard?${sp.toString()}">${label}</a>`;
+    };
+
+    const cards = orders.rows.map(x=>`
+      <div class="card govo-rider-card">
+        <div class="govo-rider-head">
+          <div>
+            <span class="govo-chip">#${esc(String(x.id))}</span>
+            <h2>${esc(String(x.shop_name || "Order"))}</h2>
+            <small>${esc(String(x.customer_name || ""))} — ${esc(String(x.customer_phone || ""))}</small>
+          </div>
+          <span class="govo-status">${esc(String(x.status || "pending"))}</span>
+        </div>
+
+        <div class="govo-rider-grid">
+          <div><b>Pickup</b><span>${esc(String(x.pickup_location || ""))}</span></div>
+          <div><b>Drop</b><span>${esc(String(x.drop_location || ""))}</span></div>
+          <div><b>Item</b><span>${esc(String(x.item_details || ""))}</span></div>
+          <div><b>Customer Note</b><span>${esc(String(x.note || "No note"))}</span></div>
+          <div><b>Admin Note</b><span>${esc(String(x.admin_note || "No note"))}</span></div>
+          <div><b>Merchant Note</b><span>${esc(String(x.merchant_note || "No note"))}</span></div>
+        </div>
+
+        <form method="POST" action="/rider/dashboard" class="govo-rider-form">
+          <input type="hidden" name="phone" value="${esc(phone)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <div class="govo-rider-buttons">
+            <button name="status" value="picked_up">📦 Picked Up</button>
+            <button name="status" value="delivered">🏁 Delivered</button>
+            <button name="status" value="failed">⚠️ Failed</button>
+          </div>
+        </form>
+      </div>
+    `).join("");
+
+    return res.send(page("Rider Dashboard", `
+      <style>
+        .govo-rider-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+        .govo-rider-nav a{font-size:13px!important;padding:9px 11px!important;border-radius:999px;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:900;color:#bbf7d0!important;background:rgba(34,197,94,.06)}
+        .govo-rider-nav a.active{background:#22c55e!important;color:#052e16!important}
+        .govo-rider-search{display:grid;gap:8px;margin-top:12px}
+        .govo-rider-search input{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-rider-search button{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-rider-card{margin-top:14px!important;padding:16px!important}
+        .govo-rider-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-rider-head h2{font-size:22px!important;line-height:1.15!important;margin:10px 0 4px!important;color:#22c55e!important}
+        .govo-rider-head small{font-size:13px!important;color:#cbd5e1!important}
+        .govo-chip,.govo-status{display:inline-flex;padding:5px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900;text-transform:capitalize}
+        .govo-rider-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+        .govo-rider-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px}
+        .govo-rider-grid b{display:block;font-size:13px!important;margin-bottom:5px}
+        .govo-rider-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word}
+        .govo-rider-form{display:grid;gap:8px;margin-top:10px}
+        .govo-rider-form button{font-size:14px!important;padding:10px!important;border-radius:12px!important}
+        .govo-rider-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+        @media(max-width:700px){
+          .govo-rider-grid{grid-template-columns:1fr}
+          .govo-rider-buttons{grid-template-columns:1fr}
+          .govo-rider-head{flex-direction:column}
+        }
+      </style>
+
+      <div class="card">
+        <h1>🛵 Rider Dashboard</h1>
+        <p><b>Rider:</b> ${esc(String(rd.rider_name || ""))}</p>
+        <p><b>Phone:</b> ${esc(String(rd.phone || ""))}</p>
+        <p><b>Status:</b> ${esc(String(rd.status || ""))}</p>
+
+        <div class="govo-rider-nav">
+          ${link("All " + (c.total || 0), "all", status==="all")}
+          ${link("Assigned " + (c.assigned || 0), "assigned", status==="assigned")}
+          ${link("Picked Up " + (c.picked_up || 0), "picked_up", status==="picked_up")}
+          ${link("Delivered " + (c.delivered || 0), "delivered", status==="delivered")}
+          ${link("Failed " + (c.failed || 0), "failed", status==="failed")}
+        </div>
+
+        <form method="GET" action="/rider/dashboard" class="govo-rider-search">
+          <input type="hidden" name="phone" value="${esc(phone)}">
+          <input name="q" value="${esc(q)}" placeholder="Search order, customer, phone, drop, item">
+          <button>🔎 Search</button>
+        </form>
+
+        <div class="govo-rider-nav">
+          <a href="/rider">Rider Registration</a>
+          <a href="/track">Track Order</a>
+          <a href="https://govoexpress.com">Main Website</a>
+        </div>
+      </div>
+
+      ${cards || `<div class="card"><h2>No assigned orders found</h2><p>Admin order assign করলে এখানে দেখাবে।</p></div>`}
+    `));
+  } catch(e) {
+    console.log("Rider dashboard v2 error:", e.message);
+    return res.status(500).send(page("Rider Dashboard Error", `<div class="card"><h1>Rider Dashboard Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO RIDER DASHBOARD V2 END */
+
+
 app.all("/rider/dashboard", async (req,res)=>{
   try {
     await govoEnsureRiderAssignTables();
