@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const multer = require('multer');
 const { Pool } = require('pg');
 
 loadEnv();
@@ -15,6 +16,32 @@ app.use(express.json());
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_PIN = String(process.env.ADMIN_PIN || process.env.GOVO_ADMIN_PIN || process.env.PIN || '').trim();
 const pool = new Pool(pgConfig());
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOAD_DIR, { fallthrough: false, maxAge: '7d' }));
+
+
+const productUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(String(file.originalname || '')).toLowerCase();
+      const safeExt = ALLOWED_IMAGE_EXTS.has(ext) ? ext : '.bin';
+      const name = `product-${Date.now()}-${Math.random().toString(16).slice(2)}${safeExt}`;
+      cb(null, name);
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(String(file.originalname || '')).toLowerCase();
+    if (!ALLOWED_IMAGE_EXTS.has(ext) || !ALLOWED_IMAGE_MIMES.has(String(file.mimetype || '').toLowerCase())) {
+      return cb(new Error('Only jpg, jpeg, png, webp, and gif images up to 3MB are allowed.'));
+    }
+    cb(null, true);
+  },
+});
 
 function loadEnv() {
   try {
@@ -490,7 +517,7 @@ app.get('/merchant/item/:id/delete', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-app.all('/merchant/products', async (req, res, next) => {
+app.all('/merchant/products', productUpload.single('product_image'), async (req, res, next) => {
   try {
     const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
     if (!phone) return res.send(page('Merchant Products', `<section class="card"><h1>Product / Menu Manager</h1><form method="GET" action="/merchant/products"><label>Merchant Phone</label><input name="phone" required><button>Open Product Manager</button></form></section>`, 'merchant'));
@@ -499,13 +526,18 @@ app.all('/merchant/products', async (req, res, next) => {
     const m = merchant.rows[0];
     const selectedFilter = String((req.body && req.body.filter) || (req.query && req.query.filter) || 'all').trim().toLowerCase();
     const redirect = () => res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}&filter=${encodeURIComponent(selectedFilter)}`);
+    const uploadedImageUrl = req.file ? `/uploads/${req.file.filename}` : '';
 
     if (req.method === 'POST' && req.body.action === 'add') {
-      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available, is_deleted, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,false,NOW())`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '']);
+      const imageUrl = uploadedImageUrl || String(req.body.image_url || '').trim();
+      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available, is_deleted, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,false,NOW())`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', imageUrl]);
       return redirect();
     }
     if (req.method === 'POST' && req.body.action === 'edit') {
-      await pool.query(`UPDATE govo_shop_products SET product_name=$1, price=$2, category=$3, description=$4, image_url=$5, shop_name=$6, merchant_lead_id=$7, updated_at=NOW() WHERE id=$8 AND merchant_phone=$9 AND COALESCE(is_deleted,false)=false`, [req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '', m.shop_name || '', m.id, req.body.id || '', phone]);
+      const current = await pool.query(`SELECT image_url FROM govo_shop_products WHERE id=$1 AND merchant_phone=$2 AND COALESCE(is_deleted,false)=false LIMIT 1`, [req.body.id || '', phone]);
+      const currentImageUrl = current.rows[0] ? String(current.rows[0].image_url || '') : '';
+      const imageUrl = uploadedImageUrl || String(req.body.image_url || currentImageUrl || '').trim();
+      await pool.query(`UPDATE govo_shop_products SET product_name=$1, price=$2, category=$3, description=$4, image_url=$5, shop_name=$6, merchant_lead_id=$7, updated_at=NOW() WHERE id=$8 AND merchant_phone=$9 AND COALESCE(is_deleted,false)=false`, [req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', imageUrl, m.shop_name || '', m.id, req.body.id || '', phone]);
       return redirect();
     }
     if (req.method === 'POST' && req.body.action === 'toggle') {
@@ -537,7 +569,7 @@ app.all('/merchant/products', async (req, res, next) => {
         </div>
         <p>${esc(x.description || '')}</p>
         ${badge(x.is_available ? 'available' : 'unavailable')}
-        <form method="POST" action="/merchant/products" style="margin-top:12px">
+        <form method="POST" action="/merchant/products" enctype="multipart/form-data" style="margin-top:12px">
           <input type="hidden" name="phone" value="${esc(phone)}">
           <input type="hidden" name="filter" value="${esc(filter)}">
           <input type="hidden" name="id" value="${esc(x.id)}">
@@ -546,7 +578,8 @@ app.all('/merchant/products', async (req, res, next) => {
           <label>Price</label><input name="price" value="${esc(x.price || '')}">
           <label>Category</label><input name="category" value="${esc(x.category || '')}">
           <label>Description</label><textarea name="description">${esc(x.description || '')}</textarea>
-          <label>Image URL</label><input name="image_url" value="${esc(x.image_url || '')}">
+          <label>Current Image URL</label><input name="image_url" value="${esc(x.image_url || '')}" placeholder="Existing URL kept if no upload">
+          <label>Upload New Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif">
           <button>Save Product</button>
         </form>
         <div class="actions">
@@ -565,7 +598,7 @@ app.all('/merchant/products', async (req, res, next) => {
           ${filterLink(`Unavailable ${c.unavailable || 0}`, 'unavailable')}
           <a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Shop</a>
         </div>
-        <form method="POST" action="/merchant/products">
+        <form method="POST" action="/merchant/products" enctype="multipart/form-data">
           <input type="hidden" name="phone" value="${esc(phone)}">
           <input type="hidden" name="filter" value="${esc(filter)}">
           <input type="hidden" name="action" value="add">
@@ -573,7 +606,8 @@ app.all('/merchant/products', async (req, res, next) => {
           <label>Price</label><input name="price" placeholder="৳120 / Negotiable">
           <label>Category</label><input name="category" placeholder="Food / Grocery / Service">
           <label>Description</label><textarea name="description"></textarea>
-          <label>Image URL</label><input name="image_url" placeholder="https://...">
+          <label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif">
+          <label>Image URL</label><input name="image_url" placeholder="Optional legacy URL">
           <button>Add Product</button>
         </form>
       </section>
