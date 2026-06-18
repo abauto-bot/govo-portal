@@ -1317,6 +1317,228 @@ function govoAdminOrdersPinLoginMobile(res, msg){
 
 /* GOVO ADMIN ORDERS COMPACT UI START */
 
+
+/* GOVO MERCHANT ORDERS V1 START */
+
+async function govoEnsureMerchantOrdersV1(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      merchant_note TEXT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+async function govoMerchantNotifyV1(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Merchant order notify skipped:", e.message);
+  }
+}
+
+app.all("/merchant/orders", async (req,res)=>{
+  try {
+    await govoEnsureMerchantOrdersV1();
+
+    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || "").trim();
+
+    if (!phone) {
+      return res.send(page("Merchant Orders", `
+        <div class="card">
+          <h1>📦 Merchant Orders</h1>
+          <p>নিজের দোকানের order দেখতে merchant phone দিন।</p>
+
+          <form method="GET" action="/merchant/orders">
+            <label>Merchant Phone</label>
+            <input name="phone" placeholder="017xxxxxxxx" required>
+            <button>Open Orders</button>
+          </form>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <a class="btn" href="/merchant/dashboard">Merchant Dashboard</a>
+            <a class="btn" href="/shops">View Shops</a>
+          </div>
+        </div>
+      `));
+    }
+
+    const merchant = await pool.query(`
+      SELECT id, shop_name, owner_name, phone, whatsapp, location, shop_address, COALESCE(status,'pending') AS status
+      FROM govo_merchant_leads
+      WHERE phone=$1 OR whatsapp=$1
+      ORDER BY id DESC
+      LIMIT 1
+    `, [phone]);
+
+    if (!merchant.rows.length) {
+      return res.send(page("Merchant Not Found", `
+        <div class="card">
+          <h1>Merchant Not Found</h1>
+          <p>এই phone number দিয়ে merchant পাওয়া যায়নি।</p>
+          <a class="btn" href="/merchant">Register Merchant</a>
+        </div>
+      `));
+    }
+
+    const m = merchant.rows[0];
+
+    if (req.method === "POST") {
+      const id = String(req.body.id || "");
+      const status = String(req.body.status || "merchant_confirmed");
+      const merchant_note = String(req.body.merchant_note || "");
+
+      const updated = await pool.query(`
+        UPDATE govo_orders
+        SET status=$1, merchant_note=$2, updated_at=NOW()
+        WHERE id=$3
+          AND (
+            merchant_phone=$4
+            OR merchant_phone=$5
+            OR shop_name=$6
+          )
+        RETURNING *
+      `, [status, merchant_note, id, m.phone || "", m.whatsapp || "", m.shop_name || ""]);
+
+      if (updated.rows.length) {
+        const x = updated.rows[0];
+        await govoMerchantNotifyV1([
+          "🏪 GOVO Merchant Order Update",
+          "",
+          `Order ID: #${x.id}`,
+          `Shop: ${x.shop_name || ""}`,
+          `Status: ${String(x.status || "").toUpperCase()}`,
+          `Merchant Note: ${x.merchant_note || "N/A"}`,
+          `Customer: ${x.customer_name || ""}`,
+          `Drop: ${x.drop_location || ""}`,
+          `Item: ${x.item_details || ""}`
+        ].join("\n"));
+      }
+
+      return res.redirect("/merchant/orders?phone=" + encodeURIComponent(phone));
+    }
+
+    const orders = await pool.query(`
+      SELECT *
+      FROM govo_orders
+      WHERE merchant_phone=$1
+         OR merchant_phone=$2
+         OR shop_name=$3
+      ORDER BY id DESC
+      LIMIT 100
+    `, [m.phone || "", m.whatsapp || "", m.shop_name || ""]);
+
+    const cards = orders.rows.map(x=>`
+      <div class="card govo-merchant-order-card">
+        <div class="govo-mo-head">
+          <div>
+            <span class="govo-mo-chip">#${esc(String(x.id))}</span>
+            <h2>${esc(String(x.customer_name || "Customer"))}</h2>
+            <small>${esc(String(x.customer_phone || ""))}</small>
+          </div>
+          <span class="govo-mo-status">${esc(String(x.status || "pending"))}</span>
+        </div>
+
+        <div class="govo-mo-grid">
+          <div><b>Pickup</b><span>${esc(String(x.pickup_location || ""))}</span></div>
+          <div><b>Drop</b><span>${esc(String(x.drop_location || ""))}</span></div>
+          <div><b>Item</b><span>${esc(String(x.item_details || ""))}</span></div>
+          <div><b>Customer Note</b><span>${esc(String(x.note || "No note"))}</span></div>
+          <div><b>Admin Note</b><span>${esc(String(x.admin_note || "No note"))}</span></div>
+          <div><b>Rider</b><span>${esc(String(x.rider_name || "Not assigned"))}</span><small>${esc(String(x.rider_phone || ""))}</small></div>
+        </div>
+
+        <form method="POST" action="/merchant/orders" class="govo-mo-form">
+          <input type="hidden" name="phone" value="${esc(phone)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input name="merchant_note" placeholder="Merchant note">
+          <div class="govo-mo-buttons">
+            <button name="status" value="merchant_confirmed">Confirm</button>
+            <button name="status" value="preparing">Preparing</button>
+            <button name="status" value="ready">Ready</button>
+          </div>
+        </form>
+      </div>
+    `).join("");
+
+    return res.send(page("Merchant Orders", `
+      <style>
+        .govo-mo-nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+        .govo-mo-nav a{font-size:13px!important;padding:9px 11px!important;border-radius:13px!important;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:800;color:#bbf7d0!important}
+        .govo-merchant-order-card{margin-top:14px!important;padding:16px!important}
+        .govo-mo-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-mo-head h2{font-size:22px!important;line-height:1.15!important;margin:10px 0 4px!important;color:#22c55e!important}
+        .govo-mo-head small{font-size:13px!important;color:#cbd5e1!important}
+        .govo-mo-chip,.govo-mo-status{display:inline-flex;padding:5px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900;text-transform:capitalize}
+        .govo-mo-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+        .govo-mo-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}
+        .govo-mo-grid b{display:block;font-size:13px!important;margin-bottom:5px}
+        .govo-mo-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word}
+        .govo-mo-grid small{display:block;font-size:12px!important;margin-top:3px}
+        .govo-mo-form{display:grid;gap:8px;margin-top:10px}
+        .govo-mo-form input{font-size:14px!important;padding:10px!important;border-radius:12px!important;width:100%!important}
+        .govo-mo-form button{font-size:14px!important;padding:10px!important;border-radius:12px!important}
+        .govo-mo-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+        @media(max-width:700px){
+          .govo-mo-grid{grid-template-columns:1fr}
+          .govo-mo-buttons{grid-template-columns:1fr}
+          .govo-mo-head{flex-direction:column}
+        }
+      </style>
+
+      <div class="card">
+        <h1>📦 Merchant Orders</h1>
+        <p><b>Shop:</b> ${esc(String(m.shop_name || ""))}</p>
+        <p><b>Merchant:</b> ${esc(String(m.owner_name || ""))} — ${esc(String(m.phone || ""))}</p>
+
+        <div class="govo-mo-nav">
+          <a href="/merchant/dashboard?phone=${encodeURIComponent(phone)}">Dashboard</a>
+          <a href="/merchant/products?phone=${encodeURIComponent(phone)}">Products/Menu</a>
+          <a href="/shop/${encodeURIComponent(String(m.id))}">View Shop</a>
+          <a href="/shops">All Shops</a>
+        </div>
+      </div>
+
+      ${cards || `<div class="card"><h2>No orders yet</h2><p>Customer order korle ekhane show korbe.</p></div>`}
+    `));
+  } catch(e) {
+    console.log("Merchant orders error:", e.message);
+    return res.status(500).send(page("Merchant Orders Error", `<div class="card"><h1>Merchant Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO MERCHANT ORDERS V1 END */
+
+
 app.get("/admin/orders", async (req,res)=>{
   try {
     const pin = String((req.query && req.query.pin) || "").trim();
