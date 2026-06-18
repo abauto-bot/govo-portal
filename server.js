@@ -1314,6 +1314,149 @@ function govoAdminOrdersPinLoginMobile(res, msg){
   `));
 }
 
+
+/* GOVO ADMIN ORDERS COMPACT UI START */
+
+app.get("/admin/orders", async (req,res)=>{
+  try {
+    const pin = String((req.query && req.query.pin) || "").trim();
+    const real = String(process.env.ADMIN_PIN || "").trim();
+
+    if (!pin || !real || pin !== real) {
+      return res.send(page("Admin PIN Login", `
+        <div class="card govo-compact-wrap">
+          <h1>🔐 Admin PIN</h1>
+          <p>Admin orders দেখতে PIN দিন.</p>
+          <form method="GET" action="/admin/orders">
+            <input name="pin" placeholder="Enter admin PIN" required>
+            <button>Open Orders</button>
+          </form>
+        </div>
+      `));
+    }
+
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_id INT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+    await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+
+    const orders = await pool.query(`
+      SELECT id, shop_name, merchant_phone, customer_name, customer_phone,
+             pickup_location, drop_location, item_details, note,
+             COALESCE(status,'pending') AS status,
+             admin_note, rider_name, rider_phone, created_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riders = await pool.query(`
+      SELECT id, rider_name, phone
+      FROM govo_rider_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riderOptions = riders.rows.map(r=>`
+      <option value="${esc(String(r.id))}">${esc(String(r.rider_name || ""))} — ${esc(String(r.phone || ""))}</option>
+    `).join("");
+
+    const cards = orders.rows.map(x=>`
+      <div class="card govo-order-compact-card">
+        <div class="govo-order-head">
+          <div>
+            <span class="govo-chip">#${esc(String(x.id))}</span>
+            <h2>${esc(String(x.shop_name || "Unknown Shop"))}</h2>
+            <small>${esc(String(x.merchant_phone || ""))}</small>
+          </div>
+          <span class="govo-status-chip">${esc(String(x.status || "pending"))}</span>
+        </div>
+
+        <div class="govo-mini-grid">
+          <div><b>Customer</b><span>${esc(String(x.customer_name || ""))}</span><small>${esc(String(x.customer_phone || ""))}</small></div>
+          <div><b>Pickup</b><span>${esc(String(x.pickup_location || ""))}</span></div>
+          <div><b>Drop</b><span>${esc(String(x.drop_location || ""))}</span></div>
+          <div><b>Item</b><span>${esc(String(x.item_details || ""))}</span></div>
+          <div><b>Rider</b><span>${esc(String(x.rider_name || "Not assigned"))}</span><small>${esc(String(x.rider_phone || ""))}</small></div>
+          <div><b>Note</b><span>${esc(String(x.note || "No note"))}</span></div>
+        </div>
+
+        <form method="POST" action="/admin/order/assign" class="govo-compact-form">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="order_id" value="${esc(String(x.id))}">
+          <select name="rider_id" required>
+            <option value="">Select Rider</option>
+            ${riderOptions}
+          </select>
+          <button>🛵 Assign Rider</button>
+        </form>
+
+        <form method="POST" action="/admin/order/status" class="govo-compact-form">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input name="admin_note" placeholder="Admin note">
+          <div class="govo-compact-buttons">
+            <button name="status" value="accepted">Accept</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="delivered">Delivered</button>
+          </div>
+        </form>
+      </div>
+    `).join("");
+
+    return res.send(page("Admin Orders", `
+      <style>
+        .govo-compact-wrap h1{font-size:32px!important;line-height:1.1!important;margin:0 0 10px!important}
+        .govo-compact-wrap p{font-size:15px!important;line-height:1.5!important;margin:0 0 14px!important}
+        .govo-compact-nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+        .govo-compact-nav a{font-size:13px!important;padding:9px 11px!important;border-radius:13px!important;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:800;color:#bbf7d0!important}
+        .govo-order-compact-card{margin-top:14px!important;padding:16px!important}
+        .govo-order-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-order-head h2{font-size:22px!important;line-height:1.15!important;margin:10px 0 4px!important;color:#22c55e!important}
+        .govo-order-head small{font-size:13px!important;color:#cbd5e1!important}
+        .govo-chip,.govo-status-chip{display:inline-flex;padding:5px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900;text-transform:capitalize}
+        .govo-mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+        .govo-mini-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}
+        .govo-mini-grid b{display:block;font-size:13px!important;color:#e5e7eb!important;margin-bottom:5px}
+        .govo-mini-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word;color:#f8fafc!important}
+        .govo-mini-grid small{display:block;font-size:12px!important;line-height:1.3!important;color:#cbd5e1!important;margin-top:3px}
+        .govo-compact-form{display:grid;gap:8px;margin-top:10px}
+        .govo-compact-form input,.govo-compact-form select{font-size:14px!important;padding:10px!important;border-radius:12px!important;width:100%!important}
+        .govo-compact-form button{font-size:14px!important;padding:10px!important;border-radius:12px!important}
+        .govo-compact-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+        @media(max-width:700px){
+          .card.govo-compact-wrap{padding:18px!important}
+          .govo-compact-wrap h1{font-size:30px!important}
+          .govo-mini-grid{grid-template-columns:1fr}
+          .govo-compact-buttons{grid-template-columns:1fr}
+          .govo-order-head{flex-direction:column}
+        }
+      </style>
+
+      <div class="card govo-compact-wrap">
+        <h1>📦 Admin Orders</h1>
+        <p>Orders manage, rider assign, status update.</p>
+        <div class="govo-compact-nav">
+          <a href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a>
+          <a href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchant Leads</a>
+          <a href="/admin/riders?pin=${encodeURIComponent(pin)}">Rider Leads</a>
+          <a href="/rider/dashboard">Rider Dashboard</a>
+        </div>
+      </div>
+
+      ${cards || `<div class="card govo-order-compact-card"><h2>No orders found</h2></div>`}
+    `));
+  } catch(e) {
+    return res.status(500).send(page("Admin Orders Error", `<div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN ORDERS COMPACT UI END */
+
+
 app.get("/admin/orders", async (req,res)=>{
   try {
     const pin = String((req.query && req.query.pin) || "").trim();
