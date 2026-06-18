@@ -2931,6 +2931,229 @@ app.get("/shops", async (req,res)=>{
 /* GOVO SAFE SHOPS CARD V2 END */
 
 
+
+/* GOVO ADMIN OS DASHBOARD V2 START */
+
+async function govoEnsureAdminOsDashboardV2(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      merchant_note TEXT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_merchant_leads (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      owner_name TEXT,
+      phone TEXT,
+      location TEXT,
+      category TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_rider_leads (
+      id SERIAL PRIMARY KEY,
+      rider_name TEXT,
+      phone TEXT,
+      location TEXT,
+      vehicle_type TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+}
+
+function govoAdminOsLoginV2(res, msg){
+  return res.send(page("Admin OS Login", `
+    <div class="card">
+      <h1>🔐 Admin OS Login</h1>
+      <p>${esc(String(msg || "Admin dashboard খুলতে PIN দিন."))}</p>
+      <form method="GET" action="/admin/os">
+        <label>Admin PIN</label>
+        <input name="pin" placeholder="Enter admin PIN" required>
+        <button>Open Admin OS</button>
+      </form>
+    </div>
+  `));
+}
+
+app.get("/admin/os", async (req,res)=>{
+  try {
+    const pin = String((req.query && req.query.pin) || "").trim();
+    const real = String(process.env.ADMIN_PIN || "").trim();
+
+    if (!pin) return govoAdminOsLoginV2(res, "PIN missing. Admin OS খুলতে PIN দিন.");
+    if (!real || pin !== real) return govoAdminOsLoginV2(res, "Wrong PIN. আবার সঠিক PIN দিন.");
+
+    await govoEnsureAdminOsDashboardV2();
+
+    const orderStats = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int AS pending,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='accepted')::int AS accepted,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='assigned')::int AS assigned,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='picked_up')::int AS picked_up,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int AS delivered,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int AS rejected,
+        COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int AS today
+      FROM govo_orders
+    `);
+
+    const merchantStats = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int AS approved,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int AS pending
+      FROM govo_merchant_leads
+    `);
+
+    const riderStats = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int AS approved,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int AS pending
+      FROM govo_rider_leads
+    `);
+
+    const recent = await pool.query(`
+      SELECT id, shop_name, customer_name, customer_phone, drop_location,
+             item_details, COALESCE(status,'pending') AS status, rider_name, created_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 8
+    `);
+
+    const o = orderStats.rows[0] || {};
+    const m = merchantStats.rows[0] || {};
+    const r = riderStats.rows[0] || {};
+
+    const statCard = (title, value, sub) => `
+      <div class="govo-stat-card">
+        <small>${esc(title)}</small>
+        <b>${esc(String(value || 0))}</b>
+        <span>${esc(sub || "")}</span>
+      </div>
+    `;
+
+    const recentRows = recent.rows.map(x=>`
+      <div class="govo-recent-order">
+        <div>
+          <b>#${esc(String(x.id))} — ${esc(String(x.shop_name || ""))}</b>
+          <small>${esc(String(x.customer_name || ""))} • ${esc(String(x.customer_phone || ""))}</small>
+          <small>Drop: ${esc(String(x.drop_location || ""))}</small>
+        </div>
+        <span>${esc(String(x.status || "pending"))}</span>
+      </div>
+    `).join("");
+
+    return res.send(page("Admin OS", `
+      <style>
+        .govo-os-head h1{font-size:34px!important;margin:0 0 8px!important;color:#22c55e!important}
+        .govo-os-head p{font-size:15px!important;line-height:1.45!important}
+        .govo-os-nav{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:16px}
+        .govo-os-nav a{padding:12px;border-radius:15px;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:900;text-align:center;color:#bbf7d0!important;background:rgba(34,197,94,.06)}
+        .govo-stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+        .govo-stat-card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:14px}
+        .govo-stat-card small{display:block;font-size:12px!important;color:#cbd5e1!important}
+        .govo-stat-card b{display:block;font-size:28px!important;color:#22c55e!important;margin:5px 0}
+        .govo-stat-card span{font-size:12px!important;color:#cbd5e1!important}
+        .govo-recent-order{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:15px;padding:12px;margin-top:10px}
+        .govo-recent-order b{display:block;font-size:14px!important;color:#f8fafc!important}
+        .govo-recent-order small{display:block;font-size:12px!important;color:#cbd5e1!important;margin-top:3px}
+        .govo-recent-order span{font-size:12px!important;font-weight:900;color:#bbf7d0;background:#052e16;border:1px solid #22c55e;border-radius:999px;padding:5px 9px;text-transform:capitalize}
+        @media(max-width:700px){
+          .govo-stat-grid{grid-template-columns:1fr 1fr}
+          .govo-os-nav{grid-template-columns:1fr}
+        }
+      </style>
+
+      <div class="card govo-os-head">
+        <h1>⚙️ GOVO Admin OS</h1>
+        <p>Business control center — orders, merchants, riders, tracking এক জায়গায়.</p>
+
+        <div class="govo-os-nav">
+          <a href="/admin/orders?pin=${encodeURIComponent(pin)}">📦 Orders</a>
+          <a href="/admin/leads?pin=${encodeURIComponent(pin)}">🏪 Merchants</a>
+          <a href="/admin/riders?pin=${encodeURIComponent(pin)}">🛵 Riders</a>
+          <a href="/shops">👁️ Customer Shops</a>
+          <a href="/track">🔎 Track Order</a>
+          <a href="https://govoexpress.com">🏠 Main Website</a>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>📊 Orders Overview</h2>
+        <div class="govo-stat-grid">
+          ${statCard("Total Orders", o.total, "All time")}
+          ${statCard("Today Orders", o.today, "Current day")}
+          ${statCard("Pending", o.pending, "Need action")}
+          ${statCard("Accepted", o.accepted, "Admin accepted")}
+          ${statCard("Assigned", o.assigned, "Rider assigned")}
+          ${statCard("Picked Up", o.picked_up, "On delivery")}
+          ${statCard("Delivered", o.delivered, "Completed")}
+          ${statCard("Rejected", o.rejected, "Cancelled")}
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>🏪 Merchant / 🛵 Rider</h2>
+        <div class="govo-stat-grid">
+          ${statCard("Total Merchants", m.total, "All merchant leads")}
+          ${statCard("Approved Merchants", m.approved, "Visible in shops")}
+          ${statCard("Pending Merchants", m.pending, "Need approval")}
+          ${statCard("Total Riders", r.total, "All rider leads")}
+          ${statCard("Approved Riders", r.approved, "Can assign orders")}
+          ${statCard("Pending Riders", r.pending, "Need approval")}
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>🕒 Recent Orders</h2>
+        ${recentRows || `<p>No recent orders.</p>`}
+      </div>
+    `));
+  } catch(e) {
+    console.log("Admin OS dashboard v2 error:", e.message);
+    return res.status(500).send(page("Admin OS Error", `<div class="card"><h1>Admin OS Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN OS DASHBOARD V2 END */
+
+
 app.get("/admin/os", (req,res)=>{
   const pin = encodeURIComponent((req.query && req.query.pin) || process.env.ADMIN_PIN || "");
   res.send(page("GOVO Admin OS", `
