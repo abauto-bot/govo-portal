@@ -529,6 +529,181 @@ app.all("/merchant/dashboard", async (req,res)=>{
 
 
 /* GOVO SAFE SHOPS CARD V2 START */
+
+/* GOVO SAFE ORDER FLOW FINAL START */
+
+async function govoEnsureOrdersTable(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS shop_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS pickup_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS drop_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS item_details TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+}
+
+async function govoOrderNotify(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Order Telegram notify skipped:", e.message);
+  }
+}
+
+app.all("/order", async (req,res)=>{
+  try {
+    await govoEnsureOrdersTable();
+
+    if (req.method === "POST") {
+      const shop_name = String(req.body.shop_name || "");
+      const merchant_phone = String(req.body.merchant_phone || "");
+      const customer_name = String(req.body.customer_name || "");
+      const customer_phone = String(req.body.customer_phone || "");
+      const pickup_location = String(req.body.pickup_location || "");
+      const drop_location = String(req.body.drop_location || "");
+      const item_details = String(req.body.item_details || "");
+      const note = String(req.body.note || "");
+
+      const out = await pool.query(`
+        INSERT INTO govo_orders
+          (shop_name, merchant_phone, customer_name, customer_phone, pickup_location, drop_location, item_details, note, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending')
+        RETURNING id
+      `, [shop_name, merchant_phone, customer_name, customer_phone, pickup_location, drop_location, item_details, note]);
+
+      const orderId = out.rows[0].id;
+
+      await govoOrderNotify([
+        "📦 New GOVO Order",
+        "",
+        `Order ID: #${orderId}`,
+        `Shop: ${shop_name || "N/A"}`,
+        `Merchant Phone: ${merchant_phone || "N/A"}`,
+        `Customer: ${customer_name || "N/A"}`,
+        `Customer Phone: ${customer_phone || "N/A"}`,
+        `Pickup: ${pickup_location || "N/A"}`,
+        `Drop: ${drop_location || "N/A"}`,
+        `Item: ${item_details || "N/A"}`,
+        `Note: ${note || "N/A"}`,
+        `Time: ${new Date().toLocaleString("en-GB", {timeZone:"Asia/Dhaka"})}`
+      ].join("\n"));
+
+      return res.redirect("/order/success?id=" + encodeURIComponent(orderId));
+    }
+
+    const shop = String((req.query && req.query.shop) || "");
+    let merchantPhone = "";
+    let pickup = "";
+
+    if (shop) {
+      const r = await pool.query(`
+        SELECT shop_name, phone, whatsapp, location, shop_address
+        FROM govo_merchant_leads
+        WHERE shop_name=$1
+        ORDER BY id DESC
+        LIMIT 1
+      `, [shop]);
+
+      if (r.rows.length) {
+        merchantPhone = String(r.rows[0].whatsapp || r.rows[0].phone || "");
+        pickup = String(r.rows[0].shop_address || r.rows[0].location || "");
+      }
+    }
+
+    return res.send(page("Delivery Book", `
+      <div class="card">
+        <h1>📦 Delivery Book</h1>
+        <p>Customer order information din. Submit korle admin orders e chole jabe.</p>
+
+        <form method="POST" action="/order">
+          <label>Shop Name</label>
+          <input name="shop_name" value="${esc(shop)}" placeholder="Shop name" required>
+
+          <label>Merchant Phone</label>
+          <input name="merchant_phone" value="${esc(merchantPhone)}" placeholder="Merchant phone">
+
+          <label>Customer Name</label>
+          <input name="customer_name" placeholder="Customer name" required>
+
+          <label>Customer Phone</label>
+          <input name="customer_phone" placeholder="017xxxxxxxx" required>
+
+          <label>Pickup Location</label>
+          <input name="pickup_location" value="${esc(pickup)}" placeholder="Pickup location" required>
+
+          <label>Drop Location</label>
+          <input name="drop_location" placeholder="Customer address / drop location" required>
+
+          <label>Item Details</label>
+          <textarea name="item_details" placeholder="Food parcel / medicine / product details" required></textarea>
+
+          <label>Note</label>
+          <textarea name="note" placeholder="Extra note, optional"></textarea>
+
+          <button>Submit Order</button>
+        </form>
+
+        <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+          <a class="btn" href="/shops">Back to Shops</a>
+        </div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Order flow error:", e.message);
+    return res.status(500).send(page("Order Error", `<div class="card"><h1>Order Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/order/success", async (req,res)=>{
+  const id = String((req.query && req.query.id) || "");
+  return res.send(page("Order Submitted", `
+    <div class="card">
+      <h1>✅ Order Submitted</h1>
+      <p>Your order has been received. Admin team review korbe.</p>
+      <p><b>Order ID:</b> #${esc(id)}</p>
+      <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn" href="/shops">Back to Shops</a>
+        <a class="btn" href="/order">Create Another Order</a>
+      </div>
+    </div>
+  `));
+});
+
+/* GOVO SAFE ORDER FLOW FINAL END */
+
+
 app.get("/shops", async (req,res)=>{
   try {
     await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
