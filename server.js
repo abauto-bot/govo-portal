@@ -142,8 +142,8 @@ async function sendTelegram(text) {
 
 const css = `
 :root{--bg:#0b1020;--panel:#111827;--line:#263244;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#60a5fa}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed,.badge.unavailable{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.badge.verified{background:#0c4a6e;border-color:#38bdf8;color:#e0f2fe}.badge.trusted{background:#064e3b;border-color:#34d399;color:#d1fae5}.badge.available{background:#052e16;border-color:#22c55e;color:#bbf7d0}.badge.emergency{background:#7c2d12;border-color:#fb923c;color:#ffedd5}.badge.rating{background:#422006;border-color:#facc15;color:#fef9c3}.badge.clear{background:#172554;border-color:#60a5fa;color:#dbeafe}.app-hero{background:radial-gradient(circle at 15% 0%,rgba(34,197,94,.28),transparent 34%),linear-gradient(180deg,#102016,#111827);overflow:hidden}.app-hero h1{font-size:clamp(34px,8vw,58px)}.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.quick-grid .btn{min-height:58px;text-align:center}.chips{display:flex;gap:8px;overflow:auto;padding:2px 0 8px;scrollbar-width:none}.chips a{white-space:nowrap}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.bottom-nav{position:sticky;bottom:10px;z-index:8;display:none;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(2,6,23,.94);border:1px solid rgba(34,197,94,.35);border-radius:18px;padding:8px;margin-top:18px;backdrop-filter:blur(12px)}.bottom-nav a{color:#d1fae5;text-decoration:none;text-align:center;font-size:12px;font-weight:900;padding:8px 4px;border-radius:12px}.bottom-nav a.active{background:#22c55e;color:#052e16}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
-@media(max-width:760px){.app{padding:12px 12px 88px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}.bottom-nav{display:grid}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed,.badge.unavailable{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.badge.verified{background:#0c4a6e;border-color:#38bdf8;color:#e0f2fe}.badge.trusted{background:#064e3b;border-color:#34d399;color:#d1fae5}.badge.available{background:#052e16;border-color:#22c55e;color:#bbf7d0}.badge.emergency{background:#7c2d12;border-color:#fb923c;color:#ffedd5}.badge.rating{background:#422006;border-color:#facc15;color:#fef9c3}.badge.clear{background:#172554;border-color:#60a5fa;color:#dbeafe}.app-hero{background:radial-gradient(circle at 15% 0%,rgba(34,197,94,.28),transparent 34%),linear-gradient(180deg,#102016,#111827);overflow:hidden}.app-hero h1{font-size:clamp(34px,8vw,58px)}.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.quick-grid .btn{min-height:58px;text-align:center}.chips{display:flex;gap:8px;overflow:auto;padding:2px 0 8px;scrollbar-width:none}.chips a{white-space:nowrap}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.step{border:1px solid rgba(148,163,184,.18);background:#0f172a;border-radius:14px;padding:10px;text-align:center;color:var(--muted);font-size:12px;font-weight:900}.step.done{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.58);color:#bbf7d0}.big-status{display:inline-flex;font-size:16px;padding:9px 13px;margin:6px 0 10px}.bottom-nav{position:sticky;bottom:10px;z-index:8;display:none;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(2,6,23,.94);border:1px solid rgba(34,197,94,.35);border-radius:18px;padding:8px;margin-top:18px;backdrop-filter:blur(12px)}.bottom-nav a{color:#d1fae5;text-decoration:none;text-align:center;font-size:12px;font-weight:900;padding:8px 4px;border-radius:12px}.bottom-nav a.active{background:#22c55e;color:#052e16}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
+@media(max-width:760px){.app{padding:12px 12px 88px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.quick-grid,.timeline{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}.bottom-nav{display:grid}}
 `;
 
 function page(title, body, active = '') {
@@ -684,22 +684,88 @@ app.all('/order', async (req, res, next) => {
 
 app.get('/order/success', (req, res) => {
   const id = String(req.query.id || '');
-  res.send(page('Order Submitted', `<section class="card"><h1>Order Submitted</h1><p>Your order has been received.</p><h2>Tracking ID: #${esc(id)}</h2><div class="actions"><a class="btn" href="/track?id=${encodeURIComponent(id)}">Track Order</a><a class="btn secondary" href="/shops">Back Shops</a></div></section>`));
+  res.send(page('Order Submitted', `<section class="card app-hero"><span class="pill">Order Received</span><h1>Order Submitted</h1><p>Your order has been received by GOVO.</p><h2>Tracking ID: #${esc(id)}</h2><div class="actions"><a class="btn" href="/track/order/${encodeURIComponent(id)}">Track Order</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'track'));
 });
+
+function statusMeaning(status) {
+  const s = String(status || 'pending').toLowerCase();
+  return {
+    pending: 'waiting for admin review',
+    accepted: 'accepted by admin/provider',
+    assigned: 'assigned to rider/provider',
+    picked_up: 'rider picked up',
+    working: 'provider working',
+    ready: 'ready',
+    delivered: 'finished',
+    completed: 'finished',
+    rejected: 'cancelled/failed',
+    failed: 'cancelled/failed',
+    cancelled: 'cancelled/failed',
+  }[s] || 'status update in progress';
+}
+
+function progressStage(type, status) {
+  const s = String(status || 'pending').toLowerCase();
+  if (['delivered', 'completed'].includes(s)) return 4;
+  if (['assigned', 'picked_up', 'working', 'ready'].includes(s)) return 3;
+  if (['accepted'].includes(s)) return 2;
+  if (['rejected', 'failed', 'cancelled'].includes(s)) return 4;
+  return 1;
+}
+
+function timelineHtml(type, status) {
+  const stage = progressStage(type, status);
+  const labels = type === 'order' ? ['Submitted', 'Accepted', 'Assigned / Picked Up', 'Delivered'] : ['Submitted', 'Accepted', 'Assigned / Working', 'Completed'];
+  return `<div class="timeline">${labels.map((label, i) => `<div class="step ${i + 1 <= stage ? 'done' : ''}">${esc(label)}</div>`).join('')}</div>`;
+}
+
+function trackingOrderCard(x) {
+  return `<div class="card"><div class="section-head"><h2>Delivery Order #${esc(x.id)}</h2><span class="badge big-status ${esc(String(x.status || 'pending').toLowerCase())}">${esc(x.status || 'pending')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('order', x.status)}<div class="detail-grid"><div><b>ID</b><span>#${esc(x.id)}</span></div><div><b>Type</b><span>Order</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Shop</b><span>${esc(x.shop_name || 'GOVO Order')}<br>${esc(x.merchant_phone || '')}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Drop / Details</b><span>${esc(x.drop_location)}<br>${esc(x.item_details)}</span></div><div><b>Rider</b><span>${esc(x.rider_name || 'Not assigned')}<br>${esc(x.rider_phone || '')}</span></div><div><b>Notes</b><span>Admin: ${esc(x.admin_note || 'No note')}<br>Merchant: ${esc(x.merchant_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div><div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Open Tracking Link</a></div></div>`;
+}
+
+function trackingServiceCard(x) {
+  return `<div class="card"><div class="section-head"><h2>Service Request #${esc(x.id)}</h2><span class="badge big-status ${esc(String(x.status || 'pending').toLowerCase())}">${esc(x.status || 'pending')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('service', x.status)}<div class="detail-grid"><div><b>ID</b><span>#${esc(x.id)}</span></div><div><b>Type</b><span>Service</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Provider</b><span>${esc(x.provider_name || 'GOVO Provider')}<br>${esc(x.provider_phone || '')}</span></div><div><b>Service Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Provider Status</b><span>${esc(x.service_type || 'Service')}<br>${esc(x.provider_note || 'No provider note')}</span></div><div><b>Notes</b><span>Admin: ${esc(x.admin_note || 'No note')}<br>Customer: ${esc(x.note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div><div class="actions"><a class="btn secondary" href="/track/service/${encodeURIComponent(x.id)}">Open Tracking Link</a></div></div>`;
+}
+
+async function fetchTrackingResults({ id = '', phone = '', type = '' }) {
+  const out = { orders: [], services: [] };
+  if (type !== 'service') {
+    if (id && phone) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 10`, [id, phone])).rows;
+    else if (id) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE id=$1 ORDER BY id DESC LIMIT 10`, [id])).rows;
+    else if (phone) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE customer_phone=$1 ORDER BY id DESC LIMIT 10`, [phone])).rows;
+  }
+  if (type !== 'order') {
+    if (id && phone) out.services = (await pool.query(`SELECT * FROM govo_service_requests WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 10`, [id, phone])).rows;
+    else if (id) out.services = (await pool.query(`SELECT * FROM govo_service_requests WHERE id=$1 ORDER BY id DESC LIMIT 10`, [id])).rows;
+    else if (phone) out.services = (await pool.query(`SELECT * FROM govo_service_requests WHERE customer_phone=$1 ORDER BY id DESC LIMIT 10`, [phone])).rows;
+  }
+  return out;
+}
+
+function renderTrackPage({ id = '', phone = '', orders = [], services = [], direct = false }) {
+  const searched = !!(id || phone || direct);
+  const orderHtml = orders.map(trackingOrderCard).join('');
+  const serviceHtml = services.map(trackingServiceCard).join('');
+  const empty = searched && !orders.length && !services.length ? `<section class="card"><h2>No tracking found</h2><p style="color:var(--muted)">Check your order/request ID or phone number. Contact GOVO if you need help.</p><div class="actions"><a class="btn" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a></div></section>` : '';
+  return page('Track GOVO', `<section class="card app-hero"><span class="pill">Unified Tracking</span><h1>Track order or service request</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Search by tracking ID, request ID, or phone number. GOVO checks both delivery orders and service requests.</p><form method="GET" action="/track"><label>Order / Request ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Phone Number</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form><div class="actions"><a class="btn secondary" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a></div></section>${orderHtml ? `<section class="card"><div class="section-head"><h2>Delivery Orders</h2><span class="pill">${orders.length}</span></div></section><section class="cards">${orderHtml}</section>` : ''}${serviceHtml ? `<section class="card"><div class="section-head"><h2>Service Requests</h2><span class="pill">${services.length}</span></div></section><section class="cards">${serviceHtml}</section>` : ''}${empty}`, 'track');
+}
 
 app.get('/track', async (req, res, next) => {
   try {
     const id = String(req.query.id || '').trim();
     const phone = String(req.query.phone || '').trim();
-    let result = '';
-    if (id || phone) {
-      let r;
-      if (id && phone) r = await pool.query(`SELECT * FROM govo_orders WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 5`, [id, phone]);
-      else if (id) r = await pool.query(`SELECT * FROM govo_orders WHERE id=$1 ORDER BY id DESC LIMIT 5`, [id]);
-      else r = await pool.query(`SELECT * FROM govo_orders WHERE customer_phone=$1 ORDER BY id DESC LIMIT 10`, [phone]);
-      result = r.rows.length ? r.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>Order #${esc(x.id)}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Shop</b><span>${esc(x.shop_name || 'GOVO Order')}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Drop</b><span>${esc(x.drop_location)}</span></div><div><b>Item</b><span>${esc(x.item_details)}</span></div><div><b>Rider</b><span>${esc(x.rider_name || 'Not assigned')}<br>${esc(x.rider_phone || '')}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Merchant Note</b><span>${esc(x.merchant_note || 'No note')}</span></div></div></div>`).join('') : '<div class="card"><h2>No Order Found</h2></div>';
-    }
-    res.send(page('Track Order', `<section class="card"><h1>Track Order</h1><form method="GET" action="/track"><label>Order ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Customer Phone</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form></section>${result}`, 'track'));
+    const results = await fetchTrackingResults({ id, phone });
+    res.send(renderTrackPage({ id, phone, orders: results.orders, services: results.services }));
+  } catch (e) { next(e); }
+});
+
+app.get('/track/:type/:id', async (req, res, next) => {
+  try {
+    const type = String(req.params.type || '').trim().toLowerCase();
+    if (!['order', 'service'].includes(type)) return res.status(404).send(renderTrackPage({ direct: true }));
+    const id = String(req.params.id || '').trim();
+    const results = await fetchTrackingResults({ id, type });
+    res.send(renderTrackPage({ id, orders: results.orders, services: results.services, direct: true }));
   } catch (e) { next(e); }
 });
 
@@ -1041,7 +1107,7 @@ app.post('/service/request', async (req, res, next) => {
     const saved = await pool.query(`INSERT INTO govo_service_requests (provider_id, provider_name, provider_phone, service_type, customer_name, customer_phone, service_address, problem_details, preferred_time, note, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',NOW(),NOW()) RETURNING *`, [p.id, p.provider_name || '', p.phone || '', req.body.service_type || p.service_type || '', req.body.customer_name || '', req.body.customer_phone || '', req.body.service_address || '', req.body.problem_details || '', req.body.preferred_time || '', req.body.note || '']);
     const x = saved.rows[0];
     sendTelegram(['New GOVO Service Request', '', `Request ID: #${x.id}`, `Provider: ${x.provider_name || ''}`, `Provider Phone: ${x.provider_phone || ''}`, `Service: ${x.service_type || ''}`, `Customer: ${x.customer_name || ''}`, `Customer Phone: ${x.customer_phone || ''}`, `Address: ${x.service_address || ''}`, `Problem: ${x.problem_details || ''}`, `Preferred: ${x.preferred_time || ''}`].join('\n')).catch(() => {});
-    res.send(page('Service Request Submitted', `<section class="card"><h1>Request Submitted</h1><p>GOVO team and provider will review your request.</p><h2>Request ID: #${esc(x.id)}</h2><div class="actions"><a class="btn" href="/services">Services</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/track">Track</a></div></section>`, 'services'));
+    res.send(page('Service Request Submitted', `<section class="card app-hero"><span class="pill">Request Received</span><h1>Request Submitted</h1><p>GOVO team and provider will review your service request.</p><h2>Request ID: #${esc(x.id)}</h2><div class="actions"><a class="btn" href="/track/service/${encodeURIComponent(x.id)}">Track Request</a><a class="btn secondary" href="/services">Back to Services</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'services'));
   } catch (e) { next(e); }
 });
 
