@@ -1867,6 +1867,304 @@ app.post("/admin/rider/status", async (req,res)=>{
   }
 });
 
+
+/* GOVO ADMIN MERCHANTS POLISH V1 START */
+
+async function govoEnsureAdminMerchantsPolishV1(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_merchant_leads (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      owner_name TEXT,
+      phone TEXT,
+      whatsapp TEXT,
+      location TEXT,
+      category TEXT,
+      delivery_needed TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      shop_description TEXT,
+      shop_address TEXT,
+      products TEXT,
+      image_url TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_name TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS owner_name TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS phone TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS whatsapp TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS location TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS category TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS delivery_needed TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_address TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS products TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS image_url TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+function govoAdminMerchantPinOk(req,res){
+  const pin = String((req.query && req.query.pin) || (req.body && req.body.pin) || "").trim();
+  const real = String(process.env.ADMIN_PIN || "").trim();
+
+  if (!pin || !real || pin !== real) {
+    res.send(page("Admin PIN Login", `
+      <div class="card">
+        <h1>🔐 Admin PIN</h1>
+        <p>Merchant management খুলতে PIN দিন।</p>
+        <form method="GET" action="/admin/leads">
+          <input name="pin" placeholder="Enter admin PIN" required>
+          <button>Open Merchants</button>
+        </form>
+      </div>
+    `));
+    return false;
+  }
+  return true;
+}
+
+async function govoAdminMerchantNotifyV1(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Admin merchant notify skipped:", e.message);
+  }
+}
+
+app.post("/admin/merchant/status", async (req,res)=>{
+  try {
+    if (!govoAdminMerchantPinOk(req,res)) return;
+
+    await govoEnsureAdminMerchantsPolishV1();
+
+    const pin = String(req.body.pin || "");
+    const id = String(req.body.id || "");
+    const status = String(req.body.status || "pending");
+    const admin_note = String(req.body.admin_note || "");
+
+    const r = await pool.query(`
+      UPDATE govo_merchant_leads
+      SET status=$1, admin_note=$2, updated_at=NOW()
+      WHERE id=$3
+      RETURNING *
+    `, [status, admin_note, id]);
+
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await govoAdminMerchantNotifyV1([
+        "🏪 GOVO Merchant Status Updated",
+        "",
+        `Merchant ID: #${x.id}`,
+        `Shop: ${x.shop_name || ""}`,
+        `Owner: ${x.owner_name || ""}`,
+        `Phone: ${x.phone || ""}`,
+        `Category: ${x.category || ""}`,
+        `Location: ${x.location || ""}`,
+        `Status: ${String(x.status || "").toUpperCase()}`,
+        `Admin Note: ${x.admin_note || "N/A"}`
+      ].join("\n"));
+    }
+
+    return res.redirect("/admin/leads?pin=" + encodeURIComponent(pin));
+  } catch(e) {
+    console.log("Admin merchant status error:", e.message);
+    return res.status(500).send(page("Merchant Status Error", `<div class="card"><h1>Merchant Status Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/admin/leads", async (req,res)=>{
+  try {
+    if (!govoAdminMerchantPinOk(req,res)) return;
+
+    await govoEnsureAdminMerchantsPolishV1();
+
+    const pin = String(req.query.pin || "");
+    const status = String((req.query && req.query.status) || "all").trim();
+    const q = String((req.query && req.query.q) || "").trim();
+
+    const conditions = [];
+    const params = [];
+
+    if (status && status !== "all") {
+      params.push(status);
+      conditions.push(`COALESCE(status,'pending')=$${params.length}`);
+    }
+
+    if (q) {
+      params.push("%" + q.toLowerCase() + "%");
+      conditions.push(`
+        LOWER(
+          COALESCE(shop_name,'') || ' ' ||
+          COALESCE(owner_name,'') || ' ' ||
+          COALESCE(phone,'') || ' ' ||
+          COALESCE(whatsapp,'') || ' ' ||
+          COALESCE(location,'') || ' ' ||
+          COALESCE(category,'') || ' ' ||
+          COALESCE(shop_address,'') || ' ' ||
+          COALESCE(products,'') || ' ' ||
+          COALESCE(admin_note,'')
+        ) LIKE $${params.length}
+      `);
+    }
+
+    const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+
+    const merchants = await pool.query(`
+      SELECT id, shop_name, owner_name, phone, whatsapp, location, category,
+             delivery_needed, COALESCE(status,'pending') AS status,
+             admin_note, shop_description, shop_address, products, image_url,
+             created_at, updated_at
+      FROM govo_merchant_leads
+      ${where}
+      ORDER BY id DESC
+      LIMIT 150
+    `, params);
+
+    const counts = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int AS pending,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int AS approved,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int AS rejected
+      FROM govo_merchant_leads
+    `);
+
+    const c = counts.rows[0] || {};
+
+    const link = (label, st, active) => {
+      const sp = new URLSearchParams({ pin });
+      if (st && st !== "all") sp.set("status", st);
+      return `<a class="${active ? "active" : ""}" href="/admin/leads?${sp.toString()}">${label}</a>`;
+    };
+
+    const cards = merchants.rows.map(x=>`
+      <div class="card govo-ma-card">
+        <div class="govo-ma-head">
+          <div>
+            <span class="govo-chip">#${esc(String(x.id))}</span>
+            <h2>${esc(String(x.shop_name || "Unnamed Shop"))}</h2>
+            <small>${esc(String(x.owner_name || ""))} — ${esc(String(x.phone || ""))}</small>
+          </div>
+          <span class="govo-status">${esc(String(x.status || "pending"))}</span>
+        </div>
+
+        <div class="govo-ma-grid">
+          <div><b>Category</b><span>${esc(String(x.category || ""))}</span></div>
+          <div><b>Location</b><span>${esc(String(x.shop_address || x.location || ""))}</span></div>
+          <div><b>WhatsApp</b><span>${esc(String(x.whatsapp || ""))}</span></div>
+          <div><b>Delivery</b><span>${esc(String(x.delivery_needed || ""))}</span></div>
+          <div><b>Products</b><span>${esc(String(x.products || "Not added"))}</span></div>
+          <div><b>Admin Note</b><span>${esc(String(x.admin_note || "No note"))}</span></div>
+        </div>
+
+        <form method="POST" action="/admin/merchant/status" class="govo-ma-form">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input name="admin_note" placeholder="Admin note">
+          <div class="govo-ma-buttons">
+            <button name="status" value="approved">Approve</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="pending">Pending</button>
+          </div>
+        </form>
+
+        <div class="govo-ma-links">
+          <a href="/shop/${encodeURIComponent(String(x.id))}">View Shop</a>
+          <a href="/merchant/dashboard?phone=${encodeURIComponent(String(x.phone || ""))}">Dashboard</a>
+          <a href="/merchant/products?phone=${encodeURIComponent(String(x.phone || ""))}">Products</a>
+          <a href="tel:${esc(String(x.whatsapp || x.phone || ""))}">Call</a>
+        </div>
+      </div>
+    `).join("");
+
+    return res.send(page("Admin Merchants", `
+      <style>
+        .govo-ma-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+        .govo-ma-nav a{font-size:13px!important;padding:9px 11px!important;border-radius:999px;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:900;color:#bbf7d0!important;background:rgba(34,197,94,.06)}
+        .govo-ma-nav a.active{background:#22c55e!important;color:#052e16!important}
+        .govo-ma-search{display:grid;gap:8px;margin-top:12px}
+        .govo-ma-search input{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-ma-search button{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-ma-card{margin-top:14px!important;padding:16px!important}
+        .govo-ma-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-ma-head h2{font-size:22px!important;line-height:1.15!important;margin:10px 0 4px!important;color:#22c55e!important}
+        .govo-ma-head small{font-size:13px!important;color:#cbd5e1!important}
+        .govo-chip,.govo-status{display:inline-flex;padding:5px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900;text-transform:capitalize}
+        .govo-ma-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+        .govo-ma-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px}
+        .govo-ma-grid b{display:block;font-size:13px!important;margin-bottom:5px}
+        .govo-ma-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word}
+        .govo-ma-form{display:grid;gap:8px;margin-top:10px}
+        .govo-ma-form input{font-size:14px!important;padding:10px!important;border-radius:12px!important;width:100%!important}
+        .govo-ma-form button{font-size:14px!important;padding:10px!important;border-radius:12px!important}
+        .govo-ma-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+        .govo-ma-links{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+        .govo-ma-links a{text-align:center;text-decoration:none;font-size:13px!important;padding:10px;border-radius:12px;border:1px solid rgba(34,197,94,.35);color:#bbf7d0!important;font-weight:900}
+        @media(max-width:700px){
+          .govo-ma-grid{grid-template-columns:1fr}
+          .govo-ma-buttons,.govo-ma-links{grid-template-columns:1fr}
+          .govo-ma-head{flex-direction:column}
+        }
+      </style>
+
+      <div class="card">
+        <h1>🏪 Admin Merchants</h1>
+        <p>Merchant approve/reject, search, filter, shop/dashboard access.</p>
+
+        <div class="govo-ma-nav">
+          ${link("All " + (c.total || 0), "all", status==="all")}
+          ${link("Pending " + (c.pending || 0), "pending", status==="pending")}
+          ${link("Approved " + (c.approved || 0), "approved", status==="approved")}
+          ${link("Rejected " + (c.rejected || 0), "rejected", status==="rejected")}
+        </div>
+
+        <form method="GET" action="/admin/leads" class="govo-ma-search">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input name="q" value="${esc(q)}" placeholder="Search shop, owner, phone, location, product">
+          <button>🔎 Search Merchant</button>
+        </form>
+
+        <div class="govo-ma-nav">
+          <a href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a>
+          <a href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a>
+          <a href="/admin/riders?pin=${encodeURIComponent(pin)}">Riders</a>
+          <a href="/merchant">Merchant Registration</a>
+          <a href="/shops">Public Shops</a>
+        </div>
+
+        <p><b>${merchants.rows.length}</b> merchant showing.</p>
+      </div>
+
+      ${cards || `<div class="card"><h2>No merchant found</h2><p>Filter/search change kore dekho.</p></div>`}
+    `));
+  } catch(e) {
+    console.log("Admin merchants polish error:", e.message);
+    return res.status(500).send(page("Admin Merchants Error", `<div class="card"><h1>Admin Merchants Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN MERCHANTS POLISH V1 END */
+
+
 app.get("/admin/riders", async (req,res)=>{
   try {
     if (!govoAdminRiderPinOk(req,res)) return;
