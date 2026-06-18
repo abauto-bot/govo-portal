@@ -686,6 +686,191 @@ app.all("/order", async (req,res)=>{
   }
 });
 
+
+/* GOVO ADMIN ORDER ACTIONS START */
+
+function govoAdminPinOk(req,res){
+  const pin = String((req.query && req.query.pin) || (req.body && req.body.pin) || "");
+  const real = String(process.env.ADMIN_PIN || "");
+  if (!real || pin !== real) {
+    res.status(403).send(page("Forbidden", `<div class="card"><h1>403</h1><p>Admin PIN required.</p></div>`));
+    return false;
+  }
+  return true;
+}
+
+async function govoEnsureOrderAdminColumns(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS shop_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS pickup_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS drop_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS item_details TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+}
+
+async function govoAdminOrderNotify(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Admin order telegram skipped:", e.message);
+  }
+}
+
+app.post("/admin/order/status", async (req,res)=>{
+  try {
+    if (!govoAdminPinOk(req,res)) return;
+
+    await govoEnsureOrderAdminColumns();
+
+    const id = String(req.body.id || "");
+    const status = String(req.body.status || "pending");
+    const pin = String(req.body.pin || "");
+    const admin_note = String(req.body.admin_note || "");
+
+    const r = await pool.query(`
+      UPDATE govo_orders
+      SET status=$1, admin_note=$2, updated_at=NOW()
+      WHERE id=$3
+      RETURNING *
+    `, [status, admin_note, id]);
+
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await govoAdminOrderNotify([
+        "⚙️ GOVO Order Status Updated",
+        "",
+        `Order ID: #${x.id}`,
+        `Status: ${String(x.status || "").toUpperCase()}`,
+        `Shop: ${x.shop_name || "N/A"}`,
+        `Customer: ${x.customer_name || "N/A"}`,
+        `Phone: ${x.customer_phone || "N/A"}`,
+        `Drop: ${x.drop_location || "N/A"}`,
+        `Admin Note: ${x.admin_note || "N/A"}`,
+        `Time: ${new Date().toLocaleString("en-GB", {timeZone:"Asia/Dhaka"})}`
+      ].join("\n"));
+    }
+
+    return res.redirect("/admin/orders?pin=" + encodeURIComponent(pin));
+  } catch(e) {
+    console.log("Admin order status error:", e.message);
+    return res.status(500).send(page("Order Status Error", `<div class="card"><h1>Order Status Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/admin/orders", async (req,res)=>{
+  try {
+    if (!govoAdminPinOk(req,res)) return;
+
+    await govoEnsureOrderAdminColumns();
+
+    const pin = String(req.query.pin || "");
+
+    const r = await pool.query(`
+      SELECT id, shop_name, merchant_phone, customer_name, customer_phone,
+             pickup_location, drop_location, item_details, note,
+             COALESCE(status,'pending') AS status,
+             admin_note, created_at, updated_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const rows = r.rows.map(x=>`
+      <tr>
+        <td>#${esc(String(x.id))}</td>
+        <td>
+          <b>${esc(String(x.shop_name || ""))}</b><br>
+          <small>${esc(String(x.merchant_phone || ""))}</small>
+        </td>
+        <td>
+          <b>${esc(String(x.customer_name || ""))}</b><br>
+          ${esc(String(x.customer_phone || ""))}
+        </td>
+        <td>
+          <b>Pickup:</b> ${esc(String(x.pickup_location || ""))}<br>
+          <b>Drop:</b> ${esc(String(x.drop_location || ""))}
+        </td>
+        <td>${esc(String(x.item_details || ""))}<br><small>${esc(String(x.note || ""))}</small></td>
+        <td><b>${esc(String(x.status || "pending"))}</b><br><small>${esc(String(x.admin_note || ""))}</small></td>
+        <td>
+          <form method="POST" action="/admin/order/status" style="display:grid;gap:8px;min-width:150px">
+            <input type="hidden" name="pin" value="${esc(pin)}">
+            <input type="hidden" name="id" value="${esc(String(x.id))}">
+            <input name="admin_note" placeholder="Admin note" style="padding:8px;border-radius:10px">
+            <button name="status" value="accepted">Accept</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="delivered">Delivered</button>
+          </form>
+        </td>
+        <td><small>${esc(String(x.created_at || ""))}</small></td>
+      </tr>
+    `).join("");
+
+    return res.send(page("Admin Orders", `
+      <div class="card">
+        <h1>Admin Orders</h1>
+        <p>Customer delivery orders manage korun.</p>
+        <div style="overflow:auto">
+          <table>
+            <tr>
+              <th>ID</th>
+              <th>Shop</th>
+              <th>Customer</th>
+              <th>Route</th>
+              <th>Item</th>
+              <th>Status</th>
+              <th>Action</th>
+              <th>Time</th>
+            </tr>
+            ${rows || `<tr><td colspan="8">No orders found</td></tr>`}
+          </table>
+        </div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Admin orders v2 error:", e.message);
+    return res.status(500).send(page("Admin Orders Error", `<div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN ORDER ACTIONS END */
+
+
 app.get("/order/success", async (req,res)=>{
   const id = String((req.query && req.query.id) || "");
   return res.send(page("Order Submitted", `
