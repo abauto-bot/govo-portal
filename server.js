@@ -1950,6 +1950,140 @@ async function govoAdminMerchantNotifyV1(text){
   }
 }
 
+
+/* GOVO MERCHANT APPROVE ACTION FIX START */
+
+async function govoEnsureMerchantApproveActionFix(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_merchant_leads (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      owner_name TEXT,
+      phone TEXT,
+      whatsapp TEXT,
+      location TEXT,
+      category TEXT,
+      delivery_needed TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+async function govoMerchantApproveNotifyFix(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Merchant approve notify skipped:", e.message);
+  }
+}
+
+app.all("/admin/merchant/status", async (req,res)=>{
+  try {
+    await govoEnsureMerchantApproveActionFix();
+
+    const pin = String((req.body && req.body.pin) || (req.query && req.query.pin) || "").trim();
+    const real = String(process.env.ADMIN_PIN || "").trim();
+
+    if (!pin || !real || pin !== real) {
+      return res.status(403).send(page("Forbidden", `
+        <div class="card">
+          <h1>403</h1>
+          <p>Admin PIN required.</p>
+          <a class="btn" href="/admin/leads">Back</a>
+        </div>
+      `));
+    }
+
+    const id = String(
+      (req.body && (req.body.id || req.body.lead_id || req.body.merchant_id)) ||
+      (req.query && (req.query.id || req.query.lead_id || req.query.merchant_id)) ||
+      ""
+    ).trim();
+
+    let status = String(
+      (req.body && (req.body.status || req.body.action)) ||
+      (req.query && (req.query.status || req.query.action)) ||
+      "pending"
+    ).trim().toLowerCase();
+
+    if (status === "approve") status = "approved";
+    if (status === "reject") status = "rejected";
+    if (!["approved","rejected","pending"].includes(status)) status = "pending";
+
+    const admin_note = String((req.body && req.body.admin_note) || (req.query && req.query.admin_note) || "").trim();
+
+    if (!id) {
+      return res.status(400).send(page("Merchant Action Error", `
+        <div class="card">
+          <h1>Merchant Action Error</h1>
+          <p>Merchant ID missing.</p>
+          <a class="btn" href="/admin/leads?pin=${encodeURIComponent(pin)}">Back Merchants</a>
+        </div>
+      `));
+    }
+
+    const r = await pool.query(`
+      UPDATE govo_merchant_leads
+      SET status=$1, admin_note=$2, updated_at=NOW()
+      WHERE id=$3
+      RETURNING id, shop_name, owner_name, phone, category, location, status, admin_note
+    `, [status, admin_note, id]);
+
+    if (!r.rows.length) {
+      return res.status(404).send(page("Merchant Not Found", `
+        <div class="card">
+          <h1>Merchant Not Found</h1>
+          <p>ID #${esc(id)} পাওয়া যায়নি।</p>
+          <a class="btn" href="/admin/leads?pin=${encodeURIComponent(pin)}">Back Merchants</a>
+        </div>
+      `));
+    }
+
+    const x = r.rows[0];
+
+    await govoMerchantApproveNotifyFix([
+      "🏪 GOVO Merchant Status Updated",
+      "",
+      `Merchant ID: #${x.id}`,
+      `Shop: ${x.shop_name || ""}`,
+      `Owner: ${x.owner_name || ""}`,
+      `Phone: ${x.phone || ""}`,
+      `Category: ${x.category || ""}`,
+      `Location: ${x.location || ""}`,
+      `Status: ${String(x.status || "").toUpperCase()}`,
+      `Admin Note: ${x.admin_note || "N/A"}`
+    ].join("\n"));
+
+    return res.redirect("/admin/leads?pin=" + encodeURIComponent(pin) + "&v=merchant-action-fixed");
+  } catch(e) {
+    console.log("Merchant approve action fix error:", e.message);
+    return res.status(500).send(page("Merchant Action Error", `<div class="card"><h1>Merchant Action Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO MERCHANT APPROVE ACTION FIX END */
+
+
 app.post("/admin/merchant/status", async (req,res)=>{
   try {
     if (!govoAdminMerchantPinOk(req,res)) return;
