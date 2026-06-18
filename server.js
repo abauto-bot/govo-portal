@@ -792,6 +792,121 @@ app.post("/admin/order/status", async (req,res)=>{
   }
 });
 
+
+/* GOVO SHOPS HOME V3 START */
+app.get("/shops", async (req,res)=>{
+  try {
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_address TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS products TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS whatsapp TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS image_url TEXT");
+
+    const q = String((req.query && req.query.q) || "").trim().toLowerCase();
+    const category = String((req.query && req.query.category) || "").trim();
+    const area = String((req.query && req.query.area) || "").trim();
+
+    const all = await pool.query(`
+      SELECT id, shop_name, owner_name, phone, location, category, delivery_needed,
+             COALESCE(status,'pending') AS status,
+             shop_description, shop_address, products, whatsapp, image_url, created_at
+      FROM govo_merchant_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 300
+    `);
+
+    let rows = all.rows;
+
+    if (q) {
+      rows = rows.filter(x => [
+        x.shop_name, x.owner_name, x.phone, x.location, x.category,
+        x.shop_description, x.shop_address, x.products
+      ].join(" ").toLowerCase().includes(q));
+    }
+
+    if (category) {
+      rows = rows.filter(x => String(x.category || "") === category);
+    }
+
+    if (area) {
+      rows = rows.filter(x => String(x.location || "").toLowerCase().includes(area.toLowerCase()) || String(x.shop_address || "").toLowerCase().includes(area.toLowerCase()));
+    }
+
+    const categories = [...new Set(all.rows.map(x=>String(x.category || "").trim()).filter(Boolean))].sort();
+    const areas = [...new Set(all.rows.map(x=>String(x.location || "").trim()).filter(Boolean))].sort();
+
+    const categoryOptions = [`<option value="">All Category</option>`].concat(
+      categories.map(c=>`<option value="${esc(c)}" ${c===category?"selected":""}>${esc(c)}</option>`)
+    ).join("");
+
+    const areaOptions = [`<option value="">All Area</option>`].concat(
+      areas.map(a=>`<option value="${esc(a)}" ${a===area?"selected":""}>${esc(a)}</option>`)
+    ).join("");
+
+    const cards = rows.map(x=>`
+      <div class="card" style="margin-bottom:22px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">
+          <div>
+            <div style="display:inline-flex;padding:8px 14px;border-radius:999px;border:1px solid #22c55e;background:#052e16;color:#bbf7d0;font-weight:900">
+              ${esc(String(x.category || "Shop"))}
+            </div>
+            <h2 style="color:#22c55e;margin:16px 0 10px;font-size:32px">${esc(String(x.shop_name || ""))}</h2>
+          </div>
+          ${x.image_url ? `<img src="${esc(String(x.image_url))}" style="width:82px;height:82px;object-fit:cover;border-radius:18px;border:1px solid #22c55e">` : ""}
+        </div>
+
+        <div style="font-size:17px;line-height:1.8;color:#dbeafe;margin-top:10px">
+          <div><b>Owner:</b> ${esc(String(x.owner_name || ""))}</div>
+          <div><b>Phone:</b> ${esc(String(x.whatsapp || x.phone || ""))}</div>
+          <div><b>Location:</b> ${esc(String(x.shop_address || x.location || ""))}</div>
+          <div><b>Delivery:</b> ${esc(String(x.delivery_needed || ""))}</div>
+          <div><b>About:</b> ${esc(String(x.shop_description || "Details coming soon"))}</div>
+          <div><b>Products:</b> ${esc(String(x.products || "Not added yet"))}</div>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+          <a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
+          <a class="btn" href="tel:${esc(String(x.whatsapp || x.phone || ""))}">☎️ Call Shop</a>
+          <a class="btn" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || "")}">🏪 Shop Dashboard</a>
+        </div>
+      </div>
+    `).join("");
+
+    return res.send(page("GOVO Shops", `
+      <div class="card">
+        <h1>🏪 GOVO Shops</h1>
+        <p>Approved dokan gulo ekhane dekha jabe. Customer shop select kore delivery book korte parbe.</p>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:18px 0">
+          <a class="btn" href="https://govoexpress.com">🏠 Back Home</a>
+          <a class="btn" href="/shops">🏪 All Shops</a>
+          <a class="btn" href="/merchant">➕ Register Shop</a>
+          <a class="btn" href="/merchant/dashboard">🔐 Merchant Login</a>
+        </div>
+
+        <form method="GET" action="/shops" style="display:grid;gap:12px;margin-top:16px">
+          <input name="q" value="${esc(q)}" placeholder="🔎 Search shop, product, owner, phone">
+          <select name="category">${categoryOptions}</select>
+          <select name="area">${areaOptions}</select>
+          <button>Filter Shops</button>
+        </form>
+
+        <p style="margin-top:14px"><b>${rows.length}</b> shop found out of <b>${all.rows.length}</b> approved shops.</p>
+      </div>
+
+      <div style="margin-top:22px">
+        ${cards || `<div class="card"><h2>No shop found</h2><p>Filter change korun ba admin theke merchant approve korun.</p><a class="btn" href="/shops">Reset Filter</a></div>`}
+      </div>
+    `));
+  } catch(e) {
+    console.log("Shops home v3 error:", e.message);
+    return res.status(500).send(page("Shops Error", `<div class="card"><h1>Shops Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+/* GOVO SHOPS HOME V3 END */
+
+
 app.get("/admin/orders", async (req,res)=>{
   try {
     if (!govoAdminPinOk(req,res)) return;
