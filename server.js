@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const { Pool } = require('pg');
+const crypto = require('crypto');
 
 const multer = require("multer");
 
@@ -101,23 +102,71 @@ function bdTime(v) {
   }
 }
 
+const ADMIN_COOKIE = 'govo_admin_session';
+const ADMIN_SESSION_SECRET = String(process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || process.env.COOKIE_SECRET || ADMIN_PIN || 'govo-admin-session-secret').trim();
+
+function rawPin(req) {
+  return String((req.body && (req.body.admin_pin || req.body.pin)) || (req.query && req.query.pin) || '').trim();
+}
+
 function getPin(req) {
-  return String((req.body && req.body.pin) || (req.query && req.query.pin) || '').trim();
+  return '';
+}
+
+function parseCookies(req) {
+  return String(req.headers.cookie || '').split(';').reduce((acc, part) => {
+    const i = part.indexOf('=');
+    if (i > -1) acc[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    return acc;
+  }, {});
+}
+
+function adminToken() {
+  if (!ADMIN_PIN) return '';
+  return crypto.createHmac('sha256', `${ADMIN_SESSION_SECRET}:${ADMIN_PIN}`).update('govo-admin-lock-v1').digest('hex');
+}
+
+function safeEqual(a, b) {
+  const aa = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+}
+
+function hasAdminCookie(req) {
+  const token = parseCookies(req)[ADMIN_COOKIE];
+  const expected = adminToken();
+  return Boolean(expected && token && safeEqual(token, expected));
+}
+
+function requestIsHttps(req) {
+  return req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase() === 'https';
+}
+
+function setAdminCookie(req, res) {
+  res.cookie(ADMIN_COOKIE, adminToken(), { httpOnly: true, sameSite: 'lax', secure: requestIsHttps(req), path: '/admin' });
+}
+
+function clearAdminCookie(req, res) {
+  res.clearCookie(ADMIN_COOKIE, { httpOnly: true, sameSite: 'lax', secure: requestIsHttps(req), path: '/admin' });
+}
+
+function hasValidAdminPin(req) {
+  const pin = rawPin(req);
+  return Boolean(ADMIN_PIN && pin && safeEqual(pin, ADMIN_PIN));
+}
+
+function isAdminAuthorized(req) {
+  return hasAdminCookie(req) || hasValidAdminPin(req);
+}
+
+function adminLoginPage(message = '') {
+  return page('Admin Login', `<section class="card lock-card app-hero"><span class="pill">Admin Security</span><h1>GOVO Admin Login</h1><p>Enter the admin PIN to open the GOVO Control Center.</p>${message ? `<p style="color:#fecaca;font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/admin/login"><label>Admin PIN</label><input name="admin_pin" type="password" placeholder="Admin PIN" required autofocus><button>Login</button></form><div class="actions"><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'admin');
 }
 
 function requireAdmin(req, res) {
-  const pin = getPin(req);
-  if (ADMIN_PIN && pin === ADMIN_PIN) return true;
-  res.status(403).send(page('Admin Locked', `
-    <section class="card lock-card">
-      <h1>Admin Locked</h1>
-      <p>Admin panel open korte correct PIN lagbe.</p>
-      <form method="GET" action="${esc(req.path || '/admin/os')}">
-        <input name="pin" type="password" placeholder="Admin PIN" required autofocus>
-        <button>Unlock</button>
-      </form>
-    </section>
-  `, 'admin'));
+  if (isAdminAuthorized(req)) return true;
+  if (req.method === 'GET') return res.redirect('/admin'), false;
+  res.status(403).send(page('Unauthorized', '<section class="card lock-card"><h1>Unauthorized</h1><p>Admin login required.</p><a class="btn" href="/admin">Admin Login</a></section>', 'admin'));
   return false;
 }
 
@@ -146,9 +195,21 @@ const css = `
 @media(max-width:760px){.app{padding:12px 12px 88px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.quick-grid,.timeline{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}.bottom-nav{display:grid}}
 `;
 
+function adminNav(active) {
+  const links = [
+    ['Dashboard', '/admin/os'],
+    ['Orders', '/admin/orders'],
+    ['Merchants', '/admin/leads'],
+    ['Riders', '/admin/riders'],
+    ['Providers', '/admin/providers'],
+    ['Service Requests', '/admin/service-requests'],
+    ['Reviews', '/admin/reviews'],
+  ];
+  return `<nav class="nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<a href="/">Main Website</a><form method="POST" action="/admin/logout" style="display:inline"><button class="secondary" style="padding:9px 11px">Logout</button></form></nav>`;
+}
+
 function page(title, body, active = '') {
-  const pin = ADMIN_PIN ? `?pin=${encodeURIComponent(ADMIN_PIN)}` : '';
-  const nav = [
+  const publicNav = [
     ['app', '/app', 'App'],
     ['merchant', '/merchant', 'Merchant'],
     ['rider', '/rider', 'Rider'],
@@ -156,11 +217,13 @@ function page(title, body, active = '') {
     ['services', '/services', 'Services'],
     ['provider', '/provider', 'Provider'],
     ['track', '/track', 'Track'],
-    ['admin', `/admin/os${pin}`, 'Admin'],
   ].map(([key, href, label]) => `<a class="${active === key ? 'active' : ''}" href="${href}">${label}</a>`).join('');
+  const isAdmin = active === 'admin';
+  const nav = isAdmin ? adminNav(active) : `<nav class="nav">${publicNav}</nav>`;
+  const robots = isAdmin ? '<meta name="robots" content="noindex,nofollow">' : '';
   const showBottom = !['admin', 'merchant', 'rider'].includes(active);
   const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="/track">Track</a><a href="/merchant">Join</a></nav>` : '';
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><span class="pill">Live System</span></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main></body></html>`;
 }
 
 function badge(status) {
@@ -216,7 +279,7 @@ function adminTrustControls(type, x, pin) {
   return `<div class="actions">${fields.map(([field, label]) => {
     const current = boolish(x[field]);
     const action = type === 'merchant' ? '/admin/merchant/trust' : '/admin/provider/trust';
-    return `<form method="POST" action="${action}"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="field" value="${field}"><input type="hidden" name="value" value="${current ? 'false' : 'true'}"><button class="${current ? '' : 'secondary'}">${esc(label)}: ${esc(current ? 'On' : 'Off')}</button></form>`;
+    return `<form method="POST" action="${action}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="field" value="${field}"><input type="hidden" name="value" value="${current ? 'false' : 'true'}"><button class="${current ? '' : 'secondary'}">${esc(label)}: ${esc(current ? 'On' : 'Off')}</button></form>`;
   }).join('')}</div>`;
 }
 
@@ -296,7 +359,40 @@ app.post('/rider', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-app.get('/admin', (req, res) => res.redirect(`/admin/os${getPin(req) ? `?pin=${encodeURIComponent(getPin(req))}` : ''}`));
+app.use('/admin', (req, res, next) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  const openPaths = ['/', '/login', '/logout'];
+  if (openPaths.includes(req.path)) return next();
+  if (hasAdminCookie(req)) return next();
+  if (hasValidAdminPin(req)) {
+    setAdminCookie(req, res);
+    return next();
+  }
+  if (req.method === 'GET') return res.redirect('/admin');
+  return res.status(403).send(page('Unauthorized', '<section class="card lock-card"><h1>Unauthorized</h1><p>Admin login required.</p><a class="btn" href="/admin">Admin Login</a></section>', 'admin'));
+});
+
+app.get('/admin', (req, res) => {
+  if (hasAdminCookie(req)) return res.redirect('/admin/os');
+  if (hasValidAdminPin(req)) {
+    setAdminCookie(req, res);
+    return res.redirect('/admin/os');
+  }
+  return res.send(adminLoginPage());
+});
+
+app.post('/admin/login', (req, res) => {
+  if (hasValidAdminPin(req)) {
+    setAdminCookie(req, res);
+    return res.redirect('/admin/os');
+  }
+  return res.status(401).send(adminLoginPage('Wrong admin PIN. Please try again.'));
+});
+
+app.all('/admin/logout', (req, res) => {
+  clearAdminCookie(req, res);
+  res.redirect('/admin');
+});
 
 app.get('/admin/os', async (req, res, next) => {
   try {
@@ -325,7 +421,7 @@ app.get('/admin/os', async (req, res, next) => {
     const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="cards compact">${rows.length ? rows.map(render).join('') : '<div class="card"><p>No recent activity</p></div>'}</div></section>`;
     const recentCard = (title, status, details, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(title)}</h2>${badge(status)}</div><p>${esc(details)}</p></a>`;
     res.send(page('Admin OS', `
-      <section class="card hero"><h1>GOVO Admin OS</h1><p>Super App Control Center. Review approvals, live demand, and recent business activity from one screen.</p><div class="toolbar"><a class="btn" href="/admin/os?pin=${pinParam}">Refresh</a><a class="btn secondary" href="/">Main Website</a></div></section>
+      <section class="card hero"><h1>GOVO Admin OS</h1><p>Super App Control Center. Review approvals, live demand, and recent business activity from one screen.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/">Main Website</a></div></section>
       <section class="grid">
         ${stat('Total Orders', o.total, 'All customer orders')}
         ${stat('Pending Orders', o.pending, 'Need admin or merchant action')}
@@ -349,28 +445,28 @@ app.get('/admin/os', async (req, res, next) => {
         ${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}
       </section>
       <section class="card"><h2>Quick Actions</h2><div class="toolbar">
-        ${action('Manage Orders', `/admin/orders?pin=${pinParam}`)}
-        ${action('Manage Merchants', `/admin/leads?pin=${pinParam}`)}
-        ${action('Manage Riders', `/admin/riders?pin=${pinParam}`)}
-        ${action('Manage Providers', `/admin/providers?pin=${pinParam}`)}
-        ${action('Manage Service Requests', `/admin/service-requests?pin=${pinParam}`)}
+        ${action('Manage Orders', `/admin/orders`)}
+        ${action('Manage Merchants', `/admin/leads`)}
+        ${action('Manage Riders', `/admin/riders`)}
+        ${action('Manage Providers', `/admin/providers`)}
+        ${action('Manage Service Requests', `/admin/service-requests`)}
         ${action('View Shops', '/shops')}
         ${action('View Services', '/services')}
         ${action('Track Order', '/track')}
         ${action('Main Website', '/')}
       </div></section>
       <section class="card"><h2>Alerts</h2><div class="cards compact">
-        ${alert('Pending merchant approvals', m.pending, `/admin/leads?pin=${pinParam}&status=pending`)}
-        ${alert('Pending rider approvals', r.pending, `/admin/riders?pin=${pinParam}&status=pending`)}
-        ${alert('Pending provider approvals', p.pending, `/admin/providers?pin=${pinParam}&status=pending`)}
-        ${alert('Pending service requests', sr.pending, `/admin/service-requests?pin=${pinParam}&status=pending`)}
-        ${alert('Pending orders', o.pending, `/admin/orders?pin=${pinParam}&status=pending`)}
+        ${alert('Pending merchant approvals', m.pending, `/admin/leads?status=pending`)}
+        ${alert('Pending rider approvals', r.pending, `/admin/riders?status=pending`)}
+        ${alert('Pending provider approvals', p.pending, `/admin/providers?status=pending`)}
+        ${alert('Pending service requests', sr.pending, `/admin/service-requests?status=pending`)}
+        ${alert('Pending orders', o.pending, `/admin/orders?status=pending`)}
       </div></section>
       <section class="grid two">
-        ${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?pin=${pinParam}&q=${encodeURIComponent(x.id)}`))}
-        ${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?pin=${pinParam}&q=${encodeURIComponent(x.id)}`))}
-        ${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?pin=${pinParam}&q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}
-        ${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?pin=${pinParam}&q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}
+        ${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}
+        ${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}
+        ${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}
+        ${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}
       </section>
     `, 'admin'));
   } catch (e) { next(e); }
@@ -388,8 +484,8 @@ app.get('/admin/leads', async (req, res, next) => {
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
     const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int rejected FROM govo_merchant_leads`);
-    const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('merchant', x, pin)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
-    res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1><form class="filters" method="GET" action="/admin/leads"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/riders?pin=${encodeURIComponent(pin)}">Riders</a><a class="btn secondary" href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
+    const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('merchant', x, pin)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
+    res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1><form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -407,7 +503,7 @@ app.post('/admin/merchant/status', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Merchant Status Updated', '', `Merchant ID: #${x.id}`, `Shop: ${x.shop_name || ''}`, `Owner: ${x.owner_name || ''}`, `Phone: ${x.phone || ''}`, `Category: ${x.category || ''}`, `Location: ${x.location || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
     }
-    res.redirect(`/admin/leads?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/leads`);
   } catch (e) { next(e); }
 });
 
@@ -423,8 +519,8 @@ app.get('/admin/riders', async (req, res, next) => {
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(vehicle_type,'')) LIKE $${params.length}`); }
     const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, location, vehicle_type, experience, COALESCE(status,'pending') AS status, admin_note, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int rejected FROM govo_rider_leads`);
-    const cards = riders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form></div>`).join('');
-    res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1><form class="filters" method="GET" action="/admin/riders"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchants</a><a class="btn secondary" href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
+    const cards = riders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form></div>`).join('');
+    res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1><form class="filters" method="GET" action="/admin/riders"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -441,7 +537,7 @@ app.post('/admin/merchant/trust', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Merchant Trust Updated', '', `Merchant ID: #${x.id}`, `Shop: ${x.shop_name || ''}`, `Phone: ${x.phone || ''}`, `Verified: ${x.is_verified}`, `Trusted: ${x.is_trusted}`, `Available: ${x.is_available}`, `Emergency: ${x.emergency_available}`].join('\n'));
     }
-    res.redirect(`/admin/leads?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/leads`);
   } catch (e) { next(e); }
 });
 
@@ -458,7 +554,7 @@ app.post('/admin/rider/status', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Rider Status Updated', '', `Rider ID: #${x.id}`, `Name: ${x.rider_name || ''}`, `Phone: ${x.phone || ''}`, `Vehicle: ${x.vehicle_type || ''}`, `Location: ${x.location || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
     }
-    res.redirect(`/admin/riders?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/riders`);
   } catch (e) { next(e); }
 });
 
@@ -486,10 +582,10 @@ app.get('/admin/orders', async (req, res, next) => {
       const assignedId = x.assigned_rider_id || x.rider_id || '';
       const assignedName = x.assigned_rider_name || x.rider_name || 'Not assigned';
       const assignedPhone = x.assigned_rider_phone || x.rider_phone || '';
-      return `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Merchant</b><span>${esc(x.shop_name)}<br>${esc(x.merchant_phone)}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}<br>${esc(x.preferred_time ? `Preferred: ${x.preferred_time}` : '')}</span></div><div><b>Current Rider</b><span>${esc(assignedName)}<br>${esc(assignedPhone || '')}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/order/assign"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="order_id" value="${esc(x.id)}"><label>Assign approved rider</label><select name="rider_id" required><option value="">Select Rider</option>${riderOptions(assignedId)}</select><button>Assign Rider</button></form><form method="POST" action="/admin/order/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" value="${esc(x.admin_note || '')}" placeholder="Admin note"><div class="three">${statusButton('pending', 'Pending', x.status)}${statusButton('accepted', 'Accepted', x.status)}${statusButton('assigned', 'Assigned', x.status)}</div><div class="three">${statusButton('picked_up', 'Picked Up', x.status)}${statusButton('delivered', 'Delivered', x.status)}${statusButton('failed', 'Failed', x.status, true)}</div><div class="actions">${statusButton('rejected', 'Reject Order', x.status, true)}</div></form></div>`;
+      return `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Merchant</b><span>${esc(x.shop_name)}<br>${esc(x.merchant_phone)}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}<br>${esc(x.preferred_time ? `Preferred: ${x.preferred_time}` : '')}</span></div><div><b>Current Rider</b><span>${esc(assignedName)}<br>${esc(assignedPhone || '')}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/order/assign"><input type="hidden" name="order_id" value="${esc(x.id)}"><label>Assign approved rider</label><select name="rider_id" required><option value="">Select Rider</option>${riderOptions(assignedId)}</select><button>Assign Rider</button></form><form method="POST" action="/admin/order/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" value="${esc(x.admin_note || '')}" placeholder="Admin note"><div class="three">${statusButton('pending', 'Pending', x.status)}${statusButton('accepted', 'Accepted', x.status)}${statusButton('assigned', 'Assigned', x.status)}</div><div class="three">${statusButton('picked_up', 'Picked Up', x.status)}${statusButton('delivered', 'Delivered', x.status)}${statusButton('failed', 'Failed', x.status, true)}</div><div class="actions">${statusButton('rejected', 'Reject Order', x.status, true)}</div></form></div>`;
     }).join('');
     const c = counts.rows[0] || {};
-    res.send(page('Admin Orders', `<section class="grid"><div class="stat"><div class="label">Total</div><div class="value">${esc(c.total || 0)}</div></div><div class="stat"><div class="label">Pending</div><div class="value">${esc(c.pending || 0)}</div></div><div class="stat"><div class="label">Assigned</div><div class="value">${esc(c.assigned || 0)}</div></div><div class="stat"><div class="label">Delivered</div><div class="value">${esc(c.delivered || 0)}</div></div></section><section class="card"><h1>Admin Orders</h1><form class="filters" method="GET" action="/admin/orders"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search orders, customer, rider, address"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="assigned" ${status === 'assigned' ? 'selected' : ''}>Assigned</option><option value="picked_up" ${status === 'picked_up' ? 'selected' : ''}>Picked Up</option><option value="delivered" ${status === 'delivered' ? 'selected' : ''}>Delivered</option><option value="failed" ${status === 'failed' ? 'selected' : ''}>Failed</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchants</a><a class="btn secondary" href="/admin/riders?pin=${encodeURIComponent(pin)}">Riders</a><a class="btn secondary" href="/track">Track</a></div></section><section class="cards">${cards || '<div class="card"><h2>No orders found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Admin Orders', `<section class="grid"><div class="stat"><div class="label">Total</div><div class="value">${esc(c.total || 0)}</div></div><div class="stat"><div class="label">Pending</div><div class="value">${esc(c.pending || 0)}</div></div><div class="stat"><div class="label">Assigned</div><div class="value">${esc(c.assigned || 0)}</div></div><div class="stat"><div class="label">Delivered</div><div class="value">${esc(c.delivered || 0)}</div></div></section><section class="card"><h1>Admin Orders</h1><form class="filters" method="GET" action="/admin/orders"><input name="q" value="${esc(q)}" placeholder="Search orders, customer, rider, address"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="assigned" ${status === 'assigned' ? 'selected' : ''}>Assigned</option><option value="picked_up" ${status === 'picked_up' ? 'selected' : ''}>Picked Up</option><option value="delivered" ${status === 'delivered' ? 'selected' : ''}>Delivered</option><option value="failed" ${status === 'failed' ? 'selected' : ''}>Failed</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/track">Track</a></div></section><section class="cards">${cards || '<div class="card"><h2>No orders found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -498,14 +594,14 @@ app.post('/admin/order/assign', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone FROM govo_rider_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [String(req.body.rider_id || '')]);
-    if (!rider.rows.length) return res.status(404).send(page('Rider Not Found', `<section class="card"><h1>Rider Not Found</h1><a class="btn" href="/admin/orders?pin=${encodeURIComponent(pin)}">Back Orders</a></section>`));
+    if (!rider.rows.length) return res.status(404).send(page('Rider Not Found', `<section class="card"><h1>Rider Not Found</h1><a class="btn" href="/admin/orders">Back Orders</a></section>`));
     const rd = rider.rows[0];
     const order = await pool.query(`UPDATE govo_orders SET rider_id=$1, rider_name=$2, rider_phone=$3, assigned_rider_id=$1, assigned_rider_name=$2, assigned_rider_phone=$3, status='assigned', updated_at=NOW() WHERE id=$4 RETURNING *`, [rd.id, rd.rider_name, rd.phone, String(req.body.order_id || '')]);
     if (order.rows.length) {
       const o = order.rows[0];
       await sendTelegram([`GOVO Rider Assigned`, `Order: #${o.id}`, `Rider: ${rd.rider_name || ''} (${rd.phone || ''})`, `Customer: ${o.customer_name || ''} (${o.customer_phone || ''})`, `Pickup: ${o.pickup_location || ''}`, `Delivery: ${o.drop_location || ''}`].join('\n'));
     }
-    res.redirect(`/admin/orders?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/orders`);
   } catch (e) { next(e); }
 });
 
@@ -521,7 +617,7 @@ app.post('/admin/order/status', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Order Status Updated', '', `Order ID: #${x.id}`, `Status: ${String(x.status || '').toUpperCase()}`, `Rider: ${x.rider_name || 'Not assigned'}`, `Shop: ${x.shop_name || ''}`, `Customer: ${x.customer_name || ''}`, `Drop: ${x.drop_location || ''}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
     }
-    res.redirect(`/admin/orders?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/orders`);
   } catch (e) { next(e); }
 });
 
@@ -1197,6 +1293,19 @@ app.get('/service/request/success', (req, res) => {
   res.send(page('Service Request Submitted', `<section class="card app-hero"><span class="pill">Request Received</span><h1>Service Request Submitted</h1><p>GOVO team and provider will review your request.</p><h2>Request ID: #${esc(id)}</h2><p style="color:var(--muted);font-weight:900">Customer phone: ${esc(phone || 'Not provided')}</p><div class="timeline"><div class="step done">Submitted</div><div class="step">Provider/Admin Review</div><div class="step">Working</div><div class="step">Completed</div></div><div class="actions"><a class="btn" href="/track/service/${encodeURIComponent(id)}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Track Request</a><a class="btn secondary" href="/services">Back to Services</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'services'));
 });
 
+app.get('/admin/reviews', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const q = String(req.query.q || '').trim();
+    const params = [];
+    const where = [];
+    if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(target_type,'') || ' ' || COALESCE(customer_name,'') || ' ' || COALESCE(customer_phone,'') || ' ' || COALESCE(comment,'')) LIKE $${params.length}`); }
+    const reviews = await pool.query(`SELECT id, target_type, target_id, customer_name, customer_phone, rating, comment, COALESCE(status,'approved') AS status, created_at FROM govo_reviews ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const cards = reviews.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.target_type || 'review')} ${esc(x.rating || '')}/5</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Target</b><span>${esc(x.target_type)} #${esc(x.target_id)}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Comment</b><span>${esc(x.comment)}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div></div>`).join('');
+    res.send(page('Admin Reviews', `<section class="card"><h1>Admin Reviews</h1><form class="filters" method="GET" action="/admin/reviews"><input name="q" value="${esc(q)}" placeholder="Search reviews"><button>Search</button></form></section><section class="cards">${cards || '<div class="card"><h2>No reviews found</h2></div>'}</section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
 app.get('/admin/providers', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
@@ -1208,8 +1317,8 @@ app.get('/admin/providers', async (req, res, next) => {
     if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(address,'')) LIKE $${params.length}`); }
     const providers = await pool.query(`SELECT * FROM govo_service_providers ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
-    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('provider', x, pin)}<div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
-    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1><form class="filters" method="GET" action="/admin/providers"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/service-requests?pin=${encodeURIComponent(pin)}">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
+    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('provider', x, pin)}<div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
+    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1><form class="filters" method="GET" action="/admin/providers"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1224,7 +1333,7 @@ app.post('/admin/provider/status', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Provider Status Updated', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `Service: ${x.service_type || ''}`, `Area: ${x.area || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
     }
-    res.redirect(`/admin/providers?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/providers`);
   } catch (e) { next(e); }
 });
 
@@ -1241,7 +1350,7 @@ app.post('/admin/provider/trust', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Provider Trust Updated', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `Verified: ${x.is_verified}`, `Trusted: ${x.is_trusted}`, `Available: ${x.is_available}`, `Emergency: ${x.emergency_available}`].join('\n'));
     }
-    res.redirect(`/admin/providers?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/providers`);
   } catch (e) { next(e); }
 });
 
@@ -1256,8 +1365,8 @@ app.get('/admin/service-requests', async (req, res, next) => {
     if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(provider_phone,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(customer_name,'') || ' ' || COALESCE(customer_phone,'') || ' ' || COALESCE(service_address,'') || ' ' || COALESCE(problem_details,'')) LIKE $${params.length}`); }
     const requests = await pool.query(`SELECT *, COALESCE(customer_note,note,'') AS display_note FROM govo_service_requests ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
-    const cards = requests.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.service_type || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Provider</b><span>${esc(x.provider_name)}<br>${esc(x.provider_phone)}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Service Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Preferred</b><span>${esc(x.preferred_time || 'Any time')}</span></div><div><b>Customer Note</b><span>${esc(x.display_note || 'No note')}</span></div></div><form method="POST" action="/admin/service-request/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="pending">Pending</button><button name="status" value="accepted">Accepted</button><button name="status" value="assigned">Assigned</button></div><div class="three"><button name="status" value="working">Working</button><button name="status" value="completed">Completed</button><button class="reject" name="status" value="rejected">Rejected</button></div></form></div>`).join('');
-    res.send(page('Admin Service Requests', `<section class="card"><h1>Admin Service Requests</h1><form class="filters" method="GET" action="/admin/service-requests"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search request, provider, customer, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="assigned" ${status === 'assigned' ? 'selected' : ''}>Assigned</option><option value="working" ${status === 'working' ? 'selected' : ''}>Working</option><option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/providers?pin=${encodeURIComponent(pin)}">Providers</a></div></section><section class="cards">${cards || '<div class="card"><h2>No service request found</h2></div>'}</section>`, 'admin'));
+    const cards = requests.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.service_type || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Provider</b><span>${esc(x.provider_name)}<br>${esc(x.provider_phone)}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Service Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Preferred</b><span>${esc(x.preferred_time || 'Any time')}</span></div><div><b>Customer Note</b><span>${esc(x.display_note || 'No note')}</span></div></div><form method="POST" action="/admin/service-request/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="pending">Pending</button><button name="status" value="accepted">Accepted</button><button name="status" value="assigned">Assigned</button></div><div class="three"><button name="status" value="working">Working</button><button name="status" value="completed">Completed</button><button class="reject" name="status" value="rejected">Rejected</button></div></form></div>`).join('');
+    res.send(page('Admin Service Requests', `<section class="card"><h1>Admin Service Requests</h1><form class="filters" method="GET" action="/admin/service-requests"><input name="q" value="${esc(q)}" placeholder="Search request, provider, customer, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="assigned" ${status === 'assigned' ? 'selected' : ''}>Assigned</option><option value="working" ${status === 'working' ? 'selected' : ''}>Working</option><option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/providers">Providers</a></div></section><section class="cards">${cards || '<div class="card"><h2>No service request found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1273,7 +1382,7 @@ app.post('/admin/service-request/status', async (req, res, next) => {
       const x = r.rows[0];
       await sendTelegram(['GOVO Service Request Status Updated', '', `Request ID: #${x.id}`, `Status: ${String(x.status || '').toUpperCase()}`, `Provider: ${x.provider_name || ''}`, `Customer: ${x.customer_name || ''}`, `Customer Phone: ${x.customer_phone || ''}`, `Problem: ${x.problem_details || ''}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
     }
-    res.redirect(`/admin/service-requests?pin=${encodeURIComponent(pin)}`);
+    res.redirect(`/admin/service-requests`);
   } catch (e) { next(e); }
 });
 
