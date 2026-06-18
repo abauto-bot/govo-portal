@@ -131,7 +131,39 @@ function page(title, body, active = '') {
     ['rdash', '/dashboard/rider', 'Rider Dashboard'],
   ].map(([key, href, label]) => `<a class="${active === key ? 'active' : ''}" href="${href}">${label}</a>`).join('');
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant • Rider • Admin OS</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Admin OS • Stable MVP</div></main>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${esc(title)} | GOVO Express</title><style>${css}</style>
+<style id="govoMerchantCssPolish">
+html.govo-merchant-host body{background:#071020!important}
+html.govo-merchant-host .card{background:linear-gradient(180deg,#101827,#0b1220)!important;border:1px solid #223047!important;border-radius:28px!important;box-shadow:0 18px 60px rgba(0,0,0,.25)!important}
+html.govo-merchant-host h1,html.govo-merchant-host h2,html.govo-merchant-host h3{color:#22c55e!important;font-weight:1000!important}
+html.govo-merchant-host p{color:#a8b3c7!important;line-height:1.5!important}
+html.govo-merchant-host input,html.govo-merchant-host textarea,html.govo-merchant-host select{width:100%!important;box-sizing:border-box!important;background:#050b18!important;border:1px solid #31415f!important;border-radius:16px!important;color:#fff!important;padding:15px!important;font-size:16px!important;outline:none!important;margin-top:6px!important;margin-bottom:12px!important}
+html.govo-merchant-host textarea{min-height:110px!important}
+html.govo-merchant-host label{display:block!important;font-size:15px!important;font-weight:900!important;color:#dbeafe!important;margin-top:10px!important}
+html.govo-merchant-host button,html.govo-merchant-host .btn,html.govo-merchant-host a.btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;border-radius:18px!important;padding:14px 18px!important;background:#22c55e!important;color:#052e16!important;border:1px solid #22c55e!important;text-decoration:none!important;font-weight:1000!important;font-size:16px!important}
+html.govo-merchant-host footer,html.govo-merchant-host .footer{color:#94a3b8!important}
+@media(max-width:700px){html.govo-merchant-host .btn,html.govo-merchant-host button{width:100%!important}}
+</style>
+<script id="govoMerchantCssPolishJs">
+(function(){
+  var host=location.hostname.toLowerCase();
+  if(host.startsWith("merchant.")){document.documentElement.classList.add("govo-merchant-host");}
+  function clean(){
+    if(!host.startsWith("merchant.")) return;
+    document.querySelectorAll("a").forEach(function(a){
+      var t=(a.textContent||"").toLowerCase();
+      var h=(a.getAttribute("href")||"").toLowerCase();
+      if(t.includes("admin")||h.includes("/admin")||t.includes("rider")||h.includes("/rider")) a.style.display="none";
+    });
+    document.querySelectorAll("footer,.footer,p,div").forEach(function(el){
+      if((el.textContent||"").trim()==="GOVO Admin OS • Stable MVP") el.textContent="GOVO Express • Merchant System";
+    });
+  }
+  clean(); setTimeout(clean,500); setTimeout(clean,1500);
+})();
+</script>
+
+</head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant • Rider • Admin OS</p></div></div><span class="pill">Live System</span></div><nav class="nav">${nav}</nav></header>${body}<div class="footer">GOVO Admin OS • Stable MVP</div></main>
 <script>
 (function(){
   const host = location.hostname.toLowerCase();
