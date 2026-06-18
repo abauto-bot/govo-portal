@@ -2146,6 +2146,177 @@ app.all("/rider/dashboard", async (req,res)=>{
 /* GOVO RIDER ASSIGN V1 END */
 
 
+
+/* GOVO TRACK POLISH V2 START */
+
+async function govoEnsureTrackPolishV2(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      merchant_note TEXT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+function govoTrackStatusTextV2(status){
+  status = String(status || "pending").toLowerCase();
+  if(status === "accepted") return "✅ Accepted";
+  if(status === "assigned") return "🛵 Rider Assigned";
+  if(status === "picked_up") return "📦 Picked Up";
+  if(status === "merchant_confirmed") return "🏪 Merchant Confirmed";
+  if(status === "preparing") return "👨‍🍳 Preparing";
+  if(status === "ready") return "✅ Ready for Pickup";
+  if(status === "delivered") return "🏁 Delivered";
+  if(status === "rejected") return "❌ Rejected";
+  if(status === "failed") return "⚠️ Failed";
+  return "⏳ Pending";
+}
+
+app.get("/track", async (req,res)=>{
+  try {
+    await govoEnsureTrackPolishV2();
+
+    const id = String((req.query && req.query.id) || "").trim();
+    const phone = String((req.query && req.query.phone) || "").trim();
+
+    let cards = "";
+
+    if (id || phone) {
+      let r;
+
+      if (id && phone) {
+        r = await pool.query(`SELECT * FROM govo_orders WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 5`, [id, phone]);
+      } else if (id) {
+        r = await pool.query(`SELECT * FROM govo_orders WHERE id=$1 ORDER BY id DESC LIMIT 5`, [id]);
+      } else {
+        r = await pool.query(`SELECT * FROM govo_orders WHERE customer_phone=$1 ORDER BY id DESC LIMIT 10`, [phone]);
+      }
+
+      cards = r.rows.length ? r.rows.map(x=>`
+        <div class="card govo-track-card">
+          <div class="govo-track-head">
+            <div>
+              <span class="govo-track-chip">Order #${esc(String(x.id))}</span>
+              <h2>${esc(String(x.shop_name || "GOVO Order"))}</h2>
+              <small>${esc(String(x.customer_phone || ""))}</small>
+            </div>
+            <span class="govo-track-status">${esc(govoTrackStatusTextV2(x.status))}</span>
+          </div>
+
+          <div class="govo-track-progress">
+            <div class="${["pending","accepted","assigned","picked_up","merchant_confirmed","preparing","ready","delivered"].includes(String(x.status||"").toLowerCase()) ? "on" : ""}">Order</div>
+            <div class="${["accepted","assigned","picked_up","merchant_confirmed","preparing","ready","delivered"].includes(String(x.status||"").toLowerCase()) ? "on" : ""}">Accepted</div>
+            <div class="${["assigned","picked_up","delivered"].includes(String(x.status||"").toLowerCase()) ? "on" : ""}">Rider</div>
+            <div class="${String(x.status||"").toLowerCase()==="delivered" ? "on" : ""}">Done</div>
+          </div>
+
+          <div class="govo-track-grid">
+            <div><b>Customer</b><span>${esc(String(x.customer_name || ""))}</span></div>
+            <div><b>Pickup</b><span>${esc(String(x.pickup_location || ""))}</span></div>
+            <div><b>Drop</b><span>${esc(String(x.drop_location || ""))}</span></div>
+            <div><b>Item</b><span>${esc(String(x.item_details || ""))}</span></div>
+            <div><b>Rider</b><span>${esc(String(x.rider_name || "Not assigned"))}</span><small>${esc(String(x.rider_phone || ""))}</small></div>
+            <div><b>Admin Note</b><span>${esc(String(x.admin_note || "No note"))}</span></div>
+            <div><b>Merchant Note</b><span>${esc(String(x.merchant_note || "No note"))}</span></div>
+            <div><b>Created</b><span>${esc(String(x.created_at || ""))}</span></div>
+          </div>
+        </div>
+      `).join("") : `
+        <div class="card">
+          <h2>No Order Found</h2>
+          <p>Order ID/phone ঠিক আছে কিনা check korun.</p>
+        </div>
+      `;
+    }
+
+    return res.send(page("Track Order", `
+      <style>
+        .govo-track-card{margin-top:14px!important;padding:16px!important}
+        .govo-track-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-track-head h2{font-size:22px!important;line-height:1.15!important;margin:10px 0 4px!important;color:#22c55e!important}
+        .govo-track-chip,.govo-track-status{display:inline-flex;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900}
+        .govo-track-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}
+        .govo-track-progress div{font-size:12px!important;text-align:center;padding:8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09)}
+        .govo-track-progress div.on{background:#052e16;border-color:#22c55e;color:#bbf7d0;font-weight:900}
+        .govo-track-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+        .govo-track-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px}
+        .govo-track-grid b{display:block;font-size:13px!important;margin-bottom:5px}
+        .govo-track-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word}
+        .govo-track-grid small{display:block;font-size:12px!important;margin-top:3px}
+        @media(max-width:700px){
+          .govo-track-head{flex-direction:column}
+          .govo-track-grid{grid-template-columns:1fr}
+          .govo-track-progress{grid-template-columns:1fr 1fr}
+        }
+      </style>
+
+      <div class="card">
+        <h1>🔎 Track Order</h1>
+        <p>Order ID অথবা customer phone দিয়ে delivery status দেখুন।</p>
+
+        <form method="GET" action="/track">
+          <label>Order ID</label>
+          <input name="id" value="${esc(id)}" placeholder="Example: 12">
+
+          <label>Customer Phone</label>
+          <input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx">
+
+          <button>Check Status</button>
+        </form>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+          <a class="btn" href="/shops">🏪 Shops</a>
+          <a class="btn" href="https://govoexpress.com">🏠 Home</a>
+        </div>
+      </div>
+
+      ${cards}
+    `));
+  } catch(e) {
+    return res.status(500).send(page("Track Error", `<div class="card"><h1>Track Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/order/success", async (req,res)=>{
+  const id = String((req.query && req.query.id) || "");
+  return res.send(page("Order Submitted", `
+    <div class="card">
+      <h1>✅ Order Submitted</h1>
+      <p>আপনার order receive হয়েছে। নিচের Tracking ID save করে রাখুন।</p>
+      <h2 style="color:#22c55e">Tracking ID: #${esc(id)}</h2>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <a class="btn" href="/track?id=${encodeURIComponent(id)}">🔎 Track Order</a>
+        <a class="btn" href="/shops">🏪 Back Shops</a>
+        <a class="btn" href="https://govoexpress.com">🏠 Home</a>
+      </div>
+    </div>
+  `));
+});
+
+/* GOVO TRACK POLISH V2 END */
+
+
 app.get("/track", async (req,res)=>{
   try {
     await govoEnsureTrackingOrders();
