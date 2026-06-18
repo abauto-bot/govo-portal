@@ -389,6 +389,210 @@ app.use((req,res,next)=>{
   return next();
 });
 
+
+/* GOVO SAFE MERCHANT DASHBOARD LEADS ONLY START */
+app.all("/merchant/dashboard", async (req,res)=>{
+  try {
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_address TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS products TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS whatsapp TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS image_url TEXT");
+
+    if (req.method === "POST") {
+      const id = String(req.body.id || "");
+      const phone = String(req.body.phone || "");
+
+      await pool.query(`
+        UPDATE govo_merchant_leads
+        SET shop_name=$1,
+            owner_name=$2,
+            location=$3,
+            category=$4,
+            delivery_needed=$5,
+            whatsapp=$6,
+            shop_address=$7,
+            image_url=$8,
+            shop_description=$9,
+            products=$10
+        WHERE id=$11
+      `, [
+        req.body.shop_name || "",
+        req.body.owner_name || "",
+        req.body.location || "",
+        req.body.category || "",
+        req.body.delivery_needed || "Yes",
+        req.body.whatsapp || phone,
+        req.body.shop_address || "",
+        req.body.image_url || "",
+        req.body.shop_description || "",
+        req.body.products || "",
+        id
+      ]);
+
+      return res.redirect("/merchant/dashboard?phone=" + encodeURIComponent(phone) + "&saved=1");
+    }
+
+    const phone = String((req.query && req.query.phone) || "");
+
+    if (!phone) {
+      return res.send(page("Merchant Dashboard", `
+        <div class="card">
+          <h1>Merchant Dashboard</h1>
+          <p>Approved merchant phone number diye login/check korun.</p>
+          <form method="GET" action="/merchant/dashboard">
+            <label>Phone</label>
+            <input name="phone" placeholder="017xxxxxxxx" required>
+            <button>Open Dashboard</button>
+          </form>
+        </div>
+      `));
+    }
+
+    const r = await pool.query(`
+      SELECT *
+      FROM govo_merchant_leads
+      WHERE phone=$1
+      ORDER BY id DESC
+      LIMIT 1
+    `, [phone]);
+
+    if (!r.rows.length) {
+      return res.send(page("Merchant Not Found", `
+        <div class="card">
+          <h1>No Merchant Found</h1>
+          <p>Ei phone number diye merchant pawa jayni.</p>
+          <a class="btn" href="/merchant">Register Merchant</a>
+        </div>
+      `));
+    }
+
+    const x = r.rows[0];
+    const saved = req.query && req.query.saved ? `<p style="color:#22c55e;font-weight:900">✅ Shop info saved successfully.</p>` : "";
+
+    return res.send(page("Merchant Dashboard", `
+      <div class="card">
+        <h1>Edit Shop Info</h1>
+        ${saved}
+        <p>Status: <b>${esc(String(x.status || "pending"))}</b></p>
+
+        <form method="POST" action="/merchant/dashboard">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input type="hidden" name="phone" value="${esc(String(x.phone || ""))}">
+
+          <label>Shop Name</label>
+          <input name="shop_name" value="${esc(String(x.shop_name || ""))}" required>
+
+          <label>Owner Name</label>
+          <input name="owner_name" value="${esc(String(x.owner_name || ""))}" required>
+
+          <label>Location</label>
+          <input name="location" value="${esc(String(x.location || ""))}" required>
+
+          <label>Category</label>
+          <input name="category" value="${esc(String(x.category || ""))}" required>
+
+          <label>Delivery Needed</label>
+          <input name="delivery_needed" value="${esc(String(x.delivery_needed || "Yes"))}">
+
+          <label>WhatsApp / Phone</label>
+          <input name="whatsapp" value="${esc(String(x.whatsapp || x.phone || ""))}">
+
+          <label>Shop Address</label>
+          <input name="shop_address" value="${esc(String(x.shop_address || x.location || ""))}">
+
+          <label>Image URL</label>
+          <input name="image_url" value="${esc(String(x.image_url || ""))}" placeholder="https://...">
+
+          <label>Shop Description</label>
+          <textarea name="shop_description">${esc(String(x.shop_description || ""))}</textarea>
+
+          <label>Products / Services</label>
+          <textarea name="products">${esc(String(x.products || ""))}</textarea>
+
+          <button>Save Shop Info</button>
+        </form>
+
+        <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+          <a class="btn" href="/shops">View Public Shops</a>
+          <a class="btn" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || "")}">Refresh</a>
+        </div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Safe merchant dashboard error:", e.message);
+    return res.status(500).send(page("Merchant Dashboard Error", `<div class="card"><h1>Merchant Dashboard Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+/* GOVO SAFE MERCHANT DASHBOARD LEADS ONLY END */
+
+
+
+/* GOVO SAFE SHOPS CARD V2 START */
+app.get("/shops", async (req,res)=>{
+  try {
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_address TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS products TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS whatsapp TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS image_url TEXT");
+
+    const r = await pool.query(`
+      SELECT id, shop_name, owner_name, phone, location, category, delivery_needed,
+             COALESCE(status,'pending') AS status,
+             shop_description, shop_address, products, whatsapp, image_url, created_at
+      FROM govo_merchant_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const cards = r.rows.map(x=>`
+      <div class="card" style="margin-bottom:22px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">
+          <div>
+            <div style="display:inline-flex;padding:8px 14px;border-radius:999px;border:1px solid #22c55e;background:#052e16;color:#bbf7d0;font-weight:900">
+              ${esc(String(x.category || "Shop"))}
+            </div>
+            <h2 style="color:#22c55e;margin:16px 0 10px;font-size:32px">${esc(String(x.shop_name || ""))}</h2>
+          </div>
+          ${x.image_url ? `<img src="${esc(String(x.image_url))}" style="width:82px;height:82px;object-fit:cover;border-radius:18px;border:1px solid #22c55e">` : ""}
+        </div>
+
+        <div style="font-size:17px;line-height:1.8;color:#dbeafe;margin-top:10px">
+          <div><b>Owner:</b> ${esc(String(x.owner_name || ""))}</div>
+          <div><b>Phone:</b> ${esc(String(x.whatsapp || x.phone || ""))}</div>
+          <div><b>Location:</b> ${esc(String(x.shop_address || x.location || ""))}</div>
+          <div><b>Delivery:</b> ${esc(String(x.delivery_needed || ""))}</div>
+          <div><b>About:</b> ${esc(String(x.shop_description || "Details coming soon"))}</div>
+          <div><b>Products:</b> ${esc(String(x.products || "Not added yet"))}</div>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+          <a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
+          <a class="btn" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || "")}">🏪 Shop Dashboard</a>
+        </div>
+      </div>
+    `).join("");
+
+    return res.send(page("GOVO Shops", `
+      <div class="card">
+        <h1>GOVO Shops</h1>
+        <p>Approved merchant shops. Customer ekhane theke delivery book korte parbe.</p>
+        <a class="btn" href="/merchant/dashboard">Merchant Login</a>
+      </div>
+      <div style="margin-top:22px">
+        ${cards || `<div class="card"><h2>No approved shop found</h2><p>Admin theke merchant approve korun.</p></div>`}
+      </div>
+    `));
+  } catch(e) {
+    console.log("Safe shops v2 error:", e.message);
+    return res.status(500).send(page("Shops Error", `<div class="card"><h1>Shops Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+/* GOVO SAFE SHOPS CARD V2 END */
+
+
 app.get("/admin/os", (req,res)=>{
   const pin = encodeURIComponent((req.query && req.query.pin) || process.env.ADMIN_PIN || "");
   res.send(page("GOVO Admin OS", `
