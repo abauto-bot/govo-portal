@@ -6,9 +6,45 @@ const path = require('path');
 const express = require('express');
 const { Pool } = require('pg');
 
+const multer = require("multer");
+
 loadEnv();
 
 const app = express();
+
+/* GOVO PRODUCT UPLOAD FIX START */
+const govoUploadsDir = path.join(__dirname, "uploads");
+
+try {
+  fs.mkdirSync(govoUploadsDir, { recursive: true });
+} catch (e) {
+  console.log("Upload dir create skipped:", e.message);
+}
+
+app.use("/uploads", express.static(govoUploadsDir));
+
+const productUpload = multer({
+  storage: multer.diskStorage({
+    destination: function(req, file, cb) {
+      cb(null, govoUploadsDir);
+    },
+    filename: function(req, file, cb) {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const safeExt = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
+      const name = "product-" + Date.now() + "-" + Math.round(Math.random() * 1e9) + safeExt;
+      cb(null, name);
+    }
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: function(req, file, cb) {
+    const ok = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.mimetype);
+    if (!ok) return cb(new Error("Only jpg, jpeg, png, webp, gif images allowed"));
+    cb(null, true);
+  }
+});
+/* GOVO PRODUCT UPLOAD FIX END */
+
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -111,6 +147,8 @@ function page(title, body, active = '') {
     ['merchant', '/merchant', 'Merchant'],
     ['rider', '/rider', 'Rider'],
     ['shops', '/shops', 'Shops'],
+    ['services', '/services', 'Services'],
+    ['provider', '/provider', 'Provider'],
     ['track', '/track', 'Track'],
     ['admin', `/admin/os${pin}`, 'Admin'],
   ].map(([key, href, label]) => `<a class="${active === key ? 'active' : ''}" href="${href}">${label}</a>`).join('');
@@ -139,12 +177,18 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_profiles (id SERIAL PRIMARY KEY, merchant_lead_id INTEGER, shop_name TEXT, owner_name TEXT, phone TEXT UNIQUE, location TEXT, category TEXT, delivery_needed TEXT, description TEXT, opening_hours TEXT, delivery_area TEXT, logo_image TEXT, cover_image TEXT, whatsapp TEXT, status TEXT DEFAULT 'draft', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS govo_service_providers (id SERIAL PRIMARY KEY, provider_name TEXT, phone TEXT, whatsapp TEXT, service_type TEXT, area TEXT, address TEXT, experience TEXT, description TEXT, image_url TEXT, status TEXT DEFAULT 'pending', admin_note TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS govo_service_requests (id SERIAL PRIMARY KEY, provider_id INT, provider_name TEXT, provider_phone TEXT, service_type TEXT, customer_name TEXT, customer_phone TEXT, service_address TEXT, problem_details TEXT, preferred_time TEXT, note TEXT, status TEXT DEFAULT 'pending', admin_note TEXT, provider_note TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_items (id SERIAL PRIMARY KEY, merchant_phone TEXT, item_name TEXT, price TEXT, details TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW())`);
 
   const add = async (table, columnSql) => pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${columnSql}`);
   for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
   for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
   for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'merchant_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
+  for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
+  for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
+
 }
 
 function domainType(req) {
@@ -580,7 +624,7 @@ app.get('/merchant/item/:id/delete', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-app.all('/merchant/products', async (req, res, next) => {
+app.all('/merchant/products', productUpload.single('product_image'), async (req, res, next) => {
   try {
     const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
     if (!phone) return res.send(page('Merchant Products', `<section class="card"><h1>Product / Menu Manager</h1><form method="GET" action="/merchant/products"><label>Merchant Phone</label><input name="phone" required><button>Open Product Manager</button></form></section>`, 'merchant'));
@@ -589,13 +633,18 @@ app.all('/merchant/products', async (req, res, next) => {
     const m = merchant.rows[0];
     const selectedFilter = String((req.body && req.body.filter) || (req.query && req.query.filter) || 'all').trim().toLowerCase();
     const redirect = () => res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}&filter=${encodeURIComponent(selectedFilter)}`);
+    const uploadedImageUrl = req.file ? `/uploads/${req.file.filename}` : '';
 
     if (req.method === 'POST' && req.body.action === 'add') {
-      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available, is_deleted, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,false,NOW())`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '']);
+      const imageUrl = uploadedImageUrl || String(req.body.image_url || '').trim();
+      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available, is_deleted, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,false,NOW())`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', imageUrl]);
       return redirect();
     }
     if (req.method === 'POST' && req.body.action === 'edit') {
-      await pool.query(`UPDATE govo_shop_products SET product_name=$1, price=$2, category=$3, description=$4, image_url=$5, shop_name=$6, merchant_lead_id=$7, updated_at=NOW() WHERE id=$8 AND merchant_phone=$9 AND COALESCE(is_deleted,false)=false`, [req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '', m.shop_name || '', m.id, req.body.id || '', phone]);
+      const current = await pool.query(`SELECT image_url FROM govo_shop_products WHERE id=$1 AND merchant_phone=$2 AND COALESCE(is_deleted,false)=false LIMIT 1`, [req.body.id || '', phone]);
+      const currentImageUrl = current.rows[0] ? String(current.rows[0].image_url || '') : '';
+      const imageUrl = uploadedImageUrl || String(req.body.image_url || currentImageUrl || '').trim();
+      await pool.query(`UPDATE govo_shop_products SET product_name=$1, price=$2, category=$3, description=$4, image_url=$5, shop_name=$6, merchant_lead_id=$7, updated_at=NOW() WHERE id=$8 AND merchant_phone=$9 AND COALESCE(is_deleted,false)=false`, [req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', imageUrl, m.shop_name || '', m.id, req.body.id || '', phone]);
       return redirect();
     }
     if (req.method === 'POST' && req.body.action === 'toggle') {
@@ -627,7 +676,7 @@ app.all('/merchant/products', async (req, res, next) => {
         </div>
         <p>${esc(x.description || '')}</p>
         ${badge(x.is_available ? 'available' : 'unavailable')}
-        <form method="POST" action="/merchant/products" style="margin-top:12px">
+        <form method="POST" action="/merchant/products" enctype="multipart/form-data" style="margin-top:12px">
           <input type="hidden" name="phone" value="${esc(phone)}">
           <input type="hidden" name="filter" value="${esc(filter)}">
           <input type="hidden" name="id" value="${esc(x.id)}">
@@ -636,7 +685,7 @@ app.all('/merchant/products', async (req, res, next) => {
           <label>Price</label><input name="price" value="${esc(x.price || '')}">
           <label>Category</label><input name="category" value="${esc(x.category || '')}">
           <label>Description</label><textarea name="description">${esc(x.description || '')}</textarea>
-          <label>Image URL</label><input name="image_url" value="${esc(x.image_url || '')}">
+          <label>Current Image URL</label><input name="image_url" value="${esc(x.image_url || '')}" placeholder="Existing URL kept if no upload"><label>Upload New Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif">
           <button>Save Product</button>
         </form>
         <div class="actions">
@@ -655,7 +704,7 @@ app.all('/merchant/products', async (req, res, next) => {
           ${filterLink(`Unavailable ${c.unavailable || 0}`, 'unavailable')}
           <a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Shop</a>
         </div>
-        <form method="POST" action="/merchant/products">
+        <form method="POST" action="/merchant/products" enctype="multipart/form-data">
           <input type="hidden" name="phone" value="${esc(phone)}">
           <input type="hidden" name="filter" value="${esc(filter)}">
           <input type="hidden" name="action" value="add">
@@ -663,7 +712,7 @@ app.all('/merchant/products', async (req, res, next) => {
           <label>Price</label><input name="price" placeholder="৳120 / Negotiable">
           <label>Category</label><input name="category" placeholder="Food / Grocery / Service">
           <label>Description</label><textarea name="description"></textarea>
-          <label>Image URL</label><input name="image_url" placeholder="https://...">
+          <label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Image URL</label><input name="image_url" placeholder="Optional legacy URL">
           <button>Add Product</button>
         </form>
       </section>
@@ -713,6 +762,174 @@ app.all('/rider/dashboard', async (req, res, next) => {
     const orders = await pool.query(`SELECT * FROM govo_orders WHERE rider_phone=$1 ORDER BY id DESC LIMIT 100`, [phone]);
     const cards = orders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.shop_name || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Drop</b><span>${esc(x.drop_location)}</span></div><div><b>Item</b><span>${esc(x.item_details)}</span></div></div><form method="POST" action="/rider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><div class="three"><button name="status" value="picked_up">Picked Up</button><button name="status" value="delivered">Delivered</button><button class="reject" name="status" value="failed">Failed</button></div></form></div>`).join('');
     res.send(page('Rider Dashboard', `<section class="card"><h1>Rider Dashboard</h1><p>${esc(rd.rider_name || '')} - ${esc(rd.phone || '')}</p>${badge(rd.status)}</section><section class="cards">${cards || '<div class="card"><h2>No assigned orders found</h2></div>'}</section>`, 'rider'));
+  } catch (e) { next(e); }
+});
+
+const serviceCategories = [
+  { slug: 'electrician', icon: '⚡', title: 'Electrician', desc: 'Wiring, lights, fans and power repair.', keywords: ['electrician', 'electric', 'wiring', 'light', 'fan'] },
+  { slug: 'plumber', icon: '🚰', title: 'Plumber', desc: 'Water line, pipe, bathroom and kitchen fixes.', keywords: ['plumber', 'pipe', 'water', 'bathroom', 'kitchen'] },
+  { slug: 'ac-repair', icon: '❄️', title: 'AC Repair', desc: 'AC service, cooling, installation and maintenance.', keywords: ['ac', 'air conditioner', 'cooling', 'installation'] },
+  { slug: 'mobile-repair', icon: '📱', title: 'Mobile Repair', desc: 'Phone, display, battery and software repair.', keywords: ['mobile', 'phone', 'display', 'battery', 'software'] },
+  { slug: 'home-service', icon: '🏠', title: 'Home Service', desc: 'Cleaning, shifting, repair and home support.', keywords: ['home', 'cleaning', 'shifting', 'repair', 'service'] },
+  { slug: 'doctor', icon: '🩺', title: 'Doctor', desc: 'Doctor appointment and healthcare support.', keywords: ['doctor', 'clinic', 'medical', 'health', 'appointment'] },
+  { slug: 'agriculture', icon: '🌾', title: 'Agriculture', desc: 'Agro support, field service and farming help.', keywords: ['agriculture', 'agro', 'farm', 'seed', 'fertilizer'] },
+  { slug: 'transport', icon: '🚗', title: 'Transport', desc: 'Ride, rental, pickup and local transport.', keywords: ['transport', 'ride', 'car', 'bike', 'pickup', 'truck'] },
+  { slug: 'house-rent', icon: '🏘️', title: 'House Rent', desc: 'House, room, flat and property rent help.', keywords: ['house rent', 'rent', 'flat', 'room', 'property'] },
+  { slug: 'other', icon: '✨', title: 'Other', desc: 'Other approved GOVO service providers.', keywords: ['other', 'service', 'misc'] },
+];
+
+function providerSearchText(x) {
+  return [x.provider_name, x.phone, x.whatsapp, x.service_type, x.area, x.address, x.experience, x.description].join(' ').toLowerCase();
+}
+
+function serviceCategoryMatches(x, cat) {
+  const text = providerSearchText(x);
+  return cat.keywords.some((k) => text.includes(k.toLowerCase()));
+}
+
+function providerCard(x) {
+  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div>${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.provider_name || 'Provider')}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin-top:10px">` : ''}<div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+}
+
+async function approvedProviders() {
+  return pool.query(`SELECT * FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 500`);
+}
+
+app.all('/provider', async (req, res, next) => {
+  try {
+    if (req.method === 'POST') {
+      const r = await pool.query(`INSERT INTO govo_service_providers (provider_name, phone, whatsapp, service_type, area, address, experience, description, image_url, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',NOW(),NOW()) RETURNING *`, [req.body.provider_name || '', req.body.phone || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', req.body.image_url || '']);
+      const x = r.rows[0];
+      sendTelegram(['New GOVO Service Provider', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `WhatsApp: ${x.whatsapp || ''}`, `Type: ${x.service_type || ''}`, `Area: ${x.area || ''}`, `Address: ${x.address || ''}`].join('\n')).catch(() => {});
+      return res.send(page('Provider Submitted', `<section class="card"><h1>Provider Submitted</h1><p>GOVO team review kore approve korbe.</p><div class="actions"><a class="btn" href="/provider">Add Another</a><a class="btn secondary" href="/services">Services</a></div></section>`, 'services'));
+    }
+    res.send(page('Provider Registration', `<section class="card"><h1>Service Provider Registration</h1><p style="color:var(--muted)">Join GOVO Super App as an approved service provider.</p><form method="POST" action="/provider"><label>Provider Name</label><input name="provider_name" required><label>Phone</label><input name="phone" required><label>WhatsApp</label><input name="whatsapp"><label>Service Type</label><input name="service_type" placeholder="Electrician / Doctor / Transport" required><label>Area</label><input name="area" required><label>Address</label><textarea name="address"></textarea><label>Experience</label><input name="experience" placeholder="5 years / 100+ jobs"><label>Description</label><textarea name="description"></textarea><label>Image URL</label><input name="image_url" placeholder="Optional profile/service image URL"><button>Submit Provider</button></form></section>`, 'services'));
+  } catch (e) { next(e); }
+});
+
+app.all('/provider/dashboard', async (req, res, next) => {
+  try {
+    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
+    if (!phone) return res.send(page('Provider Dashboard', `<section class="card"><h1>Provider Dashboard</h1><form method="GET" action="/provider/dashboard"><label>Provider Phone</label><input name="phone" required><button>Open Dashboard</button></form><div class="actions"><a class="btn secondary" href="/provider">Register Provider</a><a class="btn secondary" href="/services">Services</a></div></section>`, 'services'));
+    const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    if (!provider.rows.length) return res.send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="/provider">Register Provider</a></section>`, 'services'));
+    const p = provider.rows[0];
+    if (req.method === 'POST' && req.body.action === 'profile') {
+      await pool.query(`UPDATE govo_service_providers SET provider_name=$1, whatsapp=$2, service_type=$3, area=$4, address=$5, experience=$6, description=$7, image_url=$8, updated_at=NOW() WHERE id=$9`, [req.body.provider_name || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', req.body.image_url || '', p.id]);
+      return res.redirect(`/provider/dashboard?phone=${encodeURIComponent(phone)}`);
+    }
+    if (req.method === 'POST' && req.body.action === 'request_status') {
+      const allowed = ['accepted', 'working', 'completed', 'rejected'];
+      const status = allowed.includes(String(req.body.status || '').toLowerCase()) ? String(req.body.status).toLowerCase() : 'accepted';
+      const updated = await pool.query(`UPDATE govo_service_requests SET status=$1, provider_note=$2, updated_at=NOW() WHERE id=$3 AND provider_id=$4 RETURNING *`, [status, req.body.provider_note || '', req.body.request_id || '', p.id]);
+      if (updated.rows.length) {
+        const x = updated.rows[0];
+        sendTelegram(['GOVO Provider Request Update', '', `Request ID: #${x.id}`, `Provider: ${p.provider_name || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Customer: ${x.customer_name || ''}`, `Phone: ${x.customer_phone || ''}`, `Problem: ${x.problem_details || ''}`].join('\n')).catch(() => {});
+      }
+      return res.redirect(`/provider/dashboard?phone=${encodeURIComponent(phone)}`);
+    }
+    const fresh = (await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1`, [p.id])).rows[0] || p;
+    const requests = await pool.query(`SELECT * FROM govo_service_requests WHERE provider_id=$1 OR provider_phone=$2 ORDER BY id DESC LIMIT 100`, [fresh.id, fresh.phone || '']);
+    const requestCards = requests.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.customer_name || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.customer_phone)}</span></div><div><b>Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem</b><span>${esc(x.problem_details)}</span></div><div><b>Preferred</b><span>${esc(x.preferred_time)}</span></div><div><b>Note</b><span>${esc(x.note)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/provider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="action" value="request_status"><input type="hidden" name="request_id" value="${esc(x.id)}"><input name="provider_note" placeholder="Provider note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="working">Working</button><button name="status" value="completed">Complete</button></div><button class="reject" name="status" value="rejected">Reject</button></form></div>`).join('');
+    res.send(page('Provider Dashboard', `<section class="card"><h1>Provider Dashboard</h1><p>${esc(fresh.provider_name || '')} | ${badge(fresh.status)}</p><form method="POST" action="/provider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="action" value="profile"><label>Provider Name</label><input name="provider_name" value="${esc(fresh.provider_name || '')}" required><label>WhatsApp</label><input name="whatsapp" value="${esc(fresh.whatsapp || '')}"><label>Service Type</label><input name="service_type" value="${esc(fresh.service_type || '')}" required><label>Area</label><input name="area" value="${esc(fresh.area || '')}" required><label>Address</label><textarea name="address">${esc(fresh.address || '')}</textarea><label>Experience</label><input name="experience" value="${esc(fresh.experience || '')}"><label>Description</label><textarea name="description">${esc(fresh.description || '')}</textarea><label>Image URL</label><input name="image_url" value="${esc(fresh.image_url || '')}"><button>Save Profile</button></form><div class="actions"><a class="btn secondary" href="/service/${encodeURIComponent(fresh.id)}">Public Page</a><a class="btn secondary" href="/services">Services</a></div></section><section class="card"><h2>Service Requests</h2></section><section class="cards">${requestCards || '<div class="card"><h2>No request yet</h2></div>'}</section>`, 'services'));
+  } catch (e) { next(e); }
+});
+
+app.get('/services', async (req, res, next) => {
+  try {
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const all = await approvedProviders();
+    const rows = q ? all.rows.filter((x) => providerSearchText(x).includes(q)) : all.rows.slice(0, 24);
+    const categoryCards = serviceCategories.map((cat) => {
+      const count = all.rows.filter((x) => serviceCategoryMatches(x, cat)).length;
+      return `<div class="card" style="padding:15px"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div><div style="font-size:30px;line-height:1">${cat.icon}</div><h2 style="font-size:21px;margin:10px 0 6px">${esc(cat.title)}</h2></div><span class="pill">${count}</span></div><p style="color:var(--muted);min-height:42px">${esc(cat.desc)}</p><a class="btn" href="/services?q=${encodeURIComponent(cat.title)}">View</a></div>`;
+    }).join('');
+    const cards = rows.map(providerCard).join('');
+    res.send(page('GOVO Services', `<section class="card" style="background:linear-gradient(180deg,#102016,#111827)"><span class="pill">GOVO Services</span><h1>Book trusted local service providers</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Find approved providers for repair, health, agriculture, transport, rent and home service.</p><form method="GET" action="/services"><input name="q" value="${esc(q)}" placeholder="Search service, area, name, phone"><button>Search Services</button></form><div class="actions"><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/provider">Become Provider</a></div></section><section class="card"><h2>Service Categories</h2><div class="item-grid">${categoryCards}</div></section><section class="card"><div class="actions" style="justify-content:space-between"><h2>${q ? 'Search Results' : 'Featured Providers'}</h2><span class="pill">${rows.length} showing</span></div></section><section class="cards">${cards || '<div class="card"><h2>No approved provider found</h2></div>'}</section>`, 'services'));
+  } catch (e) { next(e); }
+});
+
+app.get('/service/:id', async (req, res, next) => {
+  try {
+    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
+    const p = r.rows[0];
+    if (!p) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not approved or not found.</p><a class="btn" href="/services">Back Services</a></section>`, 'services'));
+    res.send(page(p.provider_name || 'GOVO Service', `<section class="card"><a class="btn secondary" href="/services">Back Services</a><h1>${esc(p.provider_name || '')}</h1>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.provider_name || 'Provider')}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin:10px 0">` : ''}<div class="detail-grid"><div><b>Service</b><span>${esc(p.service_type)}</span></div><div><b>Phone</b><span>${esc(p.whatsapp || p.phone)}</span></div><div><b>Area</b><span>${esc(p.area)}</span></div><div><b>Address</b><span>${esc(p.address)}</span></div><div><b>Experience</b><span>${esc(p.experience)}</span></div><div><b>About</b><span>${esc(p.description)}</span></div></div></section><section class="card"><h2>Request Service</h2><form method="POST" action="/service/request"><input type="hidden" name="provider_id" value="${esc(p.id)}"><input type="hidden" name="service_type" value="${esc(p.service_type || '')}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Service Address</label><textarea name="service_address" required></textarea><label>Problem Details</label><textarea name="problem_details" required></textarea><label>Preferred Time</label><input name="preferred_time" placeholder="Today 5 PM"><label>Note</label><textarea name="note"></textarea><button>Submit Request</button></form></section>`, 'services'));
+  } catch (e) { next(e); }
+});
+
+app.post('/service/request', async (req, res, next) => {
+  try {
+    const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.body.provider_id || '']);
+    const p = provider.rows[0];
+    if (!p) return res.status(404).send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="/services">Back Services</a></section>`, 'services'));
+    const saved = await pool.query(`INSERT INTO govo_service_requests (provider_id, provider_name, provider_phone, service_type, customer_name, customer_phone, service_address, problem_details, preferred_time, note, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',NOW(),NOW()) RETURNING *`, [p.id, p.provider_name || '', p.phone || '', req.body.service_type || p.service_type || '', req.body.customer_name || '', req.body.customer_phone || '', req.body.service_address || '', req.body.problem_details || '', req.body.preferred_time || '', req.body.note || '']);
+    const x = saved.rows[0];
+    sendTelegram(['New GOVO Service Request', '', `Request ID: #${x.id}`, `Provider: ${x.provider_name || ''}`, `Provider Phone: ${x.provider_phone || ''}`, `Service: ${x.service_type || ''}`, `Customer: ${x.customer_name || ''}`, `Customer Phone: ${x.customer_phone || ''}`, `Address: ${x.service_address || ''}`, `Problem: ${x.problem_details || ''}`, `Preferred: ${x.preferred_time || ''}`].join('\n')).catch(() => {});
+    res.send(page('Service Request Submitted', `<section class="card"><h1>Request Submitted</h1><p>GOVO team and provider will review your request.</p><h2>Request ID: #${esc(x.id)}</h2><div class="actions"><a class="btn" href="/services">Services</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/track">Track</a></div></section>`, 'services'));
+  } catch (e) { next(e); }
+});
+
+app.get('/admin/providers', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const pin = getPin(req);
+    const status = String(req.query.status || 'all').trim().toLowerCase();
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const params = [];
+    const where = [];
+    if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
+    if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(address,'')) LIKE $${params.length}`); }
+    const providers = await pool.query(`SELECT * FROM govo_service_providers ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form><div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
+    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1><form class="filters" method="GET" action="/admin/providers"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/service-requests?pin=${encodeURIComponent(pin)}">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/provider/status', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const pin = getPin(req);
+    let status = String(req.body.status || 'pending').trim().toLowerCase();
+    if (!['approved', 'rejected', 'pending'].includes(status)) status = 'pending';
+    const r = await pool.query(`UPDATE govo_service_providers SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING *`, [status, req.body.admin_note || '', req.body.id || '']);
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await sendTelegram(['GOVO Provider Status Updated', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `Service: ${x.service_type || ''}`, `Area: ${x.area || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
+    }
+    res.redirect(`/admin/providers?pin=${encodeURIComponent(pin)}`);
+  } catch (e) { next(e); }
+});
+
+app.get('/admin/service-requests', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const pin = getPin(req);
+    const status = String(req.query.status || 'all').trim().toLowerCase();
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const params = [];
+    const where = [];
+    if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
+    if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(provider_phone,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(customer_name,'') || ' ' || COALESCE(customer_phone,'') || ' ' || COALESCE(service_address,'') || ' ' || COALESCE(problem_details,'')) LIKE $${params.length}`); }
+    const requests = await pool.query(`SELECT * FROM govo_service_requests ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const cards = requests.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.service_type || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Provider</b><span>${esc(x.provider_name)}<br>${esc(x.provider_phone)}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem</b><span>${esc(x.problem_details)}</span></div><div><b>Preferred</b><span>${esc(x.preferred_time)}</span></div><div><b>Note</b><span>${esc(x.note)}</span></div></div><form method="POST" action="/admin/service-request/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="pending">Pending</button><button name="status" value="accepted">Accepted</button><button name="status" value="assigned">Assigned</button></div><div class="three"><button name="status" value="working">Working</button><button name="status" value="completed">Completed</button><button class="reject" name="status" value="rejected">Rejected</button></div></form></div>`).join('');
+    res.send(page('Admin Service Requests', `<section class="card"><h1>Admin Service Requests</h1><form class="filters" method="GET" action="/admin/service-requests"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search request, provider, customer, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option><option value="assigned" ${status === 'assigned' ? 'selected' : ''}>Assigned</option><option value="working" ${status === 'working' ? 'selected' : ''}>Working</option><option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/providers?pin=${encodeURIComponent(pin)}">Providers</a></div></section><section class="cards">${cards || '<div class="card"><h2>No service request found</h2></div>'}</section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/service-request/status', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const pin = getPin(req);
+    const allowed = ['pending', 'accepted', 'assigned', 'working', 'completed', 'rejected'];
+    let status = String(req.body.status || 'pending').trim().toLowerCase();
+    if (!allowed.includes(status)) status = 'pending';
+    const r = await pool.query(`UPDATE govo_service_requests SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING *`, [status, req.body.admin_note || '', req.body.id || '']);
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await sendTelegram(['GOVO Service Request Status Updated', '', `Request ID: #${x.id}`, `Status: ${String(x.status || '').toUpperCase()}`, `Provider: ${x.provider_name || ''}`, `Customer: ${x.customer_name || ''}`, `Customer Phone: ${x.customer_phone || ''}`, `Problem: ${x.problem_details || ''}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
+    }
+    res.redirect(`/admin/service-requests?pin=${encodeURIComponent(pin)}`);
   } catch (e) { next(e); }
 });
 
