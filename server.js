@@ -136,6 +136,8 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_rider_leads (id SERIAL PRIMARY KEY, rider_name TEXT, phone TEXT, location TEXT, vehicle_type TEXT, experience TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_orders (id SERIAL PRIMARY KEY, shop_name TEXT, merchant_phone TEXT, customer_name TEXT, customer_phone TEXT, pickup_location TEXT, drop_location TEXT, item_details TEXT, note TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_products (id SERIAL PRIMARY KEY, merchant_lead_id INT, shop_name TEXT, merchant_phone TEXT, product_name TEXT, price TEXT, category TEXT, description TEXT, image_url TEXT, is_available BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`);
+  await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_profiles (id SERIAL PRIMARY KEY, merchant_lead_id INTEGER, shop_name TEXT, owner_name TEXT, phone TEXT UNIQUE, location TEXT, category TEXT, delivery_needed TEXT, description TEXT, opening_hours TEXT, delivery_area TEXT, logo_image TEXT, cover_image TEXT, whatsapp TEXT, status TEXT DEFAULT 'draft', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_items (id SERIAL PRIMARY KEY, merchant_phone TEXT, item_name TEXT, price TEXT, details TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW())`);
 
@@ -350,9 +352,43 @@ app.get('/shop/:id', async (req, res, next) => {
     const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, created_at FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
     if (!x) return res.status(404).send(page('Shop Not Found', '<section class="card"><h1>Shop Not Found</h1><p>This shop is not approved or not found.</p></section>'));
-    const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true ORDER BY id DESC LIMIT 100`, [x.id, x.phone]);
-    const productHtml = products.rows.map((p) => `<div class="item-box"><b>${esc(p.product_name || 'Product')}</b><span>${esc(p.price || '')}</span><br><span>${esc(p.description || '')}</span></div>`).join('');
-    res.send(page(x.shop_name || 'GOVO Shop', `<section class="card"><a class="btn secondary" href="/shops">Back Shops</a><h1>${esc(x.shop_name || '')}</h1><div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || '')}</span></div></div><div class="actions"><a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Book Delivery</a></div></section><section class="card"><h2>Products / Services</h2><div class="item-grid">${productHtml || '<p>No product added yet.</p>'}</div></section>`, 'shops'));
+    const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 120`, [x.id, x.phone]);
+    const productHtml = products.rows.map((p) => {
+      const itemValue = `${p.product_name || 'Product'}${p.price ? ` - ${p.price}` : ''}`;
+      return `<div class="card" style="padding:14px;margin:0"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><span class="pill">${esc(p.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(p.product_name || 'Product')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${esc(p.price || '')}</p></div>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.product_name || 'Product')}" style="width:86px;height:86px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(p.description || '')}</p><button type="button" onclick="document.getElementById('item_details').value=${esc(JSON.stringify(itemValue))};document.getElementById('order_form').scrollIntoView({behavior:'smooth',block:'start'});">Add to Order</button></div>`;
+    }).join('');
+    res.send(page(x.shop_name || 'GOVO Shop', `
+      <section class="card">
+        <a class="btn secondary" href="/shops">Back Shops</a>
+        <h1>${esc(x.shop_name || '')}</h1>
+        <div class="detail-grid">
+          <div><b>Owner</b><span>${esc(x.owner_name)}</span></div>
+          <div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div>
+          <div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div>
+          <div><b>Category</b><span>${esc(x.category)}</span></div>
+          <div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div>
+          <div><b>About</b><span>${esc(x.shop_description || '')}</span></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Products / Menu</h2>
+        <div class="item-grid">${productHtml || '<p>No available product added yet.</p>'}</div>
+      </section>
+      <section class="card" id="order_form">
+        <h2>Order From This Shop</h2>
+        <form method="POST" action="/order">
+          <input type="hidden" name="shop_name" value="${esc(x.shop_name || '')}">
+          <input type="hidden" name="merchant_phone" value="${esc(x.whatsapp || x.phone || '')}">
+          <input type="hidden" name="pickup_location" value="${esc(x.shop_address || x.location || x.shop_name || '')}">
+          <label>Your Name</label><input name="customer_name" required>
+          <label>Your Phone</label><input name="customer_phone" required>
+          <label>Drop Location</label><input name="drop_location" required>
+          <label>Product / Menu Details</label><textarea id="item_details" name="item_details" required placeholder="Tap Add to Order, or write item details"></textarea>
+          <label>Note</label><textarea name="note"></textarea>
+          <button>Submit Order</button>
+        </form>
+      </section>
+    `, 'shops'));
   } catch (e) { next(e); }
 });
 
@@ -458,24 +494,91 @@ app.all('/merchant/products', async (req, res, next) => {
   try {
     const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
     if (!phone) return res.send(page('Merchant Products', `<section class="card"><h1>Product / Menu Manager</h1><form method="GET" action="/merchant/products"><label>Merchant Phone</label><input name="phone" required><button>Open Product Manager</button></form></section>`, 'merchant'));
-    const merchant = await pool.query(`SELECT id, shop_name, owner_name, phone, location, category, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const merchant = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     if (!merchant.rows.length) return res.send(page('Merchant Not Found', '<section class="card"><h1>No Merchant Found</h1></section>', 'merchant'));
     const m = merchant.rows[0];
+    const selectedFilter = String((req.body && req.body.filter) || (req.query && req.query.filter) || 'all').trim().toLowerCase();
+    const redirect = () => res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}&filter=${encodeURIComponent(selectedFilter)}`);
+
     if (req.method === 'POST' && req.body.action === 'add') {
-      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true)`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '']);
-      return res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}`);
+      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available, is_deleted, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,false,NOW())`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '']);
+      return redirect();
+    }
+    if (req.method === 'POST' && req.body.action === 'edit') {
+      await pool.query(`UPDATE govo_shop_products SET product_name=$1, price=$2, category=$3, description=$4, image_url=$5, shop_name=$6, merchant_lead_id=$7, updated_at=NOW() WHERE id=$8 AND merchant_phone=$9 AND COALESCE(is_deleted,false)=false`, [req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', req.body.image_url || '', m.shop_name || '', m.id, req.body.id || '', phone]);
+      return redirect();
     }
     if (req.method === 'POST' && req.body.action === 'toggle') {
-      await pool.query(`UPDATE govo_shop_products SET is_available=NOT COALESCE(is_available,true), updated_at=NOW() WHERE id=$1 AND merchant_phone=$2`, [req.body.id || '', phone]);
-      return res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}`);
+      await pool.query(`UPDATE govo_shop_products SET is_available=NOT COALESCE(is_available,true), updated_at=NOW() WHERE id=$1 AND merchant_phone=$2 AND COALESCE(is_deleted,false)=false`, [req.body.id || '', phone]);
+      return redirect();
     }
     if (req.method === 'POST' && req.body.action === 'delete') {
-      await pool.query(`UPDATE govo_shop_products SET is_available=false, updated_at=NOW() WHERE id=$1 AND merchant_phone=$2`, [req.body.id || '', phone]);
-      return res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}`);
+      await pool.query(`UPDATE govo_shop_products SET is_deleted=true, is_available=false, updated_at=NOW() WHERE id=$1 AND merchant_phone=$2`, [req.body.id || '', phone]);
+      return redirect();
     }
-    const products = await pool.query(`SELECT * FROM govo_shop_products WHERE merchant_lead_id=$1 OR merchant_phone=$2 ORDER BY COALESCE(is_available,true) DESC, id DESC LIMIT 200`, [m.id, phone]);
-    const rows = products.rows.map((x) => `<div class="item-box"><b>${esc(x.product_name || '')}</b><span>${esc(x.price || '')}</span><br><span>${esc(x.description || '')}</span><br>${badge(x.is_available ? 'available' : 'hidden')}<form method="POST" action="/merchant/products"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="action" value="toggle"><button>${x.is_available ? 'Hide' : 'Show'}</button></form><form method="POST" action="/merchant/products"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="action" value="delete"><button class="reject">Hide Product</button></form></div>`).join('');
-    res.send(page('Product / Menu Manager', `<section class="card"><h1>Product / Menu Manager</h1><p>Shop: ${esc(m.shop_name || '')}</p><form method="POST" action="/merchant/products"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="action" value="add"><label>Product/Menu Name</label><input name="product_name" required><label>Price</label><input name="price"><label>Category</label><input name="category"><label>Description</label><textarea name="description"></textarea><label>Image URL</label><input name="image_url"><button>Add Product</button></form></section><section class="card"><h2>Products</h2><div class="item-grid">${rows || '<p>No product added yet.</p>'}</div></section>`, 'merchant'));
+
+    const filter = ['available', 'unavailable'].includes(selectedFilter) ? selectedFilter : 'all';
+    const conditions = [`(merchant_lead_id=$1 OR merchant_phone=$2)`, `COALESCE(is_deleted,false)=false`];
+    if (filter === 'available') conditions.push(`COALESCE(is_available,true)=true`);
+    if (filter === 'unavailable') conditions.push(`COALESCE(is_available,true)=false`);
+    const products = await pool.query(`SELECT * FROM govo_shop_products WHERE ${conditions.join(' AND ')} ORDER BY COALESCE(is_available,true) DESC, category NULLS LAST, id DESC LIMIT 200`, [m.id, phone]);
+    const count = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false)::int available, COUNT(*) FILTER (WHERE COALESCE(is_available,true)=false AND COALESCE(is_deleted,false)=false)::int unavailable FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_deleted,false)=false`, [m.id, phone]);
+    const c = count.rows[0] || {};
+    const filterLink = (label, value) => `<a class="btn ${filter === value ? '' : 'secondary'}" href="/merchant/products?phone=${encodeURIComponent(phone)}&filter=${encodeURIComponent(value)}">${label}</a>`;
+    const rows = products.rows.map((x) => `
+      <div class="card" style="padding:14px">
+        <div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start">
+          <div style="min-width:0">
+            <span class="pill">${esc(x.category || 'Menu')}</span>
+            <h2 style="font-size:22px;margin-top:10px">${esc(x.product_name || '')}</h2>
+            <p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${esc(x.price || '')}</p>
+          </div>
+          ${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.product_name || 'Product')}" style="width:82px;height:82px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}
+        </div>
+        <p>${esc(x.description || '')}</p>
+        ${badge(x.is_available ? 'available' : 'unavailable')}
+        <form method="POST" action="/merchant/products" style="margin-top:12px">
+          <input type="hidden" name="phone" value="${esc(phone)}">
+          <input type="hidden" name="filter" value="${esc(filter)}">
+          <input type="hidden" name="id" value="${esc(x.id)}">
+          <input type="hidden" name="action" value="edit">
+          <label>Name</label><input name="product_name" value="${esc(x.product_name || '')}" required>
+          <label>Price</label><input name="price" value="${esc(x.price || '')}">
+          <label>Category</label><input name="category" value="${esc(x.category || '')}">
+          <label>Description</label><textarea name="description">${esc(x.description || '')}</textarea>
+          <label>Image URL</label><input name="image_url" value="${esc(x.image_url || '')}">
+          <button>Save Product</button>
+        </form>
+        <div class="actions">
+          <form method="POST" action="/merchant/products"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="filter" value="${esc(filter)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="action" value="toggle"><button class="secondary">${x.is_available ? 'Mark Unavailable' : 'Mark Available'}</button></form>
+          <form method="POST" action="/merchant/products" onsubmit="return confirm('Hide this product from menu?')"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="filter" value="${esc(filter)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="action" value="delete"><button class="reject">Delete Safely</button></form>
+        </div>
+      </div>
+    `).join('');
+    res.send(page('Product / Menu Manager', `
+      <section class="card">
+        <h1>Product / Menu Manager</h1>
+        <p>Shop: ${esc(m.shop_name || '')} | Showing: ${esc(filter)}</p>
+        <div class="toolbar">
+          ${filterLink(`All ${c.total || 0}`, 'all')}
+          ${filterLink(`Available ${c.available || 0}`, 'available')}
+          ${filterLink(`Unavailable ${c.unavailable || 0}`, 'unavailable')}
+          <a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Shop</a>
+        </div>
+        <form method="POST" action="/merchant/products">
+          <input type="hidden" name="phone" value="${esc(phone)}">
+          <input type="hidden" name="filter" value="${esc(filter)}">
+          <input type="hidden" name="action" value="add">
+          <label>Product/Menu Name</label><input name="product_name" required>
+          <label>Price</label><input name="price" placeholder="৳120 / Negotiable">
+          <label>Category</label><input name="category" placeholder="Food / Grocery / Service">
+          <label>Description</label><textarea name="description"></textarea>
+          <label>Image URL</label><input name="image_url" placeholder="https://...">
+          <button>Add Product</button>
+        </form>
+      </section>
+      <section class="cards">${rows || '<div class="card"><h2>No product found</h2></div>'}</section>
+    `, 'merchant'));
   } catch (e) { next(e); }
 });
 
