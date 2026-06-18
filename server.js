@@ -242,12 +242,72 @@ app.get('/admin/os', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const [orders, merchants, riders] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending FROM govo_orders`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_merchant_leads`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_rider_leads`),
+    const pinParam = encodeURIComponent(pin);
+    const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_merchant_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_rider_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_service_providers`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`),
+      pool.query(`SELECT id, shop_name, customer_name, customer_phone, drop_location, COALESCE(status,'pending') AS status, created_at FROM govo_orders ORDER BY id DESC LIMIT 5`),
+      pool.query(`SELECT id, provider_name, service_type, customer_name, customer_phone, COALESCE(status,'pending') AS status, created_at FROM govo_service_requests ORDER BY id DESC LIMIT 5`),
+      pool.query(`SELECT id, shop_name, owner_name, phone, category, COALESCE(status,'pending') AS status, created_at FROM govo_merchant_leads ORDER BY id DESC LIMIT 5`),
+      pool.query(`SELECT id, provider_name, phone, service_type, area, COALESCE(status,'pending') AS status, created_at FROM govo_service_providers ORDER BY id DESC LIMIT 5`),
     ]);
-    res.send(page('Admin OS', `<section class="grid"><div class="stat"><div class="label">Orders</div><div class="value">${esc(orders.rows[0].total || 0)}</div></div><div class="stat"><div class="label">Pending Orders</div><div class="value">${esc(orders.rows[0].pending || 0)}</div></div><div class="stat"><div class="label">Approved Merchants</div><div class="value">${esc(merchants.rows[0].approved || 0)}</div></div><div class="stat"><div class="label">Approved Riders</div><div class="value">${esc(riders.rows[0].approved || 0)}</div></div></section><section class="card"><h1>Admin OS</h1><div class="toolbar"><a class="btn" href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchants</a><a class="btn" href="/admin/riders?pin=${encodeURIComponent(pin)}">Riders</a><a class="btn" href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a><a class="btn secondary" href="/shops">Public Shops</a></div></section>`, 'admin'));
+    const o = orders.rows[0] || {};
+    const m = merchants.rows[0] || {};
+    const r = riders.rows[0] || {};
+    const p = providers.rows[0] || {};
+    const sr = serviceRequests.rows[0] || {};
+    const stat = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
+    const action = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
+    const alert = (label, count, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(label)}</h2>${badge(count ? 'pending' : 'clear')}</div><p><b>${esc(count || 0)}</b> waiting for action</p></a>`;
+    const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="cards compact">${rows.length ? rows.map(render).join('') : '<div class="card"><p>No recent activity</p></div>'}</div></section>`;
+    const recentCard = (title, status, details, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(title)}</h2>${badge(status)}</div><p>${esc(details)}</p></a>`;
+    res.send(page('Admin OS', `
+      <section class="card hero"><h1>GOVO Admin OS</h1><p>Super App Control Center. Review approvals, live demand, and recent business activity from one screen.</p><div class="toolbar"><a class="btn" href="/admin/os?pin=${pinParam}">Refresh</a><a class="btn secondary" href="/">Main Website</a></div></section>
+      <section class="grid">
+        ${stat('Total Orders', o.total, 'All customer orders')}
+        ${stat('Pending Orders', o.pending, 'Need admin or merchant action')}
+        ${stat('Delivered Orders', o.delivered, 'Completed delivery orders')}
+        ${stat('Total Merchants', m.total, 'Merchant registrations')}
+        ${stat('Pending Merchants', m.pending, 'Waiting approval')}
+        ${stat('Approved Merchants', m.approved, 'Visible in shops')}
+        ${stat('Total Riders', r.total, 'Rider registrations')}
+        ${stat('Pending Riders', r.pending, 'Waiting approval')}
+        ${stat('Approved Riders', r.approved, 'Assignable riders')}
+        ${stat('Total Service Providers', p.total, 'Provider registrations')}
+        ${stat('Pending Providers', p.pending, 'Waiting approval')}
+        ${stat('Approved Providers', p.approved, 'Visible in services')}
+        ${stat('Total Service Requests', sr.total, 'Customer service requests')}
+        ${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}
+        ${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}
+      </section>
+      <section class="card"><h2>Quick Actions</h2><div class="toolbar">
+        ${action('Manage Orders', `/admin/orders?pin=${pinParam}`)}
+        ${action('Manage Merchants', `/admin/leads?pin=${pinParam}`)}
+        ${action('Manage Riders', `/admin/riders?pin=${pinParam}`)}
+        ${action('Manage Providers', `/admin/providers?pin=${pinParam}`)}
+        ${action('Manage Service Requests', `/admin/service-requests?pin=${pinParam}`)}
+        ${action('View Shops', '/shops')}
+        ${action('View Services', '/services')}
+        ${action('Track Order', '/track')}
+        ${action('Main Website', '/')}
+      </div></section>
+      <section class="card"><h2>Alerts</h2><div class="cards compact">
+        ${alert('Pending merchant approvals', m.pending, `/admin/leads?pin=${pinParam}&status=pending`)}
+        ${alert('Pending rider approvals', r.pending, `/admin/riders?pin=${pinParam}&status=pending`)}
+        ${alert('Pending provider approvals', p.pending, `/admin/providers?pin=${pinParam}&status=pending`)}
+        ${alert('Pending service requests', sr.pending, `/admin/service-requests?pin=${pinParam}&status=pending`)}
+        ${alert('Pending orders', o.pending, `/admin/orders?pin=${pinParam}&status=pending`)}
+      </div></section>
+      <section class="grid two">
+        ${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?pin=${pinParam}&q=${encodeURIComponent(x.id)}`))}
+        ${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?pin=${pinParam}&q=${encodeURIComponent(x.id)}`))}
+        ${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?pin=${pinParam}&q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}
+        ${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?pin=${pinParam}&q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}
+      </section>
+    `, 'admin'));
   } catch (e) { next(e); }
 });
 
