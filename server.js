@@ -998,6 +998,905 @@ app.all("/merchant/products", async (req,res)=>{
   }
 });
 
+
+/* GOVO CUSTOMER TRACKING V1 START */
+
+async function govoEnsureTrackingOrders(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS shop_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS pickup_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS drop_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS item_details TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+function govoStatusBangla(status){
+  status = String(status || "pending").toLowerCase();
+  if(status === "accepted") return "✅ Accepted — Rider/Team processing korche";
+  if(status === "rejected") return "❌ Rejected — Admin order reject koreche";
+  if(status === "delivered") return "🏁 Delivered — Order complete";
+  return "⏳ Pending — Admin review korche";
+}
+
+
+/* GOVO RIDER ASSIGN V1 START */
+
+async function govoEnsureRiderAssignTables(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      rider_id INT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_id INT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+}
+
+function govoPinOkV2(req,res){
+  const pin = String((req.query && req.query.pin) || (req.body && req.body.pin) || "");
+  const real = String(process.env.ADMIN_PIN || "");
+  if (!real || pin !== real) {
+    res.status(403).send(page("Forbidden", `<div class="card"><h1>403</h1><p>Admin PIN required.</p></div>`));
+    return false;
+  }
+  return true;
+}
+
+async function govoNotifyV2(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+    const token = process.env.TELEGRAM_BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Telegram notify skipped:", e.message);
+  }
+}
+
+app.post("/admin/order/assign", async (req,res)=>{
+  try {
+    if(!govoPinOkV2(req,res)) return;
+
+    await govoEnsureRiderAssignTables();
+
+    const pin = String(req.body.pin || "");
+    const orderId = String(req.body.order_id || "");
+    const riderId = String(req.body.rider_id || "");
+
+    const rider = await pool.query(`
+      SELECT id, rider_name, phone
+      FROM govo_rider_leads
+      WHERE id=$1
+      LIMIT 1
+    `, [riderId]);
+
+    if (!rider.rows.length) {
+      return res.status(404).send(page("Rider Not Found", `<div class="card"><h1>Rider Not Found</h1><p>Rider pawa jayni.</p><a class="btn" href="/admin/orders?pin=${esc(pin)}">Back Orders</a></div>`));
+    }
+
+    const rd = rider.rows[0];
+
+    const order = await pool.query(`
+      UPDATE govo_orders
+      SET rider_id=$1,
+          rider_name=$2,
+          rider_phone=$3,
+          status='assigned',
+          updated_at=NOW()
+      WHERE id=$4
+      RETURNING *
+    `, [rd.id, rd.rider_name, rd.phone, orderId]);
+
+    if (order.rows.length) {
+      const x = order.rows[0];
+
+      await govoNotifyV2([
+        "🛵 GOVO Order Assigned",
+        "",
+        `Order ID: #${x.id}`,
+        `Rider: ${rd.rider_name || ""}`,
+        `Rider Phone: ${rd.phone || ""}`,
+        `Shop: ${x.shop_name || ""}`,
+        `Customer: ${x.customer_name || ""}`,
+        `Drop: ${x.drop_location || ""}`,
+        `Item: ${x.item_details || ""}`
+      ].join("\n"));
+    }
+
+    return res.redirect("/admin/orders?pin=" + encodeURIComponent(pin));
+  } catch(e) {
+    console.log("Order assign error:", e.message);
+    return res.status(500).send(page("Assign Error", `<div class="card"><h1>Assign Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.post("/admin/order/status", async (req,res)=>{
+  try {
+    if(!govoPinOkV2(req,res)) return;
+
+    await govoEnsureRiderAssignTables();
+
+    const pin = String(req.body.pin || "");
+    const id = String(req.body.id || "");
+    const status = String(req.body.status || "pending");
+    const admin_note = String(req.body.admin_note || "");
+
+    const r = await pool.query(`
+      UPDATE govo_orders
+      SET status=$1, admin_note=$2, updated_at=NOW()
+      WHERE id=$3
+      RETURNING *
+    `, [status, admin_note, id]);
+
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await govoNotifyV2([
+        "⚙️ GOVO Order Status Updated",
+        "",
+        `Order ID: #${x.id}`,
+        `Status: ${String(x.status || "").toUpperCase()}`,
+        `Rider: ${x.rider_name || "Not assigned"}`,
+        `Shop: ${x.shop_name || ""}`,
+        `Customer: ${x.customer_name || ""}`,
+        `Drop: ${x.drop_location || ""}`,
+        `Admin Note: ${x.admin_note || "N/A"}`
+      ].join("\n"));
+    }
+
+    return res.redirect("/admin/orders?pin=" + encodeURIComponent(pin));
+  } catch(e) {
+    console.log("Admin status error:", e.message);
+    return res.status(500).send(page("Status Error", `<div class="card"><h1>Status Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+
+/* GOVO ADMIN ORDERS PIN LOGIN FIX START */
+
+async function govoEnsureAdminOrdersPinFix(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      rider_id INT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS shop_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS customer_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS pickup_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS drop_location TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS item_details TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_id INT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+}
+
+function govoAdminOrdersLogin(res, message){
+  return res.status(200).send(page("Admin PIN Login", `
+    <div class="card">
+      <h1>🔐 Admin PIN Login</h1>
+      <p>${message ? esc(String(message)) : "Admin orders দেখতে PIN দিন."}</p>
+
+      <form method="GET" action="/admin/orders">
+        <label>Admin PIN</label>
+        <input name="pin" placeholder="Enter admin PIN" required>
+        <button>Open Admin Orders</button>
+      </form>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+        <a class="btn" href="/admin/os">Admin Home</a>
+        <a class="btn" href="https://govoexpress.com">Main Website</a>
+      </div>
+    </div>
+  `));
+}
+
+
+/* GOVO ADMIN ORDERS MOBILE UI START */
+
+async function govoEnsureAdminOrdersMobileUi(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_orders (
+      id SERIAL PRIMARY KEY,
+      shop_name TEXT,
+      merchant_phone TEXT,
+      customer_name TEXT,
+      customer_phone TEXT,
+      pickup_location TEXT,
+      drop_location TEXT,
+      item_details TEXT,
+      note TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      rider_id INT,
+      rider_name TEXT,
+      rider_phone TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_id INT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+}
+
+function govoAdminOrdersPinLoginMobile(res, msg){
+  return res.send(page("Admin PIN Login", `
+    <div class="card">
+      <h1>🔐 Admin PIN Login</h1>
+      <p>${esc(String(msg || "Admin orders দেখতে PIN দিন."))}</p>
+      <form method="GET" action="/admin/orders">
+        <label>Admin PIN</label>
+        <input name="pin" placeholder="Enter admin PIN" required>
+        <button>Open Orders</button>
+      </form>
+    </div>
+  `));
+}
+
+app.get("/admin/orders", async (req,res)=>{
+  try {
+    const pin = String((req.query && req.query.pin) || "").trim();
+    const real = String(process.env.ADMIN_PIN || "").trim();
+
+    if (!pin) return govoAdminOrdersPinLoginMobile(res, "PIN missing. Admin orders খুলতে PIN দিন.");
+    if (!real || pin !== real) return govoAdminOrdersPinLoginMobile(res, "Wrong PIN. আবার সঠিক PIN দিন.");
+
+    await govoEnsureAdminOrdersMobileUi();
+
+    const orders = await pool.query(`
+      SELECT id, shop_name, merchant_phone, customer_name, customer_phone,
+             pickup_location, drop_location, item_details, note,
+             COALESCE(status,'pending') AS status,
+             admin_note, rider_id, rider_name, rider_phone, created_at, updated_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riders = await pool.query(`
+      SELECT id, rider_name, phone, COALESCE(status,'pending') AS status
+      FROM govo_rider_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riderOptions = riders.rows.map(r=>`
+      <option value="${esc(String(r.id))}">${esc(String(r.rider_name || ""))} — ${esc(String(r.phone || ""))}</option>
+    `).join("");
+
+    const cards = orders.rows.map(x=>`
+      <div class="card govo-order-card">
+        <div class="govo-order-top">
+          <div>
+            <div class="govo-badge">#${esc(String(x.id))}</div>
+            <h2>${esc(String(x.shop_name || "Unknown Shop"))}</h2>
+            <p>${esc(String(x.merchant_phone || ""))}</p>
+          </div>
+          <div class="govo-status">${esc(String(x.status || "pending"))}</div>
+        </div>
+
+        <div class="govo-order-grid">
+          <div><b>Customer</b><br>${esc(String(x.customer_name || ""))}<br>${esc(String(x.customer_phone || ""))}</div>
+          <div><b>Pickup</b><br>${esc(String(x.pickup_location || ""))}</div>
+          <div><b>Drop</b><br>${esc(String(x.drop_location || ""))}</div>
+          <div><b>Item</b><br>${esc(String(x.item_details || ""))}</div>
+          <div><b>Note</b><br>${esc(String(x.note || "No note"))}</div>
+          <div><b>Rider</b><br>${esc(String(x.rider_name || "Not assigned"))}<br>${esc(String(x.rider_phone || ""))}</div>
+        </div>
+
+        <form method="POST" action="/admin/order/assign" class="govo-action-box">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="order_id" value="${esc(String(x.id))}">
+          <select name="rider_id" required>
+            <option value="">Select Rider</option>
+            ${riderOptions}
+          </select>
+          <button>🛵 Assign Rider</button>
+        </form>
+
+        <form method="POST" action="/admin/order/status" class="govo-action-box">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input name="admin_note" placeholder="Admin note">
+          <div class="govo-status-buttons">
+            <button name="status" value="accepted">Accept</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="delivered">Delivered</button>
+          </div>
+        </form>
+      </div>
+    `).join("");
+
+    return res.send(page("Admin Orders", `
+      <style>
+        .govo-admin-nav{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+        .govo-admin-nav a{padding:10px 12px;border-radius:14px;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:900}
+        .govo-order-card{margin-top:18px}
+        .govo-order-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+        .govo-order-top h2{color:#22c55e;margin:10px 0 4px;font-size:26px}
+        .govo-badge,.govo-status{display:inline-flex;padding:7px 12px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900}
+        .govo-order-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0;line-height:1.55}
+        .govo-order-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:12px}
+        .govo-action-box{display:grid;gap:10px;margin-top:12px}
+        .govo-action-box input,.govo-action-box select{width:100%;padding:12px;border-radius:12px}
+        .govo-status-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+        @media(max-width:700px){
+          .govo-order-grid{grid-template-columns:1fr}
+          .govo-status-buttons{grid-template-columns:1fr}
+          .govo-order-top{flex-direction:column}
+        }
+      </style>
+
+      <div class="card">
+        <h1>📦 Admin Orders</h1>
+        <p>Mobile friendly order management.</p>
+        <div class="govo-admin-nav">
+          <a href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a>
+          <a href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchant Leads</a>
+          <a href="/admin/riders?pin=${encodeURIComponent(pin)}">Rider Leads</a>
+          <a href="/rider/dashboard">Rider Dashboard</a>
+        </div>
+      </div>
+
+      ${cards || `<div class="card"><h2>No orders found</h2></div>`}
+    `));
+  } catch(e) {
+    console.log("Admin orders mobile UI error:", e.message);
+    return res.status(500).send(page("Admin Orders Error", `<div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN ORDERS MOBILE UI END */
+
+
+app.get("/admin/orders", async (req,res)=>{
+  try {
+    const pin = String((req.query && req.query.pin) || "").trim();
+    const real = String(process.env.ADMIN_PIN || "").trim();
+
+    if (!pin) {
+      return govoAdminOrdersLogin(res, "PIN missing. Admin orders খুলতে PIN দিন.");
+    }
+
+    if (!real || pin !== real) {
+      return govoAdminOrdersLogin(res, "Wrong PIN. আবার সঠিক PIN দিন.");
+    }
+
+    await govoEnsureAdminOrdersPinFix();
+
+    const orders = await pool.query(`
+      SELECT id, shop_name, merchant_phone, customer_name, customer_phone,
+             pickup_location, drop_location, item_details, note,
+             COALESCE(status,'pending') AS status,
+             admin_note, rider_id, rider_name, rider_phone, created_at, updated_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riders = await pool.query(`
+      SELECT id, rider_name, phone, location, vehicle_type, COALESCE(status,'pending') AS status
+      FROM govo_rider_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riderOptions = riders.rows.map(r=>`
+      <option value="${esc(String(r.id))}">${esc(String(r.rider_name || ""))} — ${esc(String(r.phone || ""))}</option>
+    `).join("");
+
+    const rows = orders.rows.map(x=>`
+      <tr>
+        <td>#${esc(String(x.id))}</td>
+        <td>
+          <b>${esc(String(x.shop_name || ""))}</b><br>
+          <small>${esc(String(x.merchant_phone || ""))}</small>
+        </td>
+        <td>
+          <b>${esc(String(x.customer_name || ""))}</b><br>
+          ${esc(String(x.customer_phone || ""))}
+        </td>
+        <td>
+          <b>Pickup:</b> ${esc(String(x.pickup_location || ""))}<br>
+          <b>Drop:</b> ${esc(String(x.drop_location || ""))}
+        </td>
+        <td>
+          ${esc(String(x.item_details || ""))}<br>
+          <small>${esc(String(x.note || ""))}</small>
+        </td>
+        <td>
+          <b>${esc(String(x.status || "pending"))}</b><br>
+          <small>Rider: ${esc(String(x.rider_name || "Not assigned"))}</small><br>
+          <small>${esc(String(x.rider_phone || ""))}</small>
+        </td>
+        <td>
+          <form method="POST" action="/admin/order/assign" style="display:grid;gap:8px;min-width:170px;margin-bottom:10px">
+            <input type="hidden" name="pin" value="${esc(pin)}">
+            <input type="hidden" name="order_id" value="${esc(String(x.id))}">
+            <select name="rider_id" required>
+              <option value="">Select Rider</option>
+              ${riderOptions}
+            </select>
+            <button>Assign Rider</button>
+          </form>
+
+          <form method="POST" action="/admin/order/status" style="display:grid;gap:8px;min-width:170px">
+            <input type="hidden" name="pin" value="${esc(pin)}">
+            <input type="hidden" name="id" value="${esc(String(x.id))}">
+            <input name="admin_note" placeholder="Admin note" style="padding:8px;border-radius:10px">
+            <button name="status" value="accepted">Accept</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="delivered">Delivered</button>
+          </form>
+        </td>
+        <td><small>${esc(String(x.created_at || ""))}</small></td>
+      </tr>
+    `).join("");
+
+    return res.send(page("Admin Orders", `
+      <div class="card">
+        <h1>📦 Admin Orders</h1>
+        <p>Orders manage korun, rider assign korun, status update korun.</p>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0">
+          <a class="btn" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a>
+          <a class="btn" href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchant Leads</a>
+          <a class="btn" href="/admin/riders?pin=${encodeURIComponent(pin)}">Rider Leads</a>
+          <a class="btn" href="/rider/dashboard">Rider Dashboard</a>
+        </div>
+
+        <div style="overflow:auto">
+          <table>
+            <tr>
+              <th>ID</th>
+              <th>Shop</th>
+              <th>Customer</th>
+              <th>Route</th>
+              <th>Item</th>
+              <th>Status/Rider</th>
+              <th>Actions</th>
+              <th>Time</th>
+            </tr>
+            ${rows || `<tr><td colspan="8">No orders found</td></tr>`}
+          </table>
+        </div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Admin orders pin fix error:", e.message);
+    return res.status(500).send(page("Admin Orders Error", `<div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN ORDERS PIN LOGIN FIX END */
+
+
+app.get("/admin/orders", async (req,res)=>{
+  try {
+    if(!govoPinOkV2(req,res)) return;
+
+    await govoEnsureRiderAssignTables();
+
+    const pin = String(req.query.pin || "");
+
+    const orders = await pool.query(`
+      SELECT id, shop_name, merchant_phone, customer_name, customer_phone,
+             pickup_location, drop_location, item_details, note,
+             COALESCE(status,'pending') AS status,
+             admin_note, rider_id, rider_name, rider_phone, created_at, updated_at
+      FROM govo_orders
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riders = await pool.query(`
+      SELECT id, rider_name, phone, location, vehicle_type, COALESCE(status,'pending') AS status
+      FROM govo_rider_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const riderOptions = riders.rows.map(r=>`
+      <option value="${esc(String(r.id))}">${esc(String(r.rider_name || ""))} — ${esc(String(r.phone || ""))}</option>
+    `).join("");
+
+    const rows = orders.rows.map(x=>`
+      <tr>
+        <td>#${esc(String(x.id))}</td>
+        <td>
+          <b>${esc(String(x.shop_name || ""))}</b><br>
+          <small>${esc(String(x.merchant_phone || ""))}</small>
+        </td>
+        <td>
+          <b>${esc(String(x.customer_name || ""))}</b><br>
+          ${esc(String(x.customer_phone || ""))}
+        </td>
+        <td>
+          <b>Pickup:</b> ${esc(String(x.pickup_location || ""))}<br>
+          <b>Drop:</b> ${esc(String(x.drop_location || ""))}
+        </td>
+        <td>
+          ${esc(String(x.item_details || ""))}<br>
+          <small>${esc(String(x.note || ""))}</small>
+        </td>
+        <td>
+          <b>${esc(String(x.status || "pending"))}</b><br>
+          <small>Rider: ${esc(String(x.rider_name || "Not assigned"))}</small><br>
+          <small>${esc(String(x.rider_phone || ""))}</small>
+        </td>
+        <td>
+          <form method="POST" action="/admin/order/assign" style="display:grid;gap:8px;min-width:170px;margin-bottom:10px">
+            <input type="hidden" name="pin" value="${esc(pin)}">
+            <input type="hidden" name="order_id" value="${esc(String(x.id))}">
+            <select name="rider_id" required>
+              <option value="">Select Rider</option>
+              ${riderOptions}
+            </select>
+            <button>Assign Rider</button>
+          </form>
+
+          <form method="POST" action="/admin/order/status" style="display:grid;gap:8px;min-width:170px">
+            <input type="hidden" name="pin" value="${esc(pin)}">
+            <input type="hidden" name="id" value="${esc(String(x.id))}">
+            <input name="admin_note" placeholder="Admin note" style="padding:8px;border-radius:10px">
+            <button name="status" value="accepted">Accept</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="delivered">Delivered</button>
+          </form>
+        </td>
+        <td><small>${esc(String(x.created_at || ""))}</small></td>
+      </tr>
+    `).join("");
+
+    return res.send(page("Admin Orders", `
+      <div class="card">
+        <h1>Admin Orders</h1>
+        <p>Orders manage korun, rider assign korun.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0">
+          <a class="btn" href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchant Leads</a>
+          <a class="btn" href="/admin/riders?pin=${encodeURIComponent(pin)}">Rider Leads</a>
+          <a class="btn" href="/rider/dashboard">Rider Dashboard</a>
+        </div>
+        <div style="overflow:auto">
+          <table>
+            <tr>
+              <th>ID</th>
+              <th>Shop</th>
+              <th>Customer</th>
+              <th>Route</th>
+              <th>Item</th>
+              <th>Status/Rider</th>
+              <th>Actions</th>
+              <th>Time</th>
+            </tr>
+            ${rows || `<tr><td colspan="8">No orders found</td></tr>`}
+          </table>
+        </div>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Admin orders/rider assign error:", e.message);
+    return res.status(500).send(page("Admin Orders Error", `<div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.all("/rider/dashboard", async (req,res)=>{
+  try {
+    await govoEnsureRiderAssignTables();
+
+    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || "");
+
+    if (!phone) {
+      return res.send(page("Rider Dashboard", `
+        <div class="card">
+          <h1>Rider Dashboard</h1>
+          <p>Rider phone number diye assigned order dekho.</p>
+          <form method="GET" action="/rider/dashboard">
+            <label>Rider Phone</label>
+            <input name="phone" placeholder="018xxxxxxxx" required>
+            <button>Open Dashboard</button>
+          </form>
+          <div style="margin-top:16px">
+            <a class="btn" href="/rider">Rider Registration</a>
+          </div>
+        </div>
+      `));
+    }
+
+    if (req.method === "POST") {
+      const id = String(req.body.id || "");
+      const status = String(req.body.status || "picked_up");
+
+      const r = await pool.query(`
+        UPDATE govo_orders
+        SET status=$1, updated_at=NOW()
+        WHERE id=$2 AND rider_phone=$3
+        RETURNING *
+      `, [status, id, phone]);
+
+      if (r.rows.length) {
+        const x = r.rows[0];
+
+        await govoNotifyV2([
+          "🛵 Rider Order Update",
+          "",
+          `Order ID: #${x.id}`,
+          `Status: ${String(x.status || "").toUpperCase()}`,
+          `Rider: ${x.rider_name || ""}`,
+          `Customer: ${x.customer_name || ""}`,
+          `Drop: ${x.drop_location || ""}`
+        ].join("\n"));
+      }
+
+      return res.redirect("/rider/dashboard?phone=" + encodeURIComponent(phone));
+    }
+
+    const rider = await pool.query(`
+      SELECT id, rider_name, phone, location, vehicle_type, COALESCE(status,'pending') AS status
+      FROM govo_rider_leads
+      WHERE phone=$1
+      ORDER BY id DESC
+      LIMIT 1
+    `, [phone]);
+
+    if (!rider.rows.length) {
+      return res.send(page("Rider Not Found", `
+        <div class="card">
+          <h1>Rider Not Found</h1>
+          <p>Ei phone number diye rider pawa jayni.</p>
+          <a class="btn" href="/rider">Register Rider</a>
+        </div>
+      `));
+    }
+
+    const rd = rider.rows[0];
+
+    const orders = await pool.query(`
+      SELECT *
+      FROM govo_orders
+      WHERE rider_phone=$1
+      ORDER BY id DESC
+      LIMIT 100
+    `, [phone]);
+
+    const cards = orders.rows.map(x=>`
+      <div class="card" style="margin-top:16px">
+        <h2 style="color:#22c55e">Order #${esc(String(x.id))}</h2>
+        <p><b>Status:</b> ${esc(String(x.status || ""))}</p>
+        <p><b>Shop:</b> ${esc(String(x.shop_name || ""))}</p>
+        <p><b>Customer:</b> ${esc(String(x.customer_name || ""))} — ${esc(String(x.customer_phone || ""))}</p>
+        <p><b>Pickup:</b> ${esc(String(x.pickup_location || ""))}</p>
+        <p><b>Drop:</b> ${esc(String(x.drop_location || ""))}</p>
+        <p><b>Item:</b> ${esc(String(x.item_details || ""))}</p>
+
+        <form method="POST" action="/rider/dashboard" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <input type="hidden" name="phone" value="${esc(phone)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <button name="status" value="picked_up">Picked Up</button>
+          <button name="status" value="delivered">Delivered</button>
+          <button name="status" value="failed">Failed</button>
+        </form>
+      </div>
+    `).join("");
+
+    return res.send(page("Rider Dashboard", `
+      <div class="card">
+        <h1>Rider Dashboard</h1>
+        <p><b>Rider:</b> ${esc(String(rd.rider_name || ""))}</p>
+        <p><b>Phone:</b> ${esc(String(rd.phone || ""))}</p>
+        <p><b>Status:</b> ${esc(String(rd.status || ""))}</p>
+      </div>
+      ${cards || `<div class="card" style="margin-top:16px"><h2>No assigned order</h2><p>Admin order assign korle ekhane show korbe.</p></div>`}
+    `));
+  } catch(e) {
+    console.log("Rider dashboard error:", e.message);
+    return res.status(500).send(page("Rider Dashboard Error", `<div class="card"><h1>Rider Dashboard Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO RIDER ASSIGN V1 END */
+
+
+app.get("/track", async (req,res)=>{
+  try {
+    await govoEnsureTrackingOrders();
+
+    const id = String((req.query && req.query.id) || "").trim();
+    const phone = String((req.query && req.query.phone) || "").trim();
+
+    let resultHtml = "";
+
+    if (id || phone) {
+      let r;
+
+      if (id && phone) {
+        r = await pool.query(`
+          SELECT *
+          FROM govo_orders
+          WHERE id=$1 AND customer_phone=$2
+          ORDER BY id DESC
+          LIMIT 1
+        `, [id, phone]);
+      } else if (id) {
+        r = await pool.query(`
+          SELECT *
+          FROM govo_orders
+          WHERE id=$1
+          ORDER BY id DESC
+          LIMIT 1
+        `, [id]);
+      } else {
+        r = await pool.query(`
+          SELECT *
+          FROM govo_orders
+          WHERE customer_phone=$1
+          ORDER BY id DESC
+          LIMIT 5
+        `, [phone]);
+      }
+
+      if (!r.rows.length) {
+        resultHtml = `
+          <div class="card" style="margin-top:18px">
+            <h2>No Order Found</h2>
+            <p>Order ID or phone number check kore abar try korun.</p>
+          </div>
+        `;
+      } else {
+        resultHtml = r.rows.map(x=>`
+          <div class="card" style="margin-top:18px">
+            <h1>Order #${esc(String(x.id))}</h1>
+            <p style="font-size:20px;font-weight:900;color:#22c55e">${esc(govoStatusBangla(x.status))}</p>
+
+            <div style="font-size:17px;line-height:1.8;color:#dbeafe">
+              <div><b>Shop:</b> ${esc(String(x.shop_name || ""))}</div>
+              <div><b>Customer:</b> ${esc(String(x.customer_name || ""))}</div>
+              <div><b>Phone:</b> ${esc(String(x.customer_phone || ""))}</div>
+              <div><b>Pickup:</b> ${esc(String(x.pickup_location || ""))}</div>
+              <div><b>Drop:</b> ${esc(String(x.drop_location || ""))}</div>
+              <div><b>Item:</b> ${esc(String(x.item_details || ""))}</div>
+              <div><b>Note:</b> ${esc(String(x.note || ""))}</div>
+              <div><b>Admin Note:</b> ${esc(String(x.admin_note || "No note yet"))}</div>
+              <div><b>Created:</b> ${esc(String(x.created_at || ""))}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+    }
+
+    return res.send(page("Track Order", `
+      <div class="card">
+        <h1>🔎 Track Your Order</h1>
+        <p>Order ID ba phone number diye delivery status check korun.</p>
+
+        <form method="GET" action="/track">
+          <label>Order ID</label>
+          <input name="id" value="${esc(id)}" placeholder="Example: 12">
+
+          <label>Customer Phone</label>
+          <input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx">
+
+          <button>Check Status</button>
+        </form>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+          <a class="btn" href="/shops">🏪 Back Shops</a>
+          <a class="btn" href="https://govoexpress.com">🏠 Home</a>
+        </div>
+      </div>
+
+      ${resultHtml}
+    `));
+  } catch(e) {
+    console.log("Track order error:", e.message);
+    return res.status(500).send(page("Track Error", `<div class="card"><h1>Track Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/order/success", async (req,res)=>{
+  const id = String((req.query && req.query.id) || "");
+  return res.send(page("Order Submitted", `
+    <div class="card">
+      <h1>✅ Order Submitted</h1>
+      <p>Your order has been received. Admin team review korbe.</p>
+      <p><b>Tracking / Order ID:</b> #${esc(id)}</p>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+        <a class="btn" href="/track?id=${encodeURIComponent(id)}">🔎 Track Order</a>
+        <a class="btn" href="/shops">🏪 Back Shops</a>
+        <a class="btn" href="/order">📦 Create Another Order</a>
+      </div>
+    </div>
+  `));
+});
+
+/* GOVO CUSTOMER TRACKING V1 END */
+
+
 app.get("/shop/:id", async (req,res)=>{
   try {
     await govoEnsureProductMenuV1();
