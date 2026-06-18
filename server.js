@@ -1539,6 +1539,228 @@ app.all("/merchant/orders", async (req,res)=>{
 /* GOVO MERCHANT ORDERS V1 END */
 
 
+
+/* GOVO ADMIN ORDER FILTERS V1 START */
+
+app.get("/admin/orders", async (req,res)=>{
+  try {
+    const pin = String((req.query && req.query.pin) || "").trim();
+    const real = String(process.env.ADMIN_PIN || "").trim();
+
+    if (!pin || !real || pin !== real) {
+      return res.send(page("Admin PIN Login", `
+        <div class="card">
+          <h1>🔐 Admin PIN</h1>
+          <p>Admin orders দেখতে PIN দিন।</p>
+          <form method="GET" action="/admin/orders">
+            <input name="pin" placeholder="Enter admin PIN" required>
+            <button>Open Orders</button>
+          </form>
+        </div>
+      `));
+    }
+
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_id INT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_name TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS rider_phone TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS admin_note TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS merchant_note TEXT");
+    await pool.query("ALTER TABLE govo_orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+    await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+
+    const status = String((req.query && req.query.status) || "all").trim();
+    const day = String((req.query && req.query.day) || "").trim();
+    const q = String((req.query && req.query.q) || "").trim();
+
+    const conditions = [];
+    const params = [];
+
+    if (status && status !== "all") {
+      params.push(status);
+      conditions.push(`COALESCE(status,'pending')=$${params.length}`);
+    }
+
+    if (day === "today") {
+      conditions.push(`created_at::date = CURRENT_DATE`);
+    }
+
+    if (q) {
+      params.push("%" + q.toLowerCase() + "%");
+      conditions.push(`
+        LOWER(
+          COALESCE(shop_name,'') || ' ' ||
+          COALESCE(merchant_phone,'') || ' ' ||
+          COALESCE(customer_name,'') || ' ' ||
+          COALESCE(customer_phone,'') || ' ' ||
+          COALESCE(pickup_location,'') || ' ' ||
+          COALESCE(drop_location,'') || ' ' ||
+          COALESCE(item_details,'') || ' ' ||
+          COALESCE(rider_name,'') || ' ' ||
+          COALESCE(rider_phone,'')
+        ) LIKE $${params.length}
+      `);
+    }
+
+    const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+
+    const orders = await pool.query(`
+      SELECT id, shop_name, merchant_phone, customer_name, customer_phone,
+             pickup_location, drop_location, item_details, note,
+             COALESCE(status,'pending') AS status,
+             admin_note, merchant_note, rider_name, rider_phone, created_at
+      FROM govo_orders
+      ${where}
+      ORDER BY id DESC
+      LIMIT 100
+    `, params);
+
+    const counts = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int AS today,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int AS pending,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='accepted')::int AS accepted,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='assigned')::int AS assigned,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='picked_up')::int AS picked_up,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int AS delivered,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int AS rejected
+      FROM govo_orders
+    `);
+
+    const riders = await pool.query(`
+      SELECT id, rider_name, phone
+      FROM govo_rider_leads
+      WHERE COALESCE(status,'pending')='approved'
+      ORDER BY id DESC
+      LIMIT 100
+    `);
+
+    const c = counts.rows[0] || {};
+    const link = (label, extra, active) => {
+      const sp = new URLSearchParams({ pin });
+      Object.keys(extra || {}).forEach(k => {
+        if (extra[k]) sp.set(k, extra[k]);
+      });
+      return `<a class="${active ? "active" : ""}" href="/admin/orders?${sp.toString()}">${label}</a>`;
+    };
+
+    const riderOptions = riders.rows.map(r=>`
+      <option value="${esc(String(r.id))}">${esc(String(r.rider_name || ""))} — ${esc(String(r.phone || ""))}</option>
+    `).join("");
+
+    const cards = orders.rows.map(x=>`
+      <div class="card govo-order-card">
+        <div class="govo-order-head">
+          <div>
+            <span class="govo-chip">#${esc(String(x.id))}</span>
+            <h2>${esc(String(x.shop_name || "Unknown Shop"))}</h2>
+            <small>${esc(String(x.merchant_phone || ""))}</small>
+          </div>
+          <span class="govo-status">${esc(String(x.status || "pending"))}</span>
+        </div>
+
+        <div class="govo-grid">
+          <div><b>Customer</b><span>${esc(String(x.customer_name || ""))}</span><small>${esc(String(x.customer_phone || ""))}</small></div>
+          <div><b>Pickup</b><span>${esc(String(x.pickup_location || ""))}</span></div>
+          <div><b>Drop</b><span>${esc(String(x.drop_location || ""))}</span></div>
+          <div><b>Item</b><span>${esc(String(x.item_details || ""))}</span></div>
+          <div><b>Rider</b><span>${esc(String(x.rider_name || "Not assigned"))}</span><small>${esc(String(x.rider_phone || ""))}</small></div>
+          <div><b>Note</b><span>${esc(String(x.note || "No note"))}</span></div>
+        </div>
+
+        <form method="POST" action="/admin/order/assign" class="govo-form">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="order_id" value="${esc(String(x.id))}">
+          <select name="rider_id" required>
+            <option value="">Select Rider</option>
+            ${riderOptions}
+          </select>
+          <button>🛵 Assign Rider</button>
+        </form>
+
+        <form method="POST" action="/admin/order/status" class="govo-form">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input name="admin_note" placeholder="Admin note">
+          <div class="govo-buttons">
+            <button name="status" value="accepted">Accept</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="delivered">Delivered</button>
+          </div>
+        </form>
+      </div>
+    `).join("");
+
+    return res.send(page("Admin Orders", `
+      <style>
+        .govo-filter-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+        .govo-filter-nav a{font-size:13px!important;padding:9px 11px!important;border-radius:999px;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:900;color:#bbf7d0!important;background:rgba(34,197,94,.06)}
+        .govo-filter-nav a.active{background:#22c55e!important;color:#052e16!important}
+        .govo-search{display:grid;gap:8px;margin-top:12px}
+        .govo-search input{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-search button{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-order-card{margin-top:14px!important;padding:16px!important}
+        .govo-order-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-order-head h2{font-size:22px!important;margin:10px 0 4px!important;color:#22c55e!important;line-height:1.15!important}
+        .govo-order-head small{font-size:13px!important;color:#cbd5e1!important}
+        .govo-chip,.govo-status{display:inline-flex;padding:5px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900;text-transform:capitalize}
+        .govo-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+        .govo-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px}
+        .govo-grid b{display:block;font-size:13px!important;margin-bottom:5px}
+        .govo-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word}
+        .govo-grid small{display:block;font-size:12px!important;margin-top:3px;color:#cbd5e1}
+        .govo-form{display:grid;gap:8px;margin-top:10px}
+        .govo-form input,.govo-form select{font-size:14px!important;padding:10px!important;border-radius:12px!important;width:100%!important}
+        .govo-form button{font-size:14px!important;padding:10px!important;border-radius:12px!important}
+        .govo-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+        @media(max-width:700px){
+          .govo-grid{grid-template-columns:1fr}
+          .govo-buttons{grid-template-columns:1fr}
+          .govo-order-head{flex-direction:column}
+        }
+      </style>
+
+      <div class="card">
+        <h1>📦 Admin Orders</h1>
+        <p>Filter diye fast order manage korun.</p>
+
+        <div class="govo-filter-nav">
+          ${link("All " + (c.total || 0), {}, status==="all" && !day)}
+          ${link("Today " + (c.today || 0), {day:"today"}, day==="today")}
+          ${link("Pending " + (c.pending || 0), {status:"pending"}, status==="pending")}
+          ${link("Accepted " + (c.accepted || 0), {status:"accepted"}, status==="accepted")}
+          ${link("Assigned " + (c.assigned || 0), {status:"assigned"}, status==="assigned")}
+          ${link("Picked Up " + (c.picked_up || 0), {status:"picked_up"}, status==="picked_up")}
+          ${link("Delivered " + (c.delivered || 0), {status:"delivered"}, status==="delivered")}
+          ${link("Rejected " + (c.rejected || 0), {status:"rejected"}, status==="rejected")}
+        </div>
+
+        <form method="GET" action="/admin/orders" class="govo-search">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input name="q" value="${esc(q)}" placeholder="Search shop, customer, phone, drop, item">
+          <button>🔎 Search Orders</button>
+        </form>
+
+        <div class="govo-filter-nav">
+          <a href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a>
+          <a href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchants</a>
+          <a href="/admin/riders?pin=${encodeURIComponent(pin)}">Riders</a>
+        </div>
+
+        <p><b>${orders.rows.length}</b> order showing.</p>
+      </div>
+
+      ${cards || `<div class="card"><h2>No orders found</h2><p>Filter change kore dekho.</p></div>`}
+    `));
+  } catch(e) {
+    console.log("Admin order filters error:", e.message);
+    return res.status(500).send(page("Admin Orders Error", `<div class="card"><h1>Admin Orders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN ORDER FILTERS V1 END */
+
+
 app.get("/admin/orders", async (req,res)=>{
   try {
     const pin = String((req.query && req.query.pin) || "").trim();
