@@ -794,6 +794,112 @@ app.post("/admin/order/status", async (req,res)=>{
 
 
 /* GOVO SHOPS HOME V3 START */
+
+/* GOVO SHOP DETAILS V1 START */
+app.get("/shop/:id", async (req,res)=>{
+  try {
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_address TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS products TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS whatsapp TEXT");
+    await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS image_url TEXT");
+
+    const id = String((req.params && req.params.id) || "");
+
+    const r = await pool.query(`
+      SELECT id, shop_name, owner_name, phone, location, category, delivery_needed,
+             COALESCE(status,'pending') AS status,
+             shop_description, shop_address, products, whatsapp, image_url, created_at
+      FROM govo_merchant_leads
+      WHERE id=$1 AND COALESCE(status,'pending')='approved'
+      LIMIT 1
+    `, [id]);
+
+    if (!r.rows.length) {
+      return res.status(404).send(page("Shop Not Found", `
+        <div class="card">
+          <h1>Shop Not Found</h1>
+          <p>Ei shop available na, ba admin approve kora hoyni.</p>
+          <a class="btn" href="/shops">🏪 Back to Shops</a>
+        </div>
+      `));
+    }
+
+    const x = r.rows[0];
+    const shopName = String(x.shop_name || "");
+    const merchantPhone = String(x.whatsapp || x.phone || "");
+    const pickup = String(x.shop_address || x.location || "");
+
+    return res.send(page(shopName, `
+      <div class="card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">
+          <div>
+            <div style="display:inline-flex;padding:8px 14px;border-radius:999px;border:1px solid #22c55e;background:#052e16;color:#bbf7d0;font-weight:900">
+              ${esc(String(x.category || "Shop"))}
+            </div>
+            <h1 style="color:#22c55e;margin:16px 0 10px">${esc(shopName)}</h1>
+            <p>Full shop details and delivery booking.</p>
+          </div>
+          ${x.image_url ? `<img src="${esc(String(x.image_url))}" style="width:110px;height:110px;object-fit:cover;border-radius:22px;border:1px solid #22c55e">` : ""}
+        </div>
+
+        <div style="font-size:17px;line-height:1.85;color:#dbeafe;margin-top:12px">
+          <div><b>Owner:</b> ${esc(String(x.owner_name || ""))}</div>
+          <div><b>Phone:</b> ${esc(merchantPhone)}</div>
+          <div><b>Address:</b> ${esc(pickup || "Not added yet")}</div>
+          <div><b>Delivery:</b> ${esc(String(x.delivery_needed || ""))}</div>
+          <div><b>About:</b> ${esc(String(x.shop_description || "Details coming soon"))}</div>
+          <div><b>Products / Services:</b> ${esc(String(x.products || "Not added yet"))}</div>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+          <a class="btn" href="/shops">🏪 Back Shops</a>
+          <a class="btn" href="https://govoexpress.com">🏠 Home</a>
+          <a class="btn" href="tel:${esc(merchantPhone)}">☎️ Call Shop</a>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px">
+        <h1>📦 Delivery Book</h1>
+        <p>Ei shop theke delivery request korte customer information din.</p>
+
+        <form method="POST" action="/order">
+          <label>Shop Name</label>
+          <input name="shop_name" value="${esc(shopName)}" required>
+
+          <label>Merchant Phone</label>
+          <input name="merchant_phone" value="${esc(merchantPhone)}">
+
+          <label>Customer Name</label>
+          <input name="customer_name" placeholder="Customer name" required>
+
+          <label>Customer Phone</label>
+          <input name="customer_phone" placeholder="017xxxxxxxx" required>
+
+          <label>Pickup Location</label>
+          <input name="pickup_location" value="${esc(pickup)}" required>
+
+          <label>Drop Location</label>
+          <input name="drop_location" placeholder="Customer address / drop location" required>
+
+          <label>Item Details</label>
+          <textarea name="item_details" placeholder="Ki delivery korte hobe?" required></textarea>
+
+          <label>Note</label>
+          <textarea name="note" placeholder="Extra note, optional"></textarea>
+
+          <button>Submit Order</button>
+        </form>
+      </div>
+    `));
+  } catch(e) {
+    console.log("Shop details error:", e.message);
+    return res.status(500).send(page("Shop Details Error", `<div class="card"><h1>Shop Details Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+/* GOVO SHOP DETAILS V1 END */
+
+
 app.get("/shops", async (req,res)=>{
   try {
     await pool.query("ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS shop_description TEXT");
@@ -866,7 +972,7 @@ app.get("/shops", async (req,res)=>{
         </div>
 
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
-          <a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
+          <a class="btn" href="/shop/${encodeURIComponent(x.id)}">👁️ View Details</a>\n          <a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
           <a class="btn" href="tel:${esc(String(x.whatsapp || x.phone || ""))}">☎️ Call Shop</a>
           <a class="btn" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || "")}">🏪 Shop Dashboard</a>
         </div>
@@ -1044,7 +1150,7 @@ app.get("/shops", async (req,res)=>{
         </div>
 
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
-          <a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
+          <a class="btn" href="/shop/${encodeURIComponent(x.id)}">👁️ View Details</a>\n          <a class="btn" href="/order?shop=${encodeURIComponent(x.shop_name || "")}">📦 Delivery Book</a>
           <a class="btn" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || "")}">🏪 Shop Dashboard</a>
         </div>
       </div>
