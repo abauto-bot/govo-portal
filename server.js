@@ -1756,6 +1756,284 @@ app.all("/merchant/orders", async (req,res)=>{
 
 /* GOVO ADMIN ORDER FILTERS V1 START */
 
+
+/* GOVO ADMIN RIDERS POLISH V1 START */
+
+async function govoEnsureAdminRidersPolishV1(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS govo_rider_leads (
+      id SERIAL PRIMARY KEY,
+      rider_name TEXT,
+      phone TEXT,
+      location TEXT,
+      vehicle_type TEXT,
+      status TEXT DEFAULT 'pending',
+      admin_note TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS rider_name TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS name TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS phone TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS location TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS vehicle_type TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS admin_note TEXT");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()");
+  await pool.query("ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()");
+}
+
+function govoAdminRiderPinOk(req,res){
+  const pin = String((req.query && req.query.pin) || (req.body && req.body.pin) || "").trim();
+  const real = String(process.env.ADMIN_PIN || "").trim();
+
+  if (!pin || !real || pin !== real) {
+    res.send(page("Admin PIN Login", `
+      <div class="card">
+        <h1>🔐 Admin PIN</h1>
+        <p>Rider management খুলতে PIN দিন।</p>
+        <form method="GET" action="/admin/riders">
+          <input name="pin" placeholder="Enter admin PIN" required>
+          <button>Open Riders</button>
+        </form>
+      </div>
+    `));
+    return false;
+  }
+
+  return true;
+}
+
+async function govoAdminRiderNotifyV1(text){
+  try {
+    if (typeof sendTelegram === "function") {
+      await sendTelegram(text);
+      return;
+    }
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || "";
+    const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || "";
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({chat_id: chatId, text})
+    });
+  } catch(e) {
+    console.log("Admin rider notify skipped:", e.message);
+  }
+}
+
+app.post("/admin/rider/status", async (req,res)=>{
+  try {
+    if (!govoAdminRiderPinOk(req,res)) return;
+
+    await govoEnsureAdminRidersPolishV1();
+
+    const pin = String(req.body.pin || "");
+    const id = String(req.body.id || "");
+    const status = String(req.body.status || "pending");
+    const admin_note = String(req.body.admin_note || "");
+
+    const r = await pool.query(`
+      UPDATE govo_rider_leads
+      SET status=$1, admin_note=$2, updated_at=NOW()
+      WHERE id=$3
+      RETURNING *
+    `, [status, admin_note, id]);
+
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await govoAdminRiderNotifyV1([
+        "🛵 GOVO Rider Status Updated",
+        "",
+        `Rider ID: #${x.id}`,
+        `Name: ${x.rider_name || x.name || ""}`,
+        `Phone: ${x.phone || ""}`,
+        `Vehicle: ${x.vehicle_type || ""}`,
+        `Location: ${x.location || ""}`,
+        `Status: ${String(x.status || "").toUpperCase()}`,
+        `Admin Note: ${x.admin_note || "N/A"}`
+      ].join("\n"));
+    }
+
+    return res.redirect("/admin/riders?pin=" + encodeURIComponent(pin));
+  } catch(e) {
+    console.log("Admin rider status error:", e.message);
+    return res.status(500).send(page("Rider Status Error", `<div class="card"><h1>Rider Status Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+app.get("/admin/riders", async (req,res)=>{
+  try {
+    if (!govoAdminRiderPinOk(req,res)) return;
+
+    await govoEnsureAdminRidersPolishV1();
+
+    const pin = String(req.query.pin || "");
+    const status = String((req.query && req.query.status) || "all").trim();
+    const q = String((req.query && req.query.q) || "").trim();
+
+    const conditions = [];
+    const params = [];
+
+    if (status && status !== "all") {
+      params.push(status);
+      conditions.push(`COALESCE(status,'pending')=$${params.length}`);
+    }
+
+    if (q) {
+      params.push("%" + q.toLowerCase() + "%");
+      conditions.push(`
+        LOWER(
+          COALESCE(rider_name,'') || ' ' ||
+          COALESCE(name,'') || ' ' ||
+          COALESCE(phone,'') || ' ' ||
+          COALESCE(location,'') || ' ' ||
+          COALESCE(vehicle_type,'') || ' ' ||
+          COALESCE(admin_note,'')
+        ) LIKE $${params.length}
+      `);
+    }
+
+    const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+
+    const riders = await pool.query(`
+      SELECT id,
+             COALESCE(NULLIF(rider_name,''), NULLIF(name,''), 'Unnamed Rider') AS rider_name,
+             phone, location, vehicle_type,
+             COALESCE(status,'pending') AS status,
+             admin_note, created_at, updated_at
+      FROM govo_rider_leads
+      ${where}
+      ORDER BY id DESC
+      LIMIT 150
+    `, params);
+
+    const counts = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int AS pending,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int AS approved,
+        COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int AS rejected
+      FROM govo_rider_leads
+    `);
+
+    const c = counts.rows[0] || {};
+
+    const link = (label, st, active) => {
+      const sp = new URLSearchParams({ pin });
+      if (st && st !== "all") sp.set("status", st);
+      return `<a class="${active ? "active" : ""}" href="/admin/riders?${sp.toString()}">${label}</a>`;
+    };
+
+    const cards = riders.rows.map(x=>`
+      <div class="card govo-rider-admin-card">
+        <div class="govo-ra-head">
+          <div>
+            <span class="govo-chip">#${esc(String(x.id))}</span>
+            <h2>${esc(String(x.rider_name || ""))}</h2>
+            <small>${esc(String(x.phone || ""))}</small>
+          </div>
+          <span class="govo-status">${esc(String(x.status || "pending"))}</span>
+        </div>
+
+        <div class="govo-ra-grid">
+          <div><b>Location</b><span>${esc(String(x.location || ""))}</span></div>
+          <div><b>Vehicle</b><span>${esc(String(x.vehicle_type || ""))}</span></div>
+          <div><b>Admin Note</b><span>${esc(String(x.admin_note || "No note"))}</span></div>
+          <div><b>Joined</b><span>${esc(String(x.created_at || ""))}</span></div>
+        </div>
+
+        <form method="POST" action="/admin/rider/status" class="govo-ra-form">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input type="hidden" name="id" value="${esc(String(x.id))}">
+          <input name="admin_note" placeholder="Admin note">
+          <div class="govo-ra-buttons">
+            <button name="status" value="approved">Approve</button>
+            <button name="status" value="rejected">Reject</button>
+            <button name="status" value="pending">Pending</button>
+          </div>
+        </form>
+
+        <div class="govo-ra-links">
+          <a href="/rider/dashboard?phone=${encodeURIComponent(String(x.phone || ""))}">Open Rider Dashboard</a>
+          <a href="tel:${esc(String(x.phone || ""))}">Call Rider</a>
+        </div>
+      </div>
+    `).join("");
+
+    return res.send(page("Admin Riders", `
+      <style>
+        .govo-ra-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+        .govo-ra-nav a{font-size:13px!important;padding:9px 11px!important;border-radius:999px;border:1px solid rgba(34,197,94,.35);text-decoration:none;font-weight:900;color:#bbf7d0!important;background:rgba(34,197,94,.06)}
+        .govo-ra-nav a.active{background:#22c55e!important;color:#052e16!important}
+        .govo-ra-search{display:grid;gap:8px;margin-top:12px}
+        .govo-ra-search input{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-ra-search button{padding:10px!important;border-radius:12px!important;font-size:14px!important}
+        .govo-rider-admin-card{margin-top:14px!important;padding:16px!important}
+        .govo-ra-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .govo-ra-head h2{font-size:22px!important;line-height:1.15!important;margin:10px 0 4px!important;color:#22c55e!important}
+        .govo-ra-head small{font-size:13px!important;color:#cbd5e1!important}
+        .govo-chip,.govo-status{display:inline-flex;padding:5px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-size:13px!important;font-weight:900;text-transform:capitalize}
+        .govo-ra-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}
+        .govo-ra-grid div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px}
+        .govo-ra-grid b{display:block;font-size:13px!important;margin-bottom:5px}
+        .govo-ra-grid span{display:block;font-size:14px!important;line-height:1.35!important;word-break:break-word}
+        .govo-ra-form{display:grid;gap:8px;margin-top:10px}
+        .govo-ra-form input{font-size:14px!important;padding:10px!important;border-radius:12px!important;width:100%!important}
+        .govo-ra-form button{font-size:14px!important;padding:10px!important;border-radius:12px!important}
+        .govo-ra-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+        .govo-ra-links{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+        .govo-ra-links a{text-align:center;text-decoration:none;font-size:13px!important;padding:10px;border-radius:12px;border:1px solid rgba(34,197,94,.35);color:#bbf7d0!important;font-weight:900}
+        @media(max-width:700px){
+          .govo-ra-grid{grid-template-columns:1fr}
+          .govo-ra-buttons,.govo-ra-links{grid-template-columns:1fr}
+          .govo-ra-head{flex-direction:column}
+        }
+      </style>
+
+      <div class="card">
+        <h1>🛵 Admin Riders</h1>
+        <p>Rider approve/reject, search, filter, dashboard access.</p>
+
+        <div class="govo-ra-nav">
+          ${link("All " + (c.total || 0), "all", status==="all")}
+          ${link("Pending " + (c.pending || 0), "pending", status==="pending")}
+          ${link("Approved " + (c.approved || 0), "approved", status==="approved")}
+          ${link("Rejected " + (c.rejected || 0), "rejected", status==="rejected")}
+        </div>
+
+        <form method="GET" action="/admin/riders" class="govo-ra-search">
+          <input type="hidden" name="pin" value="${esc(pin)}">
+          <input name="q" value="${esc(q)}" placeholder="Search rider, phone, location, vehicle">
+          <button>🔎 Search Rider</button>
+        </form>
+
+        <div class="govo-ra-nav">
+          <a href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a>
+          <a href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a>
+          <a href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchants</a>
+          <a href="/rider">Rider Registration</a>
+        </div>
+
+        <p><b>${riders.rows.length}</b> rider showing.</p>
+      </div>
+
+      ${cards || `<div class="card"><h2>No rider found</h2><p>Filter/search change kore dekho.</p></div>`}
+    `));
+  } catch(e) {
+    console.log("Admin riders polish error:", e.message);
+    return res.status(500).send(page("Admin Riders Error", `<div class="card"><h1>Admin Riders Error</h1><p>${esc(String(e.message))}</p></div>`));
+  }
+});
+
+/* GOVO ADMIN RIDERS POLISH V1 END */
+
+
 app.get("/admin/orders", async (req,res)=>{
   try {
     const pin = String((req.query && req.query.pin) || "").trim();
