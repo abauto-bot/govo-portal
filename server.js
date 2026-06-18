@@ -23,25 +23,30 @@ try {
 
 app.use("/uploads", express.static(govoUploadsDir));
 
-const productUpload = multer({
+const allowedImageExts = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+const allowedImageMimes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const imageUpload = multer({
   storage: multer.diskStorage({
     destination: function(req, file, cb) {
       cb(null, govoUploadsDir);
     },
     filename: function(req, file, cb) {
       const ext = path.extname(file.originalname || "").toLowerCase();
-      const safeExt = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext) ? ext : ".jpg";
-      const name = "product-" + Date.now() + "-" + Math.round(Math.random() * 1e9) + safeExt;
+      const safeExt = allowedImageExts.includes(ext) ? ext : ".jpg";
+      const field = String(file.fieldname || "image").replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "image";
+      const name = field + "-" + Date.now() + "-" + Math.round(Math.random() * 1e9) + safeExt;
       cb(null, name);
     }
   }),
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: function(req, file, cb) {
-    const ok = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.mimetype);
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const ok = allowedImageMimes.includes(file.mimetype) && allowedImageExts.includes(ext);
     if (!ok) return cb(new Error("Only jpg, jpeg, png, webp, gif images allowed"));
     cb(null, true);
   }
 });
+const productUpload = imageUpload;
 /* GOVO PRODUCT UPLOAD FIX END */
 
 
@@ -181,6 +186,11 @@ function trustBadges(x) {
   </div>`;
 }
 
+function listingImage(src, alt, large = false) {
+  if (!src) return '';
+  return `<img src="${esc(src)}" alt="${esc(alt || 'GOVO image')}" style="width:100%;${large ? 'max-height:260px' : 'height:170px'};object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin:10px 0">`;
+}
+
 function adminTrustControls(type, x, pin) {
   const fields = [
     ['is_verified', 'Verified'],
@@ -191,16 +201,8 @@ function adminTrustControls(type, x, pin) {
   return `<div class="actions">${fields.map(([field, label]) => {
     const current = boolish(x[field]);
     const action = type === 'merchant' ? '/admin/merchant/trust' : '/admin/provider/trust';
-    return `<form method="POST" action="${action}"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="field" value="${field}"><input type="hidden" name="value" value="${current ? 'false' : 'true'}"><button class="${current ? '' : 'secondary'}">${esc(current ? 'Unset ' : 'Set ')}${esc(label)}</button></form>`;
+    return `<form method="POST" action="${action}"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="field" value="${field}"><input type="hidden" name="value" value="${current ? 'false' : 'true'}"><button class="${current ? '' : 'secondary'}">${esc(label)}: ${esc(current ? 'On' : 'Off')}</button></form>`;
   }).join('')}</div>`;
-}
-
-function reviewForm(targetType, targetId) {
-  return `<form method="POST" action="/review"><input type="hidden" name="target_type" value="${esc(targetType)}"><input type="hidden" name="target_id" value="${esc(targetId)}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Rating</label><select name="rating" required><option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Okay</option><option value="2">2 - Poor</option><option value="1">1 - Bad</option></select><label>Comment</label><textarea name="comment" required></textarea><button>Submit Review</button></form>`;
-}
-
-function reviewCards(rows) {
-  return rows.length ? rows.map((x) => `<div class="card" style="padding:14px;margin:0"><div class="actions" style="justify-content:space-between"><h2>${esc(x.customer_name || 'Customer')}</h2><span class="badge rating">${esc(x.rating)} / 5</span></div><p>${esc(x.comment || '')}</p><p style="color:var(--muted);font-size:12px">${esc(bdTime(x.created_at))}</p></div>`).join('') : '<p>No review yet.</p>';
 }
 
 function statCards(c) {
@@ -231,8 +233,6 @@ async function ensureSchema() {
   for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'merchant_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
   for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
-  await pool.query(`CREATE TABLE IF NOT EXISTS govo_reviews (id SERIAL PRIMARY KEY, target_type TEXT, target_id INT, customer_name TEXT, customer_phone TEXT, rating INT, comment TEXT, status TEXT DEFAULT 'approved', created_at TIMESTAMPTZ DEFAULT NOW())`);
-  for (const col of ['target_type TEXT', 'target_id INT', 'customer_name TEXT', 'customer_phone TEXT', 'rating INT', 'comment TEXT', "status TEXT DEFAULT 'approved'", 'created_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_reviews', col);
 
 }
 
@@ -288,7 +288,7 @@ app.get('/admin/os', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const pinParam = encodeURIComponent(pin);
-    const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders, reviews] = await Promise.all([
+    const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted FROM govo_merchant_leads`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_rider_leads`),
@@ -298,14 +298,12 @@ app.get('/admin/os', async (req, res, next) => {
       pool.query(`SELECT id, provider_name, service_type, customer_name, customer_phone, COALESCE(status,'pending') AS status, created_at FROM govo_service_requests ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, shop_name, owner_name, phone, category, COALESCE(status,'pending') AS status, created_at FROM govo_merchant_leads ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, provider_name, phone, service_type, area, COALESCE(status,'pending') AS status, created_at FROM govo_service_providers ORDER BY id DESC LIMIT 5`),
-      pool.query(`SELECT COUNT(*)::int total FROM govo_reviews`),
     ]);
     const o = orders.rows[0] || {};
     const m = merchants.rows[0] || {};
     const r = riders.rows[0] || {};
     const p = providers.rows[0] || {};
     const sr = serviceRequests.rows[0] || {};
-    const rv = reviews.rows[0] || {};
     const stat = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
     const action = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
     const alert = (label, count, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(label)}</h2>${badge(count ? 'pending' : 'clear')}</div><p><b>${esc(count || 0)}</b> waiting for action</p></a>`;
@@ -331,7 +329,6 @@ app.get('/admin/os', async (req, res, next) => {
         ${stat('Verified Providers', p.verified, 'Admin verified providers')}
         ${stat('Trusted Providers', p.trusted, 'High trust providers')}
         ${stat('Emergency Providers', p.emergency_available, 'Available for urgent service')}
-        ${stat('Total Reviews', rv.total, 'Customer trust feedback')}
         ${stat('Total Service Requests', sr.total, 'Customer service requests')}
         ${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}
         ${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}
@@ -535,19 +532,20 @@ function merchantMatchesCategory(x, cat) {
 }
 
 function merchantCard(x) {
-  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || '')}</h2><span class="pill">${esc(x.category || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || 'Details coming soon')}</span></div><div><b>Products</b><span>${esc(x.products || 'Not added yet')}</span></div></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order / Book</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+  return `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || '')}</h2><span class="pill">${esc(x.category || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || 'Details coming soon')}</span></div><div><b>Products</b><span>${esc(x.products || 'Not added yet')}</span></div></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order / Book</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
 }
 
 async function approvedMerchants() {
   return pool.query(`
     SELECT l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed,
            COALESCE(l.status,'pending') AS status, l.shop_description, l.shop_address, l.products, l.image_url,
-           COALESCE(l.is_verified,false) AS is_verified, COALESCE(l.is_trusted,false) AS is_trusted,
-           COALESCE(l.is_available,true) AS is_available, COALESCE(l.emergency_available,false) AS emergency_available,
-           COALESCE(l.rating_avg,0) AS rating_avg, COALESCE(l.rating_count,0) AS rating_count, l.created_at,
-           COALESCE((SELECT string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' ') FROM govo_shop_products p WHERE (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false), '') AS product_search
+           COALESCE(l.is_verified,false) AS is_verified, COALESCE(l.is_trusted,false) AS is_trusted, COALESCE(l.is_available,true) AS is_available,
+           COALESCE(l.emergency_available,false) AS emergency_available, COALESCE(l.rating_avg,0) AS rating_avg, COALESCE(l.rating_count,0) AS rating_count, l.created_at,
+           COALESCE(string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' '), '') AS product_search
     FROM govo_merchant_leads l
+    LEFT JOIN govo_shop_products p ON (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false
     WHERE COALESCE(l.status,'pending')='approved'
+    GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.is_verified, l.is_trusted, l.is_available, l.emergency_available, l.rating_avg, l.rating_count, l.created_at
     ORDER BY l.id DESC
     LIMIT 500
   `);
@@ -618,7 +616,6 @@ app.get('/shop/:id', async (req, res, next) => {
     const x = shop.rows[0];
     if (!x) return res.status(404).send(page('Shop Not Found', '<section class="card"><h1>Shop Not Found</h1><p>This shop is not approved or not found.</p></section>'));
     const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 120`, [x.id, x.phone]);
-    const reviews = await pool.query(`SELECT customer_name, rating, comment, created_at FROM govo_reviews WHERE target_type='merchant' AND target_id=$1 AND COALESCE(status,'approved')='approved' ORDER BY id DESC LIMIT 5`, [x.id]);
     const productHtml = products.rows.map((p) => {
       const itemValue = `${p.product_name || 'Product'}${p.price ? ` - ${p.price}` : ''}`;
       return `<div class="card" style="padding:14px;margin:0"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><span class="pill">${esc(p.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(p.product_name || 'Product')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${esc(p.price || '')}</p></div>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.product_name || 'Product')}" style="width:86px;height:86px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(p.description || '')}</p><button type="button" onclick="document.getElementById('item_details').value=${esc(JSON.stringify(itemValue))};document.getElementById('order_form').scrollIntoView({behavior:'smooth',block:'start'});">Add to Order</button></div>`;
@@ -627,6 +624,7 @@ app.get('/shop/:id', async (req, res, next) => {
       <section class="card">
         <a class="btn secondary" href="/shops">Back Shops</a>
         <h1>${esc(x.shop_name || '')}</h1>
+        ${listingImage(x.image_url, x.shop_name, true)}
         ${trustBadges(x)}
         <div class="detail-grid">
           <div><b>Owner</b><span>${esc(x.owner_name)}</span></div>
@@ -641,8 +639,6 @@ app.get('/shop/:id', async (req, res, next) => {
         <h2>Products / Menu</h2>
         <div class="item-grid">${productHtml || '<p>No available product added yet.</p>'}</div>
       </section>
-      <section class="card"><h2>Customer Reviews</h2><div class="item-grid">${reviewCards(reviews.rows)}</div></section>
-      <section class="card"><h2>Write Review</h2>${reviewForm('merchant', x.id)}</section>
       <section class="card" id="order_form">
         <h2>Order From This Shop</h2>
         <form method="POST" action="/order">
@@ -658,30 +654,6 @@ app.get('/shop/:id', async (req, res, next) => {
         </form>
       </section>
     `, 'shops'));
-  } catch (e) { next(e); }
-});
-
-
-app.post('/review', async (req, res, next) => {
-  try {
-    const targetType = String(req.body.target_type || '').trim().toLowerCase();
-    const targetId = Number.parseInt(String(req.body.target_id || ''), 10);
-    const rating = Number.parseInt(String(req.body.rating || ''), 10);
-    if (!['merchant', 'provider'].includes(targetType) || !Number.isInteger(targetId) || targetId <= 0 || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return res.status(400).send(page('Invalid Review', '<section class="card"><h1>Invalid Review</h1><p>Rating must be 1 to 5 and target must be valid.</p><a class="btn" href="/shops">Back</a></section>'));
-    }
-    const exists = targetType === 'merchant'
-      ? await pool.query(`SELECT id, shop_name AS name, phone FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [targetId])
-      : await pool.query(`SELECT id, provider_name AS name, phone FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [targetId]);
-    const target = exists.rows[0];
-    if (!target) return res.status(404).send(page('Review Target Not Found', '<section class="card"><h1>Not Found</h1><p>This GOVO listing is not available for reviews.</p><a class="btn" href="/shops">Back</a></section>'));
-    await pool.query(`INSERT INTO govo_reviews (target_type, target_id, customer_name, customer_phone, rating, comment, status, created_at) VALUES ($1,$2,$3,$4,$5,$6,'approved',NOW())`, [targetType, targetId, req.body.customer_name || '', req.body.customer_phone || '', rating, req.body.comment || '']);
-    const agg = await pool.query(`SELECT COALESCE(ROUND(AVG(rating)::numeric,1),0) AS avg, COUNT(*)::int AS count FROM govo_reviews WHERE target_type=$1 AND target_id=$2 AND COALESCE(status,'approved')='approved'`, [targetType, targetId]);
-    const a = agg.rows[0] || { avg: 0, count: 0 };
-    if (targetType === 'merchant') await pool.query(`UPDATE govo_merchant_leads SET rating_avg=$1, rating_count=$2, updated_at=NOW() WHERE id=$3`, [a.avg, a.count, targetId]);
-    else await pool.query(`UPDATE govo_service_providers SET rating_avg=$1, rating_count=$2, updated_at=NOW() WHERE id=$3`, [a.avg, a.count, targetId]);
-    sendTelegram(['New GOVO Review', '', `Type: ${targetType}`, `Target ID: #${targetId}`, `Name: ${target.name || ''}`, `Rating: ${rating}/5`, `Customer: ${req.body.customer_name || ''}`, `Phone: ${req.body.customer_phone || ''}`, `Comment: ${req.body.comment || ''}`].join('\n')).catch(() => {});
-    res.redirect(targetType === 'merchant' ? `/shop/${encodeURIComponent(targetId)}` : `/service/${encodeURIComponent(targetId)}`);
   } catch (e) { next(e); }
 });
 
@@ -739,6 +711,9 @@ app.get('/merchant/dashboard', async (req, res, next) => {
     const check = await approvedMerchantByPhone(phone);
     if (!check.lead) return res.send(page('Merchant Dashboard', '<section class="card"><h1>No merchant found</h1><a class="btn" href="/merchant">Register Merchant</a></section>', 'merchant'));
     if (!check.approved) return res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Pending</h1><p>Merchant status is ${esc(check.lead.status || 'pending')}.</p></section>`, 'merchant'));
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || check.lead.image_url || '').trim();
+    if (imageUrl) await pool.query(`UPDATE govo_merchant_leads SET image_url=$1, shop_name=$2, owner_name=$3, location=$4, category=$5, shop_description=$6, whatsapp=$7, updated_at=NOW() WHERE id=$8`, [imageUrl, req.body.shop_name, req.body.owner_name, req.body.location, req.body.category, req.body.description, req.body.whatsapp, check.lead.id]);
+    else await pool.query(`UPDATE govo_merchant_leads SET shop_name=$1, owner_name=$2, location=$3, category=$4, shop_description=$5, whatsapp=$6, updated_at=NOW() WHERE id=$7`, [req.body.shop_name, req.body.owner_name, req.body.location, req.body.category, req.body.description, req.body.whatsapp, check.lead.id]);
     const existingProfile = await pool.query(`SELECT id FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone]);
     if (!existingProfile.rows.length) {
       await pool.query(`INSERT INTO govo_merchant_profiles (merchant_lead_id, shop_name, owner_name, phone, location, category, delivery_needed, status) VALUES ($1,$2,$3,$4,$5,$6,$7,'published')`, [check.lead.id, check.lead.shop_name, check.lead.owner_name, check.lead.phone, check.lead.location, check.lead.category, check.lead.delivery_needed]);
@@ -746,20 +721,20 @@ app.get('/merchant/dashboard', async (req, res, next) => {
     const prof = (await pool.query(`SELECT * FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone])).rows[0] || {};
     const items = await pool.query(`SELECT id, item_name, price, details FROM govo_shop_items WHERE merchant_phone=$1 AND COALESCE(is_active,true)=true ORDER BY id DESC LIMIT 50`, [phone]);
     const itemHtml = items.rows.map((i) => `<div class="item-box"><b>${esc(i.item_name || '')}</b><span>${esc(i.price || '')}</span><br><span>${esc(i.details || '')}</span><div class="actions"><a class="btn secondary" href="/merchant/item/${encodeURIComponent(i.id)}/delete?phone=${encodeURIComponent(phone)}">Remove</a></div></div>`).join('');
-    res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Dashboard</h1><p>Phone: ${esc(phone)}</p><form method="POST" action="/merchant/profile"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || check.lead.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || check.lead.owner_name || '')}"><label>Location</label><input name="location" value="${esc(prof.location || check.lead.location || '')}"><label>Category</label><input name="category" value="${esc(prof.category || check.lead.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || check.lead.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || check.lead.shop_description || '')}</textarea><button>Save Shop Info</button></form></section><section class="card"><h2>Add Product / Service</h2><form method="POST" action="/merchant/item"><input type="hidden" name="phone" value="${esc(phone)}"><label>Item Name</label><input name="item_name" required><label>Price</label><input name="price"><label>Details</label><textarea name="details"></textarea><button>Add Item</button></form><h2>Current Items</h2><div class="item-grid">${itemHtml || '<p>No item added yet.</p>'}</div></section>`, 'merchant'));
+    res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Dashboard</h1><p>Phone: ${esc(phone)}</p><form method="POST" action="/merchant/profile" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || check.lead.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || check.lead.owner_name || '')}"><label>Location</label><input name="location" value="${esc(prof.location || check.lead.location || '')}"><label>Category</label><input name="category" value="${esc(prof.category || check.lead.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || check.lead.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || check.lead.shop_description || '')}</textarea><label>Shop Image / Logo</label>${listingImage(check.lead.image_url || prof.logo_image, check.lead.shop_name)}<input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(check.lead.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><h2>Add Product / Service</h2><form method="POST" action="/merchant/item"><input type="hidden" name="phone" value="${esc(phone)}"><label>Item Name</label><input name="item_name" required><label>Price</label><input name="price"><label>Details</label><textarea name="details"></textarea><button>Add Item</button></form><h2>Current Items</h2><div class="item-grid">${itemHtml || '<p>No item added yet.</p>'}</div></section>`, 'merchant'));
   } catch (e) { next(e); }
 });
 
-app.post('/merchant/profile', async (req, res, next) => {
+app.post('/merchant/profile', imageUpload.single('shop_image'), async (req, res, next) => {
   try {
     const phone = String(req.body.phone || '').trim();
     const check = await approvedMerchantByPhone(phone);
     if (!check.approved) return res.status(403).send(page('Not Approved', '<section class="card"><h1>Not Approved</h1></section>'));
     const existingProfile = await pool.query(`SELECT id FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone]);
     if (existingProfile.rows.length) {
-      await pool.query(`UPDATE govo_merchant_profiles SET merchant_lead_id=$1, shop_name=$2, owner_name=$3, location=$4, category=$5, description=$6, opening_hours=$7, delivery_area=$8, whatsapp=$9, status='published', updated_at=NOW() WHERE phone=$10`, [check.lead.id, req.body.shop_name, req.body.owner_name, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp, phone]);
+      await pool.query(`UPDATE govo_merchant_profiles SET merchant_lead_id=$1, shop_name=$2, owner_name=$3, location=$4, category=$5, description=$6, opening_hours=$7, delivery_area=$8, whatsapp=$9, logo_image=$10, status='published', updated_at=NOW() WHERE phone=$11`, [check.lead.id, req.body.shop_name, req.body.owner_name, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp, imageUrl, phone]);
     } else {
-      await pool.query(`INSERT INTO govo_merchant_profiles (merchant_lead_id, shop_name, owner_name, phone, location, category, description, opening_hours, delivery_area, whatsapp, status, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'published',NOW())`, [check.lead.id, req.body.shop_name, req.body.owner_name, phone, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp]);
+      await pool.query(`INSERT INTO govo_merchant_profiles (merchant_lead_id, shop_name, owner_name, phone, location, category, description, opening_hours, delivery_area, whatsapp, logo_image, status, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'published',NOW())`, [check.lead.id, req.body.shop_name, req.body.owner_name, phone, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp, imageUrl]);
     }
     res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(phone)}`);
   } catch (e) { next(e); }
@@ -947,26 +922,27 @@ function serviceCategoryMatches(x, cat) {
 }
 
 function providerCard(x) {
-  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div>${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.provider_name || 'Provider')}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin-top:10px">` : ''}<div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+  return `<div class="card">${listingImage(x.image_url, x.provider_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div><div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
 }
 
 async function approvedProviders() {
   return pool.query(`SELECT * FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 500`);
 }
 
-app.all('/provider', async (req, res, next) => {
+app.all('/provider', imageUpload.single('provider_image'), async (req, res, next) => {
   try {
     if (req.method === 'POST') {
-      const r = await pool.query(`INSERT INTO govo_service_providers (provider_name, phone, whatsapp, service_type, area, address, experience, description, image_url, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',NOW(),NOW()) RETURNING *`, [req.body.provider_name || '', req.body.phone || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', req.body.image_url || '']);
+      const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || '').trim();
+      const r = await pool.query(`INSERT INTO govo_service_providers (provider_name, phone, whatsapp, service_type, area, address, experience, description, image_url, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',NOW(),NOW()) RETURNING *`, [req.body.provider_name || '', req.body.phone || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', imageUrl]);
       const x = r.rows[0];
       sendTelegram(['New GOVO Service Provider', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `WhatsApp: ${x.whatsapp || ''}`, `Type: ${x.service_type || ''}`, `Area: ${x.area || ''}`, `Address: ${x.address || ''}`].join('\n')).catch(() => {});
       return res.send(page('Provider Submitted', `<section class="card"><h1>Provider Submitted</h1><p>GOVO team review kore approve korbe.</p><div class="actions"><a class="btn" href="/provider">Add Another</a><a class="btn secondary" href="/services">Services</a></div></section>`, 'services'));
     }
-    res.send(page('Provider Registration', `<section class="card"><h1>Service Provider Registration</h1><p style="color:var(--muted)">Join GOVO Super App as an approved service provider.</p><form method="POST" action="/provider"><label>Provider Name</label><input name="provider_name" required><label>Phone</label><input name="phone" required><label>WhatsApp</label><input name="whatsapp"><label>Service Type</label><input name="service_type" placeholder="Electrician / Doctor / Transport" required><label>Area</label><input name="area" required><label>Address</label><textarea name="address"></textarea><label>Experience</label><input name="experience" placeholder="5 years / 100+ jobs"><label>Description</label><textarea name="description"></textarea><label>Image URL</label><input name="image_url" placeholder="Optional profile/service image URL"><button>Submit Provider</button></form></section>`, 'services'));
+    res.send(page('Provider Registration', `<section class="card"><h1>Service Provider Registration</h1><p style="color:var(--muted)">Join GOVO Super App as an approved service provider.</p><form method="POST" action="/provider" enctype="multipart/form-data"><label>Provider Name</label><input name="provider_name" required><label>Phone</label><input name="phone" required><label>WhatsApp</label><input name="whatsapp"><label>Service Type</label><input name="service_type" placeholder="Electrician / Doctor / Transport" required><label>Area</label><input name="area" required><label>Address</label><textarea name="address"></textarea><label>Experience</label><input name="experience" placeholder="5 years / 100+ jobs"><label>Description</label><textarea name="description"></textarea><label>Profile / Service Image</label><input type="file" name="provider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" placeholder="Optional existing image URL"><button>Submit Provider</button></form></section>`, 'services'));
   } catch (e) { next(e); }
 });
 
-app.all('/provider/dashboard', async (req, res, next) => {
+app.all('/provider/dashboard', imageUpload.single('provider_image'), async (req, res, next) => {
   try {
     const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
     if (!phone) return res.send(page('Provider Dashboard', `<section class="card"><h1>Provider Dashboard</h1><form method="GET" action="/provider/dashboard"><label>Provider Phone</label><input name="phone" required><button>Open Dashboard</button></form><div class="actions"><a class="btn secondary" href="/provider">Register Provider</a><a class="btn secondary" href="/services">Services</a></div></section>`, 'services'));
@@ -974,7 +950,8 @@ app.all('/provider/dashboard', async (req, res, next) => {
     if (!provider.rows.length) return res.send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="/provider">Register Provider</a></section>`, 'services'));
     const p = provider.rows[0];
     if (req.method === 'POST' && req.body.action === 'profile') {
-      await pool.query(`UPDATE govo_service_providers SET provider_name=$1, whatsapp=$2, service_type=$3, area=$4, address=$5, experience=$6, description=$7, image_url=$8, updated_at=NOW() WHERE id=$9`, [req.body.provider_name || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', req.body.image_url || '', p.id]);
+      const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || p.image_url || '').trim();
+      await pool.query(`UPDATE govo_service_providers SET provider_name=$1, whatsapp=$2, service_type=$3, area=$4, address=$5, experience=$6, description=$7, image_url=$8, updated_at=NOW() WHERE id=$9`, [req.body.provider_name || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', imageUrl, p.id]);
       return res.redirect(`/provider/dashboard?phone=${encodeURIComponent(phone)}`);
     }
     if (req.method === 'POST' && req.body.action === 'request_status') {
@@ -990,7 +967,7 @@ app.all('/provider/dashboard', async (req, res, next) => {
     const fresh = (await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1`, [p.id])).rows[0] || p;
     const requests = await pool.query(`SELECT * FROM govo_service_requests WHERE provider_id=$1 OR provider_phone=$2 ORDER BY id DESC LIMIT 100`, [fresh.id, fresh.phone || '']);
     const requestCards = requests.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.customer_name || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.customer_phone)}</span></div><div><b>Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem</b><span>${esc(x.problem_details)}</span></div><div><b>Preferred</b><span>${esc(x.preferred_time)}</span></div><div><b>Note</b><span>${esc(x.note)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/provider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="action" value="request_status"><input type="hidden" name="request_id" value="${esc(x.id)}"><input name="provider_note" placeholder="Provider note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="working">Working</button><button name="status" value="completed">Complete</button></div><button class="reject" name="status" value="rejected">Reject</button></form></div>`).join('');
-    res.send(page('Provider Dashboard', `<section class="card"><h1>Provider Dashboard</h1><p>${esc(fresh.provider_name || '')} | ${badge(fresh.status)}</p><form method="POST" action="/provider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="action" value="profile"><label>Provider Name</label><input name="provider_name" value="${esc(fresh.provider_name || '')}" required><label>WhatsApp</label><input name="whatsapp" value="${esc(fresh.whatsapp || '')}"><label>Service Type</label><input name="service_type" value="${esc(fresh.service_type || '')}" required><label>Area</label><input name="area" value="${esc(fresh.area || '')}" required><label>Address</label><textarea name="address">${esc(fresh.address || '')}</textarea><label>Experience</label><input name="experience" value="${esc(fresh.experience || '')}"><label>Description</label><textarea name="description">${esc(fresh.description || '')}</textarea><label>Image URL</label><input name="image_url" value="${esc(fresh.image_url || '')}"><button>Save Profile</button></form><div class="actions"><a class="btn secondary" href="/service/${encodeURIComponent(fresh.id)}">Public Page</a><a class="btn secondary" href="/services">Services</a></div></section><section class="card"><h2>Service Requests</h2></section><section class="cards">${requestCards || '<div class="card"><h2>No request yet</h2></div>'}</section>`, 'services'));
+    res.send(page('Provider Dashboard', `<section class="card"><h1>Provider Dashboard</h1><p>${esc(fresh.provider_name || '')} | ${badge(fresh.status)}</p><form method="POST" action="/provider/dashboard" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="action" value="profile"><label>Provider Name</label><input name="provider_name" value="${esc(fresh.provider_name || '')}" required><label>WhatsApp</label><input name="whatsapp" value="${esc(fresh.whatsapp || '')}"><label>Service Type</label><input name="service_type" value="${esc(fresh.service_type || '')}" required><label>Area</label><input name="area" value="${esc(fresh.area || '')}" required><label>Address</label><textarea name="address">${esc(fresh.address || '')}</textarea><label>Experience</label><input name="experience" value="${esc(fresh.experience || '')}"><label>Description</label><textarea name="description">${esc(fresh.description || '')}</textarea><label>Profile / Service Image</label>${listingImage(fresh.image_url, fresh.provider_name)}<input type="file" name="provider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(fresh.image_url || '')}"><button>Save Profile</button></form><div class="actions"><a class="btn secondary" href="/service/${encodeURIComponent(fresh.id)}">Public Page</a><a class="btn secondary" href="/services">Services</a></div></section><section class="card"><h2>Service Requests</h2></section><section class="cards">${requestCards || '<div class="card"><h2>No request yet</h2></div>'}</section>`, 'services'));
   } catch (e) { next(e); }
 });
 
@@ -1013,8 +990,7 @@ app.get('/service/:id', async (req, res, next) => {
     const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
     const p = r.rows[0];
     if (!p) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not approved or not found.</p><a class="btn" href="/services">Back Services</a></section>`, 'services'));
-    const reviews = await pool.query(`SELECT customer_name, rating, comment, created_at FROM govo_reviews WHERE target_type='provider' AND target_id=$1 AND COALESCE(status,'approved')='approved' ORDER BY id DESC LIMIT 5`, [p.id]);
-    res.send(page(p.provider_name || 'GOVO Service', `<section class="card"><a class="btn secondary" href="/services">Back Services</a><h1>${esc(p.provider_name || '')}</h1>${trustBadges(p)}${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.provider_name || 'Provider')}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin:10px 0">` : ''}<div class="detail-grid"><div><b>Service</b><span>${esc(p.service_type)}</span></div><div><b>Phone</b><span>${esc(p.whatsapp || p.phone)}</span></div><div><b>Area</b><span>${esc(p.area)}</span></div><div><b>Address</b><span>${esc(p.address)}</span></div><div><b>Experience</b><span>${esc(p.experience)}</span></div><div><b>About</b><span>${esc(p.description)}</span></div></div></section><section class="card"><h2>Request Service</h2><form method="POST" action="/service/request"><input type="hidden" name="provider_id" value="${esc(p.id)}"><input type="hidden" name="service_type" value="${esc(p.service_type || '')}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Service Address</label><textarea name="service_address" required></textarea><label>Problem Details</label><textarea name="problem_details" required></textarea><label>Preferred Time</label><input name="preferred_time" placeholder="Today 5 PM"><label>Note</label><textarea name="note"></textarea><button>Submit Request</button></form></section><section class="card"><h2>Customer Reviews</h2><div class="item-grid">${reviewCards(reviews.rows)}</div></section><section class="card"><h2>Write Review</h2>${reviewForm('provider', p.id)}</section>`, 'services'));
+    res.send(page(p.provider_name || 'GOVO Service', `<section class="card"><a class="btn secondary" href="/services">Back Services</a><h1>${esc(p.provider_name || '')}</h1>${listingImage(p.image_url, p.provider_name, true)}${trustBadges(p)}<div class="detail-grid"><div><b>Service</b><span>${esc(p.service_type)}</span></div><div><b>Phone</b><span>${esc(p.whatsapp || p.phone)}</span></div><div><b>Area</b><span>${esc(p.area)}</span></div><div><b>Address</b><span>${esc(p.address)}</span></div><div><b>Experience</b><span>${esc(p.experience)}</span></div><div><b>About</b><span>${esc(p.description)}</span></div></div></section><section class="card"><h2>Request Service</h2><form method="POST" action="/service/request"><input type="hidden" name="provider_id" value="${esc(p.id)}"><input type="hidden" name="service_type" value="${esc(p.service_type || '')}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Service Address</label><textarea name="service_address" required></textarea><label>Problem Details</label><textarea name="problem_details" required></textarea><label>Preferred Time</label><input name="preferred_time" placeholder="Today 5 PM"><label>Note</label><textarea name="note"></textarea><button>Submit Request</button></form></section>`, 'services'));
   } catch (e) { next(e); }
 });
 
