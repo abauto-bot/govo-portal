@@ -9,4 +9,5 @@ portal.log
 server.js.STABLE-*
 server.js.bak.*
 server.js.before-*
+server.js.current-working-*
 server.js.fix-before-*
