@@ -137,7 +137,7 @@ async function sendTelegram(text) {
 
 const css = `
 :root{--bg:#0b1020;--panel:#111827;--line:#263244;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#60a5fa}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed,.badge.unavailable{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.badge.verified{background:#0c4a6e;border-color:#38bdf8;color:#e0f2fe}.badge.trusted{background:#064e3b;border-color:#34d399;color:#d1fae5}.badge.available{background:#052e16;border-color:#22c55e;color:#bbf7d0}.badge.emergency{background:#7c2d12;border-color:#fb923c;color:#ffedd5}.badge.rating{background:#422006;border-color:#facc15;color:#fef9c3}.badge.clear{background:#172554;border-color:#60a5fa;color:#dbeafe}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
 @media(max-width:760px){.app{padding:12px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}}
 `;
 
@@ -158,6 +158,49 @@ function page(title, body, active = '') {
 function badge(status) {
   const s = String(status || 'pending').toLowerCase();
   return `<span class="badge ${esc(s)}">${esc(s)}</span>`;
+}
+
+function boolish(v) {
+  return v === true || v === 1 || String(v || '').toLowerCase() === 'true' || String(v || '') === '1';
+}
+
+function ratingText(x) {
+  const avg = Number(x.rating_avg || 0);
+  const count = Number(x.rating_count || 0);
+  return `${avg ? avg.toFixed(1).replace(/\.0$/, '') : '0'} / 5 (${count})`;
+}
+
+function trustBadges(x) {
+  const available = boolish(x.is_available);
+  return `<div class="actions trust-row">
+    ${boolish(x.is_verified) ? '<span class="badge verified">Verified</span>' : ''}
+    ${boolish(x.is_trusted) ? '<span class="badge trusted">Trusted</span>' : ''}
+    <span class="badge ${available ? 'available' : 'unavailable'}">${available ? 'Available' : 'Unavailable'}</span>
+    ${boolish(x.emergency_available) ? '<span class="badge emergency">Emergency</span>' : ''}
+    <span class="badge rating">Rating ${esc(ratingText(x))}</span>
+  </div>`;
+}
+
+function adminTrustControls(type, x, pin) {
+  const fields = [
+    ['is_verified', 'Verified'],
+    ['is_trusted', 'Trusted'],
+    ['is_available', 'Available'],
+    ['emergency_available', 'Emergency'],
+  ];
+  return `<div class="actions">${fields.map(([field, label]) => {
+    const current = boolish(x[field]);
+    const action = type === 'merchant' ? '/admin/merchant/trust' : '/admin/provider/trust';
+    return `<form method="POST" action="${action}"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="field" value="${field}"><input type="hidden" name="value" value="${current ? 'false' : 'true'}"><button class="${current ? '' : 'secondary'}">${esc(current ? 'Unset ' : 'Set ')}${esc(label)}</button></form>`;
+  }).join('')}</div>`;
+}
+
+function reviewForm(targetType, targetId) {
+  return `<form method="POST" action="/review"><input type="hidden" name="target_type" value="${esc(targetType)}"><input type="hidden" name="target_id" value="${esc(targetId)}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Rating</label><select name="rating" required><option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Okay</option><option value="2">2 - Poor</option><option value="1">1 - Bad</option></select><label>Comment</label><textarea name="comment" required></textarea><button>Submit Review</button></form>`;
+}
+
+function reviewCards(rows) {
+  return rows.length ? rows.map((x) => `<div class="card" style="padding:14px;margin:0"><div class="actions" style="justify-content:space-between"><h2>${esc(x.customer_name || 'Customer')}</h2><span class="badge rating">${esc(x.rating)} / 5</span></div><p>${esc(x.comment || '')}</p><p style="color:var(--muted);font-size:12px">${esc(bdTime(x.created_at))}</p></div>`).join('') : '<p>No review yet.</p>';
 }
 
 function statCards(c) {
@@ -183,11 +226,13 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_items (id SERIAL PRIMARY KEY, merchant_phone TEXT, item_name TEXT, price TEXT, details TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW())`);
 
   const add = async (table, columnSql) => pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${columnSql}`);
-  for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
+  for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
   for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
   for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'merchant_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
-  for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
+  for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
+  await pool.query(`CREATE TABLE IF NOT EXISTS govo_reviews (id SERIAL PRIMARY KEY, target_type TEXT, target_id INT, customer_name TEXT, customer_phone TEXT, rating INT, comment TEXT, status TEXT DEFAULT 'approved', created_at TIMESTAMPTZ DEFAULT NOW())`);
+  for (const col of ['target_type TEXT', 'target_id INT', 'customer_name TEXT', 'customer_phone TEXT', 'rating INT', 'comment TEXT', "status TEXT DEFAULT 'approved'", 'created_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_reviews', col);
 
 }
 
@@ -243,22 +288,24 @@ app.get('/admin/os', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const pinParam = encodeURIComponent(pin);
-    const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders] = await Promise.all([
+    const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders, reviews] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_merchant_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted FROM govo_merchant_leads`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_rider_leads`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_service_providers`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted, COUNT(*) FILTER (WHERE COALESCE(emergency_available,false)=true AND COALESCE(is_available,true)=true)::int emergency_available FROM govo_service_providers`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`),
       pool.query(`SELECT id, shop_name, customer_name, customer_phone, drop_location, COALESCE(status,'pending') AS status, created_at FROM govo_orders ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, provider_name, service_type, customer_name, customer_phone, COALESCE(status,'pending') AS status, created_at FROM govo_service_requests ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, shop_name, owner_name, phone, category, COALESCE(status,'pending') AS status, created_at FROM govo_merchant_leads ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, provider_name, phone, service_type, area, COALESCE(status,'pending') AS status, created_at FROM govo_service_providers ORDER BY id DESC LIMIT 5`),
+      pool.query(`SELECT COUNT(*)::int total FROM govo_reviews`),
     ]);
     const o = orders.rows[0] || {};
     const m = merchants.rows[0] || {};
     const r = riders.rows[0] || {};
     const p = providers.rows[0] || {};
     const sr = serviceRequests.rows[0] || {};
+    const rv = reviews.rows[0] || {};
     const stat = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
     const action = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
     const alert = (label, count, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(label)}</h2>${badge(count ? 'pending' : 'clear')}</div><p><b>${esc(count || 0)}</b> waiting for action</p></a>`;
@@ -273,12 +320,18 @@ app.get('/admin/os', async (req, res, next) => {
         ${stat('Total Merchants', m.total, 'Merchant registrations')}
         ${stat('Pending Merchants', m.pending, 'Waiting approval')}
         ${stat('Approved Merchants', m.approved, 'Visible in shops')}
+        ${stat('Verified Merchants', m.verified, 'Admin verified shops')}
+        ${stat('Trusted Merchants', m.trusted, 'High trust shops')}
         ${stat('Total Riders', r.total, 'Rider registrations')}
         ${stat('Pending Riders', r.pending, 'Waiting approval')}
         ${stat('Approved Riders', r.approved, 'Assignable riders')}
         ${stat('Total Service Providers', p.total, 'Provider registrations')}
         ${stat('Pending Providers', p.pending, 'Waiting approval')}
         ${stat('Approved Providers', p.approved, 'Visible in services')}
+        ${stat('Verified Providers', p.verified, 'Admin verified providers')}
+        ${stat('Trusted Providers', p.trusted, 'High trust providers')}
+        ${stat('Emergency Providers', p.emergency_available, 'Available for urgent service')}
+        ${stat('Total Reviews', rv.total, 'Customer trust feedback')}
         ${stat('Total Service Requests', sr.total, 'Customer service requests')}
         ${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}
         ${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}
@@ -321,9 +374,9 @@ app.get('/admin/leads', async (req, res, next) => {
     const where = [];
     if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
-    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, admin_note, shop_description, shop_address, products, image_url, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int rejected FROM govo_merchant_leads`);
-    const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form><div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
+    const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('merchant', x, pin)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
     res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1><form class="filters" method="GET" action="/admin/leads"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/riders?pin=${encodeURIComponent(pin)}">Riders</a><a class="btn secondary" href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
@@ -360,6 +413,23 @@ app.get('/admin/riders', async (req, res, next) => {
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int rejected FROM govo_rider_leads`);
     const cards = riders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form></div>`).join('');
     res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1><form class="filters" method="GET" action="/admin/riders"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/leads?pin=${encodeURIComponent(pin)}">Merchants</a><a class="btn secondary" href="/admin/orders?pin=${encodeURIComponent(pin)}">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+
+app.post('/admin/merchant/trust', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const pin = getPin(req);
+    const field = String(req.body.field || '').trim();
+    if (!['is_verified', 'is_trusted', 'is_available', 'emergency_available'].includes(field)) return res.status(400).send(page('Invalid Trust Field', '<section class="card"><h1>Invalid Trust Field</h1></section>', 'admin'));
+    const value = boolish(req.body.value);
+    const r = await pool.query(`UPDATE govo_merchant_leads SET ${field}=$1, updated_at=NOW() WHERE id=$2 RETURNING id, shop_name, phone, is_verified, is_trusted, is_available, emergency_available`, [value, req.body.id || '']);
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await sendTelegram(['GOVO Merchant Trust Updated', '', `Merchant ID: #${x.id}`, `Shop: ${x.shop_name || ''}`, `Phone: ${x.phone || ''}`, `Verified: ${x.is_verified}`, `Trusted: ${x.is_trusted}`, `Available: ${x.is_available}`, `Emergency: ${x.emergency_available}`].join('\n'));
+    }
+    res.redirect(`/admin/leads?pin=${encodeURIComponent(pin)}`);
   } catch (e) { next(e); }
 });
 
@@ -465,18 +535,19 @@ function merchantMatchesCategory(x, cat) {
 }
 
 function merchantCard(x) {
-  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || '')}</h2><span class="pill">${esc(x.category || 'Service')}</span></div><div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || 'Details coming soon')}</span></div><div><b>Products</b><span>${esc(x.products || 'Not added yet')}</span></div></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order / Book</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || '')}</h2><span class="pill">${esc(x.category || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || 'Details coming soon')}</span></div><div><b>Products</b><span>${esc(x.products || 'Not added yet')}</span></div></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View</a><a class="btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order / Book</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
 }
 
 async function approvedMerchants() {
   return pool.query(`
     SELECT l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed,
-           COALESCE(l.status,'pending') AS status, l.shop_description, l.shop_address, l.products, l.image_url, l.created_at,
-           COALESCE(string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' '), '') AS product_search
+           COALESCE(l.status,'pending') AS status, l.shop_description, l.shop_address, l.products, l.image_url,
+           COALESCE(l.is_verified,false) AS is_verified, COALESCE(l.is_trusted,false) AS is_trusted,
+           COALESCE(l.is_available,true) AS is_available, COALESCE(l.emergency_available,false) AS emergency_available,
+           COALESCE(l.rating_avg,0) AS rating_avg, COALESCE(l.rating_count,0) AS rating_count, l.created_at,
+           COALESCE((SELECT string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' ') FROM govo_shop_products p WHERE (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false), '') AS product_search
     FROM govo_merchant_leads l
-    LEFT JOIN govo_shop_products p ON (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false
     WHERE COALESCE(l.status,'pending')='approved'
-    GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.created_at
     ORDER BY l.id DESC
     LIMIT 500
   `);
@@ -543,10 +614,11 @@ app.get('/category/:slug', async (req, res, next) => {
 
 app.get('/shop/:id', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, created_at FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
     if (!x) return res.status(404).send(page('Shop Not Found', '<section class="card"><h1>Shop Not Found</h1><p>This shop is not approved or not found.</p></section>'));
     const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 120`, [x.id, x.phone]);
+    const reviews = await pool.query(`SELECT customer_name, rating, comment, created_at FROM govo_reviews WHERE target_type='merchant' AND target_id=$1 AND COALESCE(status,'approved')='approved' ORDER BY id DESC LIMIT 5`, [x.id]);
     const productHtml = products.rows.map((p) => {
       const itemValue = `${p.product_name || 'Product'}${p.price ? ` - ${p.price}` : ''}`;
       return `<div class="card" style="padding:14px;margin:0"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><span class="pill">${esc(p.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(p.product_name || 'Product')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${esc(p.price || '')}</p></div>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.product_name || 'Product')}" style="width:86px;height:86px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(p.description || '')}</p><button type="button" onclick="document.getElementById('item_details').value=${esc(JSON.stringify(itemValue))};document.getElementById('order_form').scrollIntoView({behavior:'smooth',block:'start'});">Add to Order</button></div>`;
@@ -555,6 +627,7 @@ app.get('/shop/:id', async (req, res, next) => {
       <section class="card">
         <a class="btn secondary" href="/shops">Back Shops</a>
         <h1>${esc(x.shop_name || '')}</h1>
+        ${trustBadges(x)}
         <div class="detail-grid">
           <div><b>Owner</b><span>${esc(x.owner_name)}</span></div>
           <div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div>
@@ -568,6 +641,8 @@ app.get('/shop/:id', async (req, res, next) => {
         <h2>Products / Menu</h2>
         <div class="item-grid">${productHtml || '<p>No available product added yet.</p>'}</div>
       </section>
+      <section class="card"><h2>Customer Reviews</h2><div class="item-grid">${reviewCards(reviews.rows)}</div></section>
+      <section class="card"><h2>Write Review</h2>${reviewForm('merchant', x.id)}</section>
       <section class="card" id="order_form">
         <h2>Order From This Shop</h2>
         <form method="POST" action="/order">
@@ -583,6 +658,30 @@ app.get('/shop/:id', async (req, res, next) => {
         </form>
       </section>
     `, 'shops'));
+  } catch (e) { next(e); }
+});
+
+
+app.post('/review', async (req, res, next) => {
+  try {
+    const targetType = String(req.body.target_type || '').trim().toLowerCase();
+    const targetId = Number.parseInt(String(req.body.target_id || ''), 10);
+    const rating = Number.parseInt(String(req.body.rating || ''), 10);
+    if (!['merchant', 'provider'].includes(targetType) || !Number.isInteger(targetId) || targetId <= 0 || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).send(page('Invalid Review', '<section class="card"><h1>Invalid Review</h1><p>Rating must be 1 to 5 and target must be valid.</p><a class="btn" href="/shops">Back</a></section>'));
+    }
+    const exists = targetType === 'merchant'
+      ? await pool.query(`SELECT id, shop_name AS name, phone FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [targetId])
+      : await pool.query(`SELECT id, provider_name AS name, phone FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [targetId]);
+    const target = exists.rows[0];
+    if (!target) return res.status(404).send(page('Review Target Not Found', '<section class="card"><h1>Not Found</h1><p>This GOVO listing is not available for reviews.</p><a class="btn" href="/shops">Back</a></section>'));
+    await pool.query(`INSERT INTO govo_reviews (target_type, target_id, customer_name, customer_phone, rating, comment, status, created_at) VALUES ($1,$2,$3,$4,$5,$6,'approved',NOW())`, [targetType, targetId, req.body.customer_name || '', req.body.customer_phone || '', rating, req.body.comment || '']);
+    const agg = await pool.query(`SELECT COALESCE(ROUND(AVG(rating)::numeric,1),0) AS avg, COUNT(*)::int AS count FROM govo_reviews WHERE target_type=$1 AND target_id=$2 AND COALESCE(status,'approved')='approved'`, [targetType, targetId]);
+    const a = agg.rows[0] || { avg: 0, count: 0 };
+    if (targetType === 'merchant') await pool.query(`UPDATE govo_merchant_leads SET rating_avg=$1, rating_count=$2, updated_at=NOW() WHERE id=$3`, [a.avg, a.count, targetId]);
+    else await pool.query(`UPDATE govo_service_providers SET rating_avg=$1, rating_count=$2, updated_at=NOW() WHERE id=$3`, [a.avg, a.count, targetId]);
+    sendTelegram(['New GOVO Review', '', `Type: ${targetType}`, `Target ID: #${targetId}`, `Name: ${target.name || ''}`, `Rating: ${rating}/5`, `Customer: ${req.body.customer_name || ''}`, `Phone: ${req.body.customer_phone || ''}`, `Comment: ${req.body.comment || ''}`].join('\n')).catch(() => {});
+    res.redirect(targetType === 'merchant' ? `/shop/${encodeURIComponent(targetId)}` : `/service/${encodeURIComponent(targetId)}`);
   } catch (e) { next(e); }
 });
 
@@ -848,7 +947,7 @@ function serviceCategoryMatches(x, cat) {
 }
 
 function providerCard(x) {
-  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div>${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.provider_name || 'Provider')}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin-top:10px">` : ''}<div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
+  return `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.provider_name || '')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>About</b><span>${esc(x.description || 'Details coming soon')}</span></div><div><b>Status</b><span>${badge(x.status)}</span></div></div>${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.provider_name || 'Provider')}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin-top:10px">` : ''}<div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}">Request Service</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone || '')}">Call</a></div></div>`;
 }
 
 async function approvedProviders() {
@@ -914,7 +1013,8 @@ app.get('/service/:id', async (req, res, next) => {
     const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
     const p = r.rows[0];
     if (!p) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not approved or not found.</p><a class="btn" href="/services">Back Services</a></section>`, 'services'));
-    res.send(page(p.provider_name || 'GOVO Service', `<section class="card"><a class="btn secondary" href="/services">Back Services</a><h1>${esc(p.provider_name || '')}</h1>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.provider_name || 'Provider')}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin:10px 0">` : ''}<div class="detail-grid"><div><b>Service</b><span>${esc(p.service_type)}</span></div><div><b>Phone</b><span>${esc(p.whatsapp || p.phone)}</span></div><div><b>Area</b><span>${esc(p.area)}</span></div><div><b>Address</b><span>${esc(p.address)}</span></div><div><b>Experience</b><span>${esc(p.experience)}</span></div><div><b>About</b><span>${esc(p.description)}</span></div></div></section><section class="card"><h2>Request Service</h2><form method="POST" action="/service/request"><input type="hidden" name="provider_id" value="${esc(p.id)}"><input type="hidden" name="service_type" value="${esc(p.service_type || '')}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Service Address</label><textarea name="service_address" required></textarea><label>Problem Details</label><textarea name="problem_details" required></textarea><label>Preferred Time</label><input name="preferred_time" placeholder="Today 5 PM"><label>Note</label><textarea name="note"></textarea><button>Submit Request</button></form></section>`, 'services'));
+    const reviews = await pool.query(`SELECT customer_name, rating, comment, created_at FROM govo_reviews WHERE target_type='provider' AND target_id=$1 AND COALESCE(status,'approved')='approved' ORDER BY id DESC LIMIT 5`, [p.id]);
+    res.send(page(p.provider_name || 'GOVO Service', `<section class="card"><a class="btn secondary" href="/services">Back Services</a><h1>${esc(p.provider_name || '')}</h1>${trustBadges(p)}${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.provider_name || 'Provider')}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.35);margin:10px 0">` : ''}<div class="detail-grid"><div><b>Service</b><span>${esc(p.service_type)}</span></div><div><b>Phone</b><span>${esc(p.whatsapp || p.phone)}</span></div><div><b>Area</b><span>${esc(p.area)}</span></div><div><b>Address</b><span>${esc(p.address)}</span></div><div><b>Experience</b><span>${esc(p.experience)}</span></div><div><b>About</b><span>${esc(p.description)}</span></div></div></section><section class="card"><h2>Request Service</h2><form method="POST" action="/service/request"><input type="hidden" name="provider_id" value="${esc(p.id)}"><input type="hidden" name="service_type" value="${esc(p.service_type || '')}"><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Service Address</label><textarea name="service_address" required></textarea><label>Problem Details</label><textarea name="problem_details" required></textarea><label>Preferred Time</label><input name="preferred_time" placeholder="Today 5 PM"><label>Note</label><textarea name="note"></textarea><button>Submit Request</button></form></section><section class="card"><h2>Customer Reviews</h2><div class="item-grid">${reviewCards(reviews.rows)}</div></section><section class="card"><h2>Write Review</h2>${reviewForm('provider', p.id)}</section>`, 'services'));
   } catch (e) { next(e); }
 });
 
@@ -941,7 +1041,7 @@ app.get('/admin/providers', async (req, res, next) => {
     if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(address,'')) LIKE $${params.length}`); }
     const providers = await pool.query(`SELECT * FROM govo_service_providers ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
-    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form><div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
+    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="pin" value="${esc(pin)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('provider', x, pin)}<div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
     res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1><form class="filters" method="GET" action="/admin/providers"><input type="hidden" name="pin" value="${esc(pin)}"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os?pin=${encodeURIComponent(pin)}">Admin Home</a><a class="btn secondary" href="/admin/service-requests?pin=${encodeURIComponent(pin)}">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
@@ -956,6 +1056,23 @@ app.post('/admin/provider/status', async (req, res, next) => {
     if (r.rows.length) {
       const x = r.rows[0];
       await sendTelegram(['GOVO Provider Status Updated', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `Service: ${x.service_type || ''}`, `Area: ${x.area || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
+    }
+    res.redirect(`/admin/providers?pin=${encodeURIComponent(pin)}`);
+  } catch (e) { next(e); }
+});
+
+
+app.post('/admin/provider/trust', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const pin = getPin(req);
+    const field = String(req.body.field || '').trim();
+    if (!['is_verified', 'is_trusted', 'is_available', 'emergency_available'].includes(field)) return res.status(400).send(page('Invalid Trust Field', '<section class="card"><h1>Invalid Trust Field</h1></section>', 'admin'));
+    const value = boolish(req.body.value);
+    const r = await pool.query(`UPDATE govo_service_providers SET ${field}=$1, updated_at=NOW() WHERE id=$2 RETURNING id, provider_name, phone, is_verified, is_trusted, is_available, emergency_available`, [value, req.body.id || '']);
+    if (r.rows.length) {
+      const x = r.rows[0];
+      await sendTelegram(['GOVO Provider Trust Updated', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `Verified: ${x.is_verified}`, `Trusted: ${x.is_trusted}`, `Available: ${x.is_available}`, `Emergency: ${x.emergency_available}`].join('\n'));
     }
     res.redirect(`/admin/providers?pin=${encodeURIComponent(pin)}`);
   } catch (e) { next(e); }
