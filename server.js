@@ -234,6 +234,7 @@ function adminNav(active) {
     ['QA', '/admin/qa'],
     ['Launch', '/admin/launch-checklist'],
     ['Pilot', '/admin/pilot'],
+    ['CRM', '/admin/pilot-crm'],
   ];
   return `<nav class="nav admin-nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<form method="POST" action="/admin/logout" style="display:inline"><button class="secondary" style="padding:8px 10px">Logout</button></form></nav>`;
 }
@@ -449,6 +450,7 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_service_providers (id SERIAL PRIMARY KEY, provider_name TEXT, phone TEXT, whatsapp TEXT, service_type TEXT, area TEXT, address TEXT, experience TEXT, description TEXT, image_url TEXT, status TEXT DEFAULT 'pending', admin_note TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_service_requests (id SERIAL PRIMARY KEY, provider_id INT, provider_name TEXT, provider_phone TEXT, service_type TEXT, customer_name TEXT, customer_phone TEXT, service_address TEXT, problem_details TEXT, preferred_time TEXT, note TEXT, status TEXT DEFAULT 'pending', admin_note TEXT, provider_note TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_items (id SERIAL PRIMARY KEY, merchant_phone TEXT, item_name TEXT, price TEXT, details TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS govo_pilot_crm (id SERIAL PRIMARY KEY, lead_type TEXT NOT NULL DEFAULT 'merchant', name TEXT, phone TEXT, whatsapp TEXT, area TEXT, category TEXT, source TEXT, status TEXT DEFAULT 'new', priority TEXT DEFAULT 'normal', note TEXT, next_followup_at TIMESTAMPTZ NULL, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
 
   const add = async (table, columnSql) => pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${columnSql}`);
   for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
@@ -456,6 +458,7 @@ async function ensureSchema() {
   for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', 'preferred_time TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'merchant_status TEXT', 'admin_note TEXT', 'merchant_note TEXT', 'provider_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'assigned_rider_id INT', 'assigned_rider_name TEXT', 'assigned_rider_phone TEXT', 'rider_note TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
   for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
+  for (const col of ["lead_type TEXT NOT NULL DEFAULT 'merchant'", 'name TEXT', 'phone TEXT', 'whatsapp TEXT', 'area TEXT', 'category TEXT', 'source TEXT', "status TEXT DEFAULT 'new'", "priority TEXT DEFAULT 'normal'", 'note TEXT', 'next_followup_at TIMESTAMPTZ NULL', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_pilot_crm', col);
 
   await markDemoRecords();
 }
@@ -619,7 +622,7 @@ app.get('/admin/os', async (req, res, next) => {
     const alertSection = alertItems.length ? alertItems.map(([label, count, href]) => alert(label, count, href)).join('') : '<div class="card compact-card alert-clear"><h2>All clear — no pending action.</h2><p>No approval or operation is waiting right now.</p></div>';
     const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="activity-list">${rows.length ? rows.map(render).join('') : '<div class="activity-row"><b>No recent activity</b><span>Nothing to show yet</span></div>'}</div></section>`;
     const recentCard = (title, status, details, href) => `<a class="activity-row" href="${href}"><span><b>${esc(title)}</b><span>${esc(details)}</span></span>${badge(status)}</a>`;
-    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('Pilot Dashboard', '/admin/pilot')}${action('Public Pilot Page', '/pilot')}${action('Merchant Pilot Page', '/pilot/merchant')}${action('Provider Pilot Page', '/pilot/provider')}${action('Rider Pilot Page', '/pilot/rider')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alertSection}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
+    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Pilot CRM', '/admin/pilot-crm')}${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('Pilot Dashboard', '/admin/pilot')}${action('Public Pilot Page', '/pilot')}${action('Merchant Pilot Page', '/pilot/merchant')}${action('Provider Pilot Page', '/pilot/provider')}${action('Rider Pilot Page', '/pilot/rider')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alertSection}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -641,7 +644,7 @@ app.get('/admin/pilot', async (req, res, next) => {
     const ready = healthOk && Number(m.approved || 0) > 0 && Number(p.approved || 0) > 0 && Number(r.approved || 0) > 0;
     const stat = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
     const link = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
-    res.send(page('Pilot Dashboard', `<section class="card app-hero"><h1>GOVO Pilot Dashboard</h1><p>Control panel for first merchants, providers, riders and customer pilot traffic.</p><div class="actions"><span class="badge ${ready ? 'available' : 'failed'}">${ready ? 'ready' : 'needs attention'}</span><a class="btn secondary" href="/pilot">Public Pilot Page</a></div><h2>${ready ? 'Pilot can start with internal users' : 'Approve at least one merchant, provider and rider first'}</h2></section><section class="grid">${stat('Total Merchants', m.total, 'Registered')}${stat('Approved Merchants', m.approved, 'Ready for pilot')}${stat('Pending Merchants', m.pending, 'Need approval')}${stat('Total Providers', p.total, 'Registered')}${stat('Approved Providers', p.approved, 'Ready for pilot')}${stat('Pending Providers', p.pending, 'Need approval')}${stat('Total Riders', r.total, 'Registered')}${stat('Approved Riders', r.approved, 'Ready for dispatch')}${stat('Pending Riders', r.pending, 'Need approval')}${stat('Orders Today', o.total_today, 'Today')}${stat('Pending Orders', o.pending, 'Need action')}${stat('Delivered Today', o.delivered, 'Completed today')}${stat('Service Requests Today', sr.total_today, 'Today')}${stat('Pending Service Requests', sr.pending, 'Need action')}${stat('Completed Service Requests', sr.completed, 'Completed today')}</section><section class="card"><h2>Pilot Links</h2><div class="toolbar">${link('Launch Checklist','/admin/launch-checklist')}${link('QA Center','/admin/qa')}${link('Orders','/admin/orders')}${link('Service Requests','/admin/service-requests')}${link('Merchants','/admin/leads')}${link('Providers','/admin/providers')}${link('Riders','/admin/riders')}${link('Public Pilot Page','/pilot')}</div></section>`, 'admin'));
+    res.send(page('Pilot Dashboard', `<section class="card app-hero"><h1>GOVO Pilot Dashboard</h1><p>Control panel for first merchants, providers, riders and customer pilot traffic.</p><div class="actions"><span class="badge ${ready ? 'available' : 'failed'}">${ready ? 'ready' : 'needs attention'}</span><a class="btn secondary" href="/pilot">Public Pilot Page</a></div><h2>${ready ? 'Pilot can start with internal users' : 'Approve at least one merchant, provider and rider first'}</h2></section><section class="grid">${stat('Total Merchants', m.total, 'Registered')}${stat('Approved Merchants', m.approved, 'Ready for pilot')}${stat('Pending Merchants', m.pending, 'Need approval')}${stat('Total Providers', p.total, 'Registered')}${stat('Approved Providers', p.approved, 'Ready for pilot')}${stat('Pending Providers', p.pending, 'Need approval')}${stat('Total Riders', r.total, 'Registered')}${stat('Approved Riders', r.approved, 'Ready for dispatch')}${stat('Pending Riders', r.pending, 'Need approval')}${stat('Orders Today', o.total_today, 'Today')}${stat('Pending Orders', o.pending, 'Need action')}${stat('Delivered Today', o.delivered, 'Completed today')}${stat('Service Requests Today', sr.total_today, 'Today')}${stat('Pending Service Requests', sr.pending, 'Need action')}${stat('Completed Service Requests', sr.completed, 'Completed today')}</section><section class="card"><h2>Pilot Links</h2><div class="toolbar">${link('Pilot CRM','/admin/pilot-crm')}${link('Launch Checklist','/admin/launch-checklist')}${link('QA Center','/admin/qa')}${link('Orders','/admin/orders')}${link('Service Requests','/admin/service-requests')}${link('Merchants','/admin/leads')}${link('Providers','/admin/providers')}${link('Riders','/admin/riders')}${link('Public Pilot Page','/pilot')}</div></section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1591,6 +1594,103 @@ app.get('/service/request/success', (req, res) => {
   const id = String(req.query.id || '');
   const phone = String(req.query.phone || '');
   res.send(page('Service Request Submitted', `<section class="card app-hero"><span class="pill">Request Received</span><h1>Service Request Submitted</h1><p>GOVO team and provider will review your request.</p><h2>Request ID: #${esc(id)}</h2><p style="color:var(--muted);font-weight:900">Customer phone: ${esc(phone || 'Not provided')}</p><div class="timeline"><div class="step done">Submitted</div><div class="step">Provider/Admin Review</div><div class="step">Working</div><div class="step">Completed</div></div><div class="actions"><a class="btn" href="/track/service/${encodeURIComponent(id)}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Track Request</a><a class="btn secondary" href="/services">Back to Services</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'services'));
+});
+
+
+function crmWhatsAppLink(phone, name = '') {
+  const raw = String(phone || '').trim();
+  if (!raw) return '';
+  let n = raw.replace(/\D/g, '');
+  if (n.startsWith('0')) n = `88${n}`;
+  if (!n.startsWith('880') && n.length === 10) n = `880${n}`;
+  const msg = `Assalamu alaikum${name ? ' ' + name : ''}, GOVO Express pilot er bepare apnar sathe kotha bolte chai.`;
+  return `https://wa.me/${n}?text=${encodeURIComponent(msg)}`;
+}
+
+function crmStatus(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return ['new', 'contacted', 'interested', 'onboarded', 'follow_up', 'not_interested'].includes(v) ? v : 'new';
+}
+
+function crmPriority(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return ['low', 'normal', 'high'].includes(v) ? v : 'normal';
+}
+
+function crmType(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return ['merchant', 'provider', 'rider', 'customer', 'partner'].includes(v) ? v : 'merchant';
+}
+
+app.get('/admin/pilot-crm', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const type = ['all', 'merchant', 'provider', 'rider', 'customer', 'partner'].includes(String(req.query.type || 'all')) ? String(req.query.type || 'all') : 'all';
+    const status = ['all', 'new', 'contacted', 'interested', 'onboarded', 'follow_up', 'not_interested'].includes(String(req.query.status || 'all')) ? String(req.query.status || 'all') : 'all';
+    const priority = ['all', 'low', 'normal', 'high'].includes(String(req.query.priority || 'all')) ? String(req.query.priority || 'all') : 'all';
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const params = [];
+    const where = [];
+    if (type !== 'all') { params.push(type); where.push(`lead_type=$${params.length}`); }
+    if (status !== 'all') { params.push(status); where.push(`status=$${params.length}`); }
+    if (priority !== 'all') { params.push(priority); where.push(`priority=$${params.length}`); }
+    if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(note,'')) LIKE $${params.length}`); }
+    const [counts, leads] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE status='new')::int new, COUNT(*) FILTER (WHERE status='interested')::int interested, COUNT(*) FILTER (WHERE status='follow_up')::int follow_up, COUNT(*) FILTER (WHERE status='onboarded')::int onboarded, COUNT(*) FILTER (WHERE priority='high')::int high FROM govo_pilot_crm`),
+      pool.query(`SELECT * FROM govo_pilot_crm ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY COALESCE(next_followup_at, created_at) ASC NULLS LAST, id DESC LIMIT 200`, params),
+    ]);
+    const c = counts.rows[0] || {};
+    const stat = (label, value) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div></div>`;
+    const opt = (current, value, label) => `<option value="${esc(value)}" ${current === value ? 'selected' : ''}>${esc(label)}</option>`;
+    const leadCards = leads.rows.map((x) => {
+      const wa = crmWhatsAppLink(x.whatsapp || x.phone, x.name);
+      return `<div class="card compact-card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.name || 'Unnamed lead')}</h2><div class="actions">${badge(x.lead_type)}${badge(x.status)}${badge(x.priority)}</div></div><div class="compact-meta"><span>${esc(x.phone || 'No phone')}</span><span>${esc(x.area || 'No area')}</span><span>${esc(x.category || 'No category')}</span>${x.next_followup_at ? `<span>Follow-up: ${esc(bdTime(x.next_followup_at))}</span>` : ''}</div><p style="color:var(--muted)">${esc(x.note || 'No note')}</p><div class="actions">${wa ? `<a class="btn secondary wa" href="${esc(wa)}">WhatsApp</a>` : ''}${x.phone ? `<a class="btn secondary" href="tel:${esc(x.phone)}">Call</a>` : ''}</div><form method="POST" action="/admin/pilot-crm/update"><input type="hidden" name="id" value="${esc(x.id)}"><div class="filters"><select name="status">${['new','contacted','interested','onboarded','follow_up','not_interested'].map(v => opt(x.status, v, v)).join('')}</select><select name="priority">${['low','normal','high'].map(v => opt(x.priority, v, v)).join('')}</select><input name="next_followup_at" type="datetime-local" value=""><input name="whatsapp" value="${esc(x.whatsapp || '')}" placeholder="WhatsApp"><input name="area" value="${esc(x.area || '')}" placeholder="Area"><input name="category" value="${esc(x.category || '')}" placeholder="Category"></div><textarea name="note" placeholder="Follow-up note">${esc(x.note || '')}</textarea><button>Update Lead</button></form></div>`;
+    }).join('');
+    res.send(page('Pilot CRM', `<section class="card app-hero"><h1>GOVO Pilot CRM</h1><p>Manage merchant, provider, rider, customer and partner follow-up during pilot testing.</p><div class="actions"><form method="POST" action="/admin/pilot-crm/quick-import"><button class="secondary">Quick Import Existing Leads</button></form><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/pilot">Pilot</a><a class="btn secondary" href="/admin/qa">QA</a></div></section><section class="grid">${stat('Total Leads', c.total)}${stat('New', c.new)}${stat('Interested', c.interested)}${stat('Follow Up', c.follow_up)}${stat('Onboarded', c.onboarded)}${stat('High Priority', c.high)}</section><section class="card"><h2>Add Lead</h2><form method="POST" action="/admin/pilot-crm"><div class="filters"><select name="lead_type">${['merchant','provider','rider','customer','partner'].map(v => `<option value="${v}">${v}</option>`).join('')}</select><input name="name" placeholder="Name"><input name="phone" placeholder="Phone"><input name="whatsapp" placeholder="WhatsApp"><input name="area" placeholder="Area"><input name="category" placeholder="Category"><input name="source" placeholder="Source"><select name="priority"><option>normal</option><option>high</option><option>low</option></select><input type="datetime-local" name="next_followup_at"></div><textarea name="note" placeholder="Note"></textarea><button>Add CRM Lead</button></form></section><section class="card"><h2>Filters</h2><form class="filters" method="GET" action="/admin/pilot-crm"><select name="type">${['all','merchant','provider','rider','customer','partner'].map(v => opt(type, v, v)).join('')}</select><select name="status">${['all','new','contacted','interested','onboarded','follow_up','not_interested'].map(v => opt(status, v, v)).join('')}</select><select name="priority">${['all','low','normal','high'].map(v => opt(priority, v, v)).join('')}</select><input name="q" value="${esc(q)}" placeholder="Search name, phone, area, category, note"><button>Filter</button></form></section><section class="cards">${leadCards || '<div class="card compact-card"><h2>No CRM leads found</h2><p style="color:var(--muted)">Add a lead or import existing pilot leads.</p></div>'}</section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/pilot-crm', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const data = [crmType(req.body.lead_type), req.body.name || '', req.body.phone || '', req.body.whatsapp || '', req.body.area || '', req.body.category || '', req.body.source || '', 'new', crmPriority(req.body.priority), req.body.note || '', req.body.next_followup_at || null];
+    const r = await pool.query(`INSERT INTO govo_pilot_crm (lead_type,name,phone,whatsapp,area,category,source,status,priority,note,next_followup_at,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULLIF($11,'')::timestamptz,NOW(),NOW()) RETURNING *`, data);
+    const x = r.rows[0];
+    if (x.priority === 'high') sendTelegram(['GOVO High Priority CRM Lead', '', `Type: ${x.lead_type}`, `Name: ${x.name || ''}`, `Phone: ${x.phone || ''}`, `Area: ${x.area || ''}`, `Category: ${x.category || ''}`, `Note: ${x.note || ''}`].join('\n')).catch(() => {});
+    res.redirect('/admin/pilot-crm');
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/pilot-crm/update', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    await pool.query(`UPDATE govo_pilot_crm SET status=$1, priority=$2, note=$3, next_followup_at=NULLIF($4,'')::timestamptz, whatsapp=$5, area=$6, category=$7, updated_at=NOW() WHERE id=$8`, [crmStatus(req.body.status), crmPriority(req.body.priority), req.body.note || '', req.body.next_followup_at || '', req.body.whatsapp || '', req.body.area || '', req.body.category || '', req.body.id || '']);
+    res.redirect('/admin/pilot-crm');
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/pilot-crm/quick-import', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const importRows = async (leadType, rows) => {
+      for (const x of rows) {
+        const phone = String(x.phone || '').trim();
+        if (!phone) continue;
+        const existing = await pool.query(`SELECT id FROM govo_pilot_crm WHERE lead_type=$1 AND phone=$2 LIMIT 1`, [leadType, phone]);
+        if (existing.rows.length) continue;
+        await pool.query(`INSERT INTO govo_pilot_crm (lead_type,name,phone,whatsapp,area,category,source,status,priority,note,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,'quick_import','new','normal',$7,NOW(),NOW())`, [leadType, x.name || '', phone, x.whatsapp || '', x.area || '', x.category || '', x.note || 'Imported from existing GOVO lead']);
+      }
+    };
+    const [m, pvd, r] = await Promise.all([
+      pool.query(`SELECT shop_name AS name, phone, whatsapp, COALESCE(shop_address,location) AS area, category, status AS note FROM govo_merchant_leads ORDER BY id DESC LIMIT 500`),
+      pool.query(`SELECT provider_name AS name, phone, whatsapp, area, service_type AS category, status AS note FROM govo_service_providers ORDER BY id DESC LIMIT 500`),
+      pool.query(`SELECT COALESCE(rider_name,name) AS name, phone, '' AS whatsapp, location AS area, vehicle_type AS category, status AS note FROM govo_rider_leads ORDER BY id DESC LIMIT 500`),
+    ]);
+    await importRows('merchant', m.rows);
+    await importRows('provider', pvd.rows);
+    await importRows('rider', r.rows);
+    res.redirect('/admin/pilot-crm');
+  } catch (e) { next(e); }
 });
 
 app.get('/admin/reviews', async (req, res, next) => {
