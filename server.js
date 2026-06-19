@@ -430,9 +430,14 @@ function publicVisibilitySql(alias = '') {
   return `COALESCE(${prefix}public_visible,true)=true AND COALESCE(${prefix}is_demo,false)=false`;
 }
 
+function publicApprovedSql(alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  return `LOWER(TRIM(COALESCE(${prefix}status,'')))='approved' AND ${publicVisibilitySql(alias)}`;
+}
+
 function visibilityBadges(x) {
   const visible = !['false', '0'].includes(String(x.public_visible ?? 'true').toLowerCase());
-  return `<div class="actions trust-row"><span class="badge ${visible ? 'available' : 'unavailable'}">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(x.is_demo) ? '<span class="badge warning">Demo/Test</span>' : ''}</div>`;
+  return `<div class="actions trust-row"><span class="badge ${visible ? 'available' : 'unavailable'}">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(x.is_demo) ? '<span class="badge emergency">Demo/Test</span>' : ''}</div>`;
 }
 
 function adminVisibilityControls(type, x) {
@@ -465,9 +470,7 @@ function adminRiderEditForm(x) {
 }
 
 function pilotPartnerEmpty(type) {
-  const join = type === 'provider' ? '/provider' : '/merchant';
-  const label = type === 'provider' ? 'Join Provider' : 'Join Merchant';
-  return `<div class="card compact-card"><h2>Pilot partners are being added.</h2><p style="color:var(--muted)">Please check again soon.</p><div class="actions"><a class="btn" href="${join}">${label}</a><a class="btn secondary" href="/app">Back to App</a></div></div>`;
+  return `<div class="card compact-card"><h2>Pilot partners are being added.</h2><p style="color:var(--muted)">Please check again soon.</p><div class="actions"><a class="btn" href="/merchant">Join Merchant</a><a class="btn secondary" href="/provider">Join Provider</a></div></div>`;
 }
 
 
@@ -589,6 +592,8 @@ async function ensureSchema() {
       ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ NULL;
       ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS reset_requested_at TIMESTAMPTZ NULL;
       ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS reset_note TEXT;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS public_visible BOOLEAN DEFAULT true;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT false;
     END IF;
   END $$`);
 
@@ -598,9 +603,9 @@ async function ensureSchema() {
 async function markDemoRecords() {
   const demoPhones = ['01700000000', '01700000001', '01700000002', '01700000003', '01799999999', '01711111111', '01811111111'];
   const demoNameSql = `demo|test|telegram|final test|db test|sample`;
-  await pool.query(`UPDATE govo_merchant_leads SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'')) ~ $2)`, [demoPhones, demoNameSql]);
+  await pool.query(`UPDATE govo_merchant_leads SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR whatsapp = ANY($1::text[]) OR LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'')) ~ $2)`, [demoPhones, demoNameSql]);
   await pool.query(`UPDATE govo_service_providers SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR whatsapp = ANY($1::text[]) OR LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(service_type,'')) ~ $2)`, [demoPhones, demoNameSql]);
-  await pool.query(`UPDATE govo_rider_leads SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'')) ~ $2)`, [demoPhones, demoNameSql]);
+  await pool.query(`UPDATE govo_rider_leads SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR whatsapp = ANY($1::text[]) OR LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'')) ~ $2)`, [demoPhones, demoNameSql]);
 }
 
 function domainType(req) {
@@ -1210,7 +1215,7 @@ async function approvedMerchants() {
            COALESCE(string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' '), '') AS product_search
     FROM govo_merchant_leads l
     LEFT JOIN govo_shop_products p ON (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false
-    WHERE COALESCE(l.status,'pending')='approved' AND ${publicVisibilitySql('l')}
+    WHERE ${publicApprovedSql('l')}
     GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.is_verified, l.is_trusted, l.is_available, l.emergency_available, l.rating_avg, l.rating_count, l.public_visible, l.is_demo, l.created_at
     ORDER BY l.id DESC
     LIMIT 500
@@ -1269,7 +1274,7 @@ app.get('/category/:slug', async (req, res, next) => {
 
 app.get('/shop/:id', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
     if (!x) return res.status(404).send(page('Shop Not Found', `<section class="card"><h1>Shop Not Found</h1><p>This shop is not public right now.</p></section>${pilotPartnerEmpty('merchant')}`, 'shops'));
     const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 120`, [x.id, x.phone]);
@@ -1726,7 +1731,7 @@ function providerCard(x) {
 }
 
 async function approvedProviders() {
-  return pool.query(`SELECT * FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} ORDER BY id DESC LIMIT 500`);
+  return pool.query(`SELECT * FROM govo_service_providers WHERE ${publicApprovedSql()} ORDER BY id DESC LIMIT 500`);
 }
 
 
@@ -1926,7 +1931,7 @@ function serviceDetailPage(provider, data = {}, error = '') {
 
 app.get('/service/:id', async (req, res, next) => {
   try {
-    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} LIMIT 1`, [req.params.id]);
+    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
     const provider = r.rows[0];
     if (!provider) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not public right now.</p><a class="btn" href="/services">Back Services</a></section>${pilotPartnerEmpty('provider')}`, 'services'));
     res.send(serviceDetailPage(provider));
@@ -1936,7 +1941,7 @@ app.get('/service/:id', async (req, res, next) => {
 app.post('/service/request', async (req, res, next) => {
   try {
     const data = normalizeServiceRequestBody(req.body);
-    const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} LIMIT 1`, [data.provider_id || '']);
+    const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [data.provider_id || '']);
     const p = provider.rows[0];
     if (!p) return res.status(404).send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="/services">Back Services</a></section>${pilotPartnerEmpty('provider')}`, 'services'));
     const missing = [];
