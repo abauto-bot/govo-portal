@@ -132,6 +132,53 @@ function safeEqual(a, b) {
   return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
 }
 
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(String(password || ''), salt, 120000, 32, 'sha256').toString('hex');
+  return { salt, hash };
+}
+
+function verifyPassword(password, salt, hash) {
+  try {
+    if (!password || !salt || !hash) return false;
+    const calculated = crypto.pbkdf2Sync(String(password), String(salt), 120000, 32, 'sha256');
+    const stored = Buffer.from(String(hash), 'hex');
+    return stored.length === calculated.length && crypto.timingSafeEqual(calculated, stored);
+  } catch {
+    return false;
+  }
+}
+
+function accountBadges(x = {}) {
+  return `<div class="actions trust-row"><span class="badge ${x.password_hash ? 'available' : 'unavailable'}">${x.password_hash ? 'Password Set' : 'No Password'}</span>${x.reset_requested_at ? '<span class="badge emergency">Reset Requested</span>' : ''}</div>`;
+}
+
+function adminPasswordResetForm(type, x = {}) {
+  const action = type === 'merchant' ? '/admin/merchant/password-reset' : '/admin/rider/password-reset';
+  return `<details class="card compact-card" style="margin-top:8px"><summary style="cursor:pointer;font-weight:900">Password Reset</summary><div style="margin-top:10px">${accountBadges(x)}<form method="POST" action="${action}"><input type="hidden" name="id" value="${esc(x.id || '')}"><label>Temporary Password</label><input name="temporary_password" type="password" minlength="6" placeholder="Minimum 6 characters" required><button>Set Temp Password</button></form>${x.reset_note ? `<p class="form-hint">Reset note: ${esc(x.reset_note)}</p>` : ''}</div></details>`;
+}
+
+function merchantLoginPage(prefill = '', message = '') {
+  return page('Merchant Dashboard Login', `<section class="card app-hero"><h1>Merchant Dashboard</h1><p class="form-hint">Phone + password diye shop dashboard open korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/merchant/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/merchant/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Merchant Account</a><a class="btn secondary" href="/merchant/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="/merchant">Register Merchant</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'merchant');
+}
+
+function riderLoginPage(prefill = '', message = '') {
+  return page('Rider Login', `<section class="card app-hero"><h1>Rider Login</h1><p class="form-hint">Phone + password diye assigned delivery orders dekhun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/rider/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/rider/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Rider Account</a><a class="btn secondary" href="/rider/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="/rider/register">Register Rider</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'rider');
+}
+
+function accountCreatePage(type, prefill = '', message = '') {
+  const title = type === 'merchant' ? 'Create Merchant Account' : 'Create Rider Account';
+  const action = type === 'merchant' ? '/merchant/account/create' : '/rider/account/create';
+  const register = type === 'merchant' ? '/merchant' : '/rider/register';
+  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Age register kora phone number diye password set korun. Notun ${type === 'merchant' ? 'shop' : 'rider'} hole registration korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Registered Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" minlength="6" required><label>Confirm Password</label><input name="confirm_password" type="password" minlength="6" required><button>Set Password</button></form><div class="actions"><a class="btn secondary" href="${register}">Register First</a><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/dashboard' : 'rider'}">Back to Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
+}
+
+function forgotPasswordPage(type, prefill = '', message = '') {
+  const title = type === 'merchant' ? 'Merchant Password Reset' : 'Rider Password Reset';
+  const action = type === 'merchant' ? '/merchant/forgot-password' : '/rider/forgot-password';
+  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Phone submit korun. Account thakle admin reset request peye jabe.</p>${message ? `<p style="color:var(--success);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Note <span style="color:var(--muted)">(optional)</span></label><textarea name="reset_note" placeholder="Example: password vule gechi"></textarea><button>Request Reset</button></form><div class="actions"><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/dashboard' : 'rider'}">Back to Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
+}
+
 function hasAdminCookie(req) {
   const token = parseCookies(req)[ADMIN_COOKIE];
   const expected = adminToken();
@@ -475,12 +522,24 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_pilot_crm (id SERIAL PRIMARY KEY, lead_type TEXT NOT NULL DEFAULT 'merchant', name TEXT, phone TEXT, whatsapp TEXT, area TEXT, category TEXT, source TEXT, status TEXT DEFAULT 'new', priority TEXT DEFAULT 'normal', note TEXT, next_followup_at TIMESTAMPTZ NULL, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
 
   const add = async (table, columnSql) => pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${columnSql}`);
-  for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'opening_hours TEXT', 'delivery_available BOOLEAN DEFAULT true', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
-  for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'whatsapp TEXT', 'area TEXT', 'address TEXT', 'nid TEXT', 'image_url TEXT', 'is_available BOOLEAN DEFAULT true', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
+  for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'opening_hours TEXT', 'delivery_available BOOLEAN DEFAULT true', 'password_hash TEXT', 'password_salt TEXT', 'password_set_at TIMESTAMPTZ NULL', 'last_login_at TIMESTAMPTZ NULL', 'reset_requested_at TIMESTAMPTZ NULL', 'reset_note TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
+  for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'whatsapp TEXT', 'area TEXT', 'address TEXT', 'nid TEXT', 'image_url TEXT', 'is_available BOOLEAN DEFAULT true', 'password_hash TEXT', 'password_salt TEXT', 'password_set_at TIMESTAMPTZ NULL', 'last_login_at TIMESTAMPTZ NULL', 'reset_requested_at TIMESTAMPTZ NULL', 'reset_note TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
   for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', 'preferred_time TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'merchant_status TEXT', 'admin_note TEXT', 'merchant_note TEXT', 'provider_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'assigned_rider_id INT', 'assigned_rider_name TEXT', 'assigned_rider_phone TEXT', 'rider_note TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
   for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'working_hours TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
   for (const col of ["lead_type TEXT NOT NULL DEFAULT 'merchant'", 'name TEXT', 'phone TEXT', 'whatsapp TEXT', 'area TEXT', 'category TEXT', 'source TEXT', "status TEXT DEFAULT 'new'", "priority TEXT DEFAULT 'normal'", 'note TEXT', 'next_followup_at TIMESTAMPTZ NULL', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_pilot_crm', col);
+
+  await pool.query(`DO $$
+  BEGIN
+    IF to_regclass('public.govo_riders') IS NOT NULL THEN
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS password_hash TEXT;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS password_salt TEXT;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS password_set_at TIMESTAMPTZ NULL;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ NULL;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS reset_requested_at TIMESTAMPTZ NULL;
+      ALTER TABLE govo_riders ADD COLUMN IF NOT EXISTS reset_note TEXT;
+    END IF;
+  END $$`);
 
   await markDemoRecords();
 }
@@ -566,16 +625,125 @@ app.post('/merchant', async (req, res, next) => {
 });
 
 app.get('/rider', (req, res) => {
-  res.send(page('Rider Registration', `<section class="card"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><button>Submit Rider Info</button></form></section>`, 'rider'));
+  res.send(riderLoginPage(String(req.query.phone || '').trim()));
+});
+
+app.get('/rider/register', (req, res) => {
+  res.send(page('Rider Registration', `<section class="card"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="/rider">Rider Login</a></div></section>`, 'rider'));
 });
 
 app.post('/rider', async (req, res, next) => {
   try {
     await pool.query(`INSERT INTO govo_rider_leads (rider_name, phone, location, vehicle_type, experience, status) VALUES ($1,$2,$3,$4,$5,'pending')`, [req.body.rider_name, req.body.phone, req.body.location, req.body.vehicle_type, req.body.experience]);
     sendTelegram(['New GOVO Rider Lead', '', `Name: ${req.body.rider_name || ''}`, `Phone: ${req.body.phone || ''}`, `Location: ${req.body.location || ''}`, `Vehicle: ${req.body.vehicle_type || ''}`, `Experience: ${req.body.experience || ''}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
-    res.send(page('Rider Submitted', `<section class="card"><h1>Rider Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="/rider">Add Another</a></section>`));
+    res.send(page('Rider Submitted', `<section class="card"><h1>Rider Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="/rider/register">Add Another</a></section>`));
   } catch (e) { next(e); }
 });
+
+app.get('/merchant/account/create', (req, res) => {
+  res.send(accountCreatePage('merchant', String(req.query.phone || '').trim()));
+});
+
+app.post('/merchant/account/create', async (req, res, next) => {
+  try {
+    const phone = String(req.body.phone || '').trim();
+    const password = String(req.body.password || '');
+    const confirm = String(req.body.confirm_password || '');
+    if (!phone) return res.status(400).send(accountCreatePage('merchant', phone, 'Phone required.'));
+    if (password.length < 6) return res.status(400).send(accountCreatePage('merchant', phone, 'Password minimum 6 characters.'));
+    if (password !== confirm) return res.status(400).send(accountCreatePage('merchant', phone, 'Confirm password did not match.'));
+    const r = await pool.query(`SELECT id, shop_name, phone, whatsapp FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    if (!r.rows.length) return res.status(404).send(accountCreatePage('merchant', phone, 'No merchant found for this phone. Register merchant first.'));
+    const hp = hashPassword(password);
+    await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
+    res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(r.rows[0].phone || phone)}&auth=basic`);
+  } catch (e) { next(e); }
+});
+
+app.post('/merchant/login', async (req, res, next) => {
+  try {
+    const phone = String(req.body.phone || '').trim();
+    const password = String(req.body.password || '');
+    if (!phone || !password) return res.status(400).send(merchantLoginPage(phone, 'Phone and password required.'));
+    const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, password_hash, password_salt FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const m = r.rows[0];
+    if (!m) return res.status(404).send(merchantLoginPage(phone, 'No merchant found. Register merchant first.'));
+    if (!m.password_hash || !m.password_salt) return res.status(403).send(merchantLoginPage(phone, 'Password not set. Create account first.'));
+    if (!verifyPassword(password, m.password_salt, m.password_hash)) return res.status(401).send(merchantLoginPage(phone, 'Wrong phone or password.'));
+    await pool.query(`UPDATE govo_merchant_leads SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1`, [m.id]);
+    res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(m.phone || phone)}&auth=basic`);
+  } catch (e) { next(e); }
+});
+
+app.get('/merchant/forgot-password', (req, res) => {
+  res.send(forgotPasswordPage('merchant', String(req.query.phone || '').trim()));
+});
+
+app.post('/merchant/forgot-password', async (req, res, next) => {
+  try {
+    const phone = String(req.body.phone || '').trim();
+    const note = String(req.body.reset_note || '').trim();
+    const r = await pool.query(`UPDATE govo_merchant_leads SET reset_requested_at=NOW(), reset_note=$1, updated_at=NOW() WHERE id=(SELECT id FROM govo_merchant_leads WHERE phone=$2 OR whatsapp=$2 ORDER BY id DESC LIMIT 1) RETURNING id, shop_name, owner_name, phone`, [note, phone]);
+    if (r.rows.length) {
+      const m = r.rows[0];
+      sendTelegram(['GOVO Merchant Password Reset Requested', '', `Merchant ID: #${m.id}`, `Shop: ${m.shop_name || ''}`, `Owner: ${m.owner_name || ''}`, `Phone: ${m.phone || phone}`, `Note: ${note || 'N/A'}`].join('\n')).catch(() => {});
+    }
+    res.send(forgotPasswordPage('merchant', '', 'Jodi account thake, admin reset request peye jabe.'));
+  } catch (e) { next(e); }
+});
+
+app.get('/rider/account/create', (req, res) => {
+  res.send(accountCreatePage('rider', String(req.query.phone || '').trim()));
+});
+
+app.post('/rider/account/create', async (req, res, next) => {
+  try {
+    const phone = String(req.body.phone || '').trim();
+    const password = String(req.body.password || '');
+    const confirm = String(req.body.confirm_password || '');
+    if (!phone) return res.status(400).send(accountCreatePage('rider', phone, 'Phone required.'));
+    if (password.length < 6) return res.status(400).send(accountCreatePage('rider', phone, 'Password minimum 6 characters.'));
+    if (password !== confirm) return res.status(400).send(accountCreatePage('rider', phone, 'Confirm password did not match.'));
+    const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    if (!r.rows.length) return res.status(404).send(accountCreatePage('rider', phone, 'No rider found for this phone. Register rider first.'));
+    const hp = hashPassword(password);
+    await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
+    res.redirect(`/rider/dashboard?phone=${encodeURIComponent(r.rows[0].phone || phone)}&auth=basic`);
+  } catch (e) { next(e); }
+});
+
+app.post('/rider/login', async (req, res, next) => {
+  try {
+    const phone = String(req.body.phone || '').trim();
+    const password = String(req.body.password || '');
+    if (!phone || !password) return res.status(400).send(riderLoginPage(phone, 'Phone and password required.'));
+    const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, password_hash, password_salt FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const rd = r.rows[0];
+    if (!rd) return res.status(404).send(riderLoginPage(phone, 'No rider found. Register rider first.'));
+    if (!rd.password_hash || !rd.password_salt) return res.status(403).send(riderLoginPage(phone, 'Password not set. Create account first.'));
+    if (!verifyPassword(password, rd.password_salt, rd.password_hash)) return res.status(401).send(riderLoginPage(phone, 'Wrong phone or password.'));
+    await pool.query(`UPDATE govo_rider_leads SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1`, [rd.id]);
+    res.redirect(`/rider/dashboard?phone=${encodeURIComponent(rd.phone || phone)}&auth=basic`);
+  } catch (e) { next(e); }
+});
+
+app.get('/rider/forgot-password', (req, res) => {
+  res.send(forgotPasswordPage('rider', String(req.query.phone || '').trim()));
+});
+
+app.post('/rider/forgot-password', async (req, res, next) => {
+  try {
+    const phone = String(req.body.phone || '').trim();
+    const note = String(req.body.reset_note || '').trim();
+    const r = await pool.query(`UPDATE govo_rider_leads SET reset_requested_at=NOW(), reset_note=$1, updated_at=NOW() WHERE id=(SELECT id FROM govo_rider_leads WHERE phone=$2 ORDER BY id DESC LIMIT 1) RETURNING id, COALESCE(rider_name,name) AS rider_name, phone`, [note, phone]);
+    if (r.rows.length) {
+      const rd = r.rows[0];
+      sendTelegram(['GOVO Rider Password Reset Requested', '', `Rider ID: #${rd.id}`, `Name: ${rd.rider_name || ''}`, `Phone: ${rd.phone || phone}`, `Note: ${note || 'N/A'}`].join('\n')).catch(() => {});
+    }
+    res.send(forgotPasswordPage('rider', '', 'Jodi account thake, admin reset request peye jabe.'));
+  } catch (e) { next(e); }
+});
+
 
 app.use('/admin', (req, res, next) => {
   res.set('X-Robots-Tag', 'noindex, nofollow');
@@ -682,9 +850,9 @@ app.get('/admin/leads', async (req, res, next) => {
     if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
     if (visibility !== 'all') { where.push(visibilityWhere()[visibility]); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
-    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, opening_hours, COALESCE(delivery_available,true) AS delivery_available, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, opening_hours, COALESCE(delivery_available,true) AS delivery_available, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, password_hash, reset_requested_at, reset_note, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_merchant_leads`);
-    const cards = merchants.rows.map((x) => `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminMerchantEditForm(x)}${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
+    const cards = merchants.rows.map((x) => `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${accountBadges(x)}${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminMerchantEditForm(x)}${adminPasswordResetForm('merchant', x)}${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
     res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1>${approvalFilterLinks('/admin/leads', status)}${visibilityFilterLinks('/admin/leads', status, visibility)}<form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
@@ -716,9 +884,9 @@ app.get('/admin/riders', async (req, res, next) => {
     if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
     if (visibility !== 'all') { where.push(visibilityWhere()[visibility]); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(vehicle_type,'')) LIKE $${params.length}`); }
-    const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, address, vehicle_type, experience, nid, image_url, COALESCE(is_available,true) AS is_available, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, address, vehicle_type, experience, nid, image_url, COALESCE(is_available,true) AS is_available, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, password_hash, reset_requested_at, reset_note, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_rider_leads`);
-    const cards = riders.rows.map((x) => `<div class="card">${listingImage(x.image_url, x.rider_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div>${visibilityBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminRiderEditForm(x)}${adminVisibilityControls('rider', x)}</div>`).join('');
+    const cards = riders.rows.map((x) => `<div class="card">${listingImage(x.image_url, x.rider_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div>${accountBadges(x)}${visibilityBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminRiderEditForm(x)}${adminPasswordResetForm('rider', x)}${adminVisibilityControls('rider', x)}</div>`).join('');
     res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1>${approvalFilterLinks('/admin/riders', status)}${visibilityFilterLinks('/admin/riders', status, visibility)}<form class="filters" method="GET" action="/admin/riders"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
@@ -835,6 +1003,39 @@ app.post('/admin/rider/status', async (req, res, next) => {
       await sendTelegram(['GOVO Rider Status Updated', '', `Rider ID: #${x.id}`, `Name: ${x.rider_name || ''}`, `Phone: ${x.phone || ''}`, `Vehicle: ${x.vehicle_type || ''}`, `Location: ${x.location || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
     }
     res.redirect(`/admin/riders`);
+  } catch (e) { next(e); }
+});
+
+
+app.post('/admin/merchant/password-reset', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const id = String(req.body.id || '').trim();
+    const temporaryPassword = String(req.body.temporary_password || '');
+    if (!id || temporaryPassword.length < 6) return res.status(400).send(page('Invalid Password Reset', '<section class="card"><h1>Invalid password reset</h1><p>Temporary password must be at least 6 characters.</p><a class="btn secondary" href="/admin/leads">Back Merchants</a></section>', 'admin'));
+    const hp = hashPassword(temporaryPassword);
+    const r = await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), reset_requested_at=NULL, reset_note='reset completed by admin', updated_at=NOW() WHERE id=$3 RETURNING id, shop_name, owner_name, phone`, [hp.hash, hp.salt, id]);
+    if (r.rows.length) {
+      const m = r.rows[0];
+      sendTelegram(['GOVO Admin Reset Merchant Password', '', `Merchant ID: #${m.id}`, `Shop: ${m.shop_name || ''}`, `Owner: ${m.owner_name || ''}`, `Phone: ${m.phone || ''}`].join('\n')).catch(() => {});
+    }
+    res.redirect('/admin/leads');
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/rider/password-reset', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const id = String(req.body.id || '').trim();
+    const temporaryPassword = String(req.body.temporary_password || '');
+    if (!id || temporaryPassword.length < 6) return res.status(400).send(page('Invalid Password Reset', '<section class="card"><h1>Invalid password reset</h1><p>Temporary password must be at least 6 characters.</p><a class="btn secondary" href="/admin/riders">Back Riders</a></section>', 'admin'));
+    const hp = hashPassword(temporaryPassword);
+    const r = await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), reset_requested_at=NULL, reset_note='reset completed by admin', updated_at=NOW() WHERE id=$3 RETURNING id, COALESCE(rider_name,name) AS rider_name, phone`, [hp.hash, hp.salt, id]);
+    if (r.rows.length) {
+      const rd = r.rows[0];
+      sendTelegram(['GOVO Admin Reset Rider Password', '', `Rider ID: #${rd.id}`, `Name: ${rd.rider_name || ''}`, `Phone: ${rd.phone || ''}`].join('\n')).catch(() => {});
+    }
+    res.redirect('/admin/riders');
   } catch (e) { next(e); }
 });
 
@@ -1206,7 +1407,7 @@ async function approvedMerchantByPhone(phone) {
 app.get('/merchant/dashboard', async (req, res, next) => {
   try {
     const phone = String(req.query.phone || '').trim();
-    if (!phone) return res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1><p>Login with your merchant phone to manage shop orders.</p><form method="GET" action="/merchant/dashboard"><label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX"><button>Open Dashboard</button></form><div class="actions"><a class="btn secondary" href="/merchant">Join Merchant</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'merchant'));
+    if (!phone) return res.send(merchantLoginPage());
     const check = await approvedMerchantByPhone(phone);
     if (!check.lead) return res.send(page('Merchant Dashboard', '<section class="card"><h1>No merchant found</h1><a class="btn" href="/merchant">Register Merchant</a></section>', 'merchant'));
     if (!check.approved) return res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Pending</h1><p>Merchant status is ${esc(check.lead.status || 'pending')}.</p><a class="btn secondary" href="/app">Back to App</a></section>`, 'merchant'));
@@ -1398,7 +1599,7 @@ app.all('/merchant/orders', async (req, res, next) => {
 app.all('/rider/dashboard', async (req, res, next) => {
   try {
     const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
-    if (!phone) return res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1><p>Login with your registered phone number to see assigned delivery orders.</p><form method="GET" action="/rider/dashboard"><label>Rider Phone</label><input name="phone" required placeholder="01XXXXXXXXX"><button>Open Dashboard</button></form><div class="actions"><a class="btn secondary" href="/rider">Join as Rider</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'rider'));
+    if (!phone) return res.send(riderLoginPage());
     const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, address, vehicle_type, nid, image_url, COALESCE(is_available,true) AS is_available, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     if (!rider.rows.length) return res.send(page('Rider Not Found', `<section class="card"><h1>Rider Not Found</h1><p>No rider profile found for ${esc(phone)}.</p><div class="actions"><a class="btn" href="/rider">Register Rider</a><a class="btn secondary" href="/rider/dashboard">Try Another Phone</a></div></section>`, 'rider'));
     const rd = rider.rows[0];
