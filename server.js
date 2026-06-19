@@ -204,6 +204,8 @@ function adminNav(active) {
     ['Providers', '/admin/providers'],
     ['Service Requests', '/admin/service-requests'],
     ['Reviews', '/admin/reviews'],
+    ['Launch', '/admin/launch-checklist'],
+    ['QA', '/admin/qa'],
   ];
   return `<nav class="nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<a href="/">Main Website</a><form method="POST" action="/admin/logout" style="display:inline"><button class="secondary" style="padding:9px 11px">Logout</button></form></nav>`;
 }
@@ -418,7 +420,7 @@ app.get('/admin/os', async (req, res, next) => {
     const alert = (label, count, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(label)}</h2>${badge(count ? 'pending' : 'clear')}</div><p><b>${esc(count || 0)}</b> waiting for action</p></a>`;
     const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="cards compact">${rows.length ? rows.map(render).join('') : '<div class="card"><p>No recent activity</p></div>'}</div></section>`;
     const recentCard = (title, status, details, href) => `<a class="card" href="${href}" style="text-decoration:none"><div class="actions" style="justify-content:space-between"><h2>${esc(title)}</h2>${badge(status)}</div><p>${esc(details)}</p></a>`;
-    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alert('Pending merchant approvals', m.pending, '/admin/leads?status=pending')}${alert('Pending rider approvals', r.pending, '/admin/riders?status=pending')}${alert('Pending provider approvals', p.pending, '/admin/providers?status=pending')}${alert('Pending service requests', sr.pending, '/admin/service-requests?status=pending')}${alert('Pending orders', o.pending, '/admin/orders?status=pending')}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
+    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('Launch Checklist', '/admin/launch-checklist')}${action('QA Center', '/admin/qa')}<form method="POST" action="/admin/seed-demo-data" style="display:inline"><button class="secondary">Seed Demo Data</button></form><form method="POST" action="/admin/telegram-test" style="display:inline"><button class="secondary">Telegram Test</button></form>${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alert('Pending merchant approvals', m.pending, '/admin/leads?status=pending')}${alert('Pending rider approvals', r.pending, '/admin/riders?status=pending')}${alert('Pending provider approvals', p.pending, '/admin/providers?status=pending')}${alert('Pending service requests', sr.pending, '/admin/service-requests?status=pending')}${alert('Pending orders', o.pending, '/admin/orders?status=pending')}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1282,6 +1284,130 @@ app.get('/service/request/success', (req, res) => {
   const id = String(req.query.id || '');
   const phone = String(req.query.phone || '');
   res.send(page('Service Request Submitted', `<section class="card app-hero"><span class="pill">Request Received</span><h1>Service Request Submitted</h1><p>GOVO team and provider will review your request.</p><h2>Request ID: #${esc(id)}</h2><p style="color:var(--muted);font-weight:900">Customer phone: ${esc(phone || 'Not provided')}</p><div class="timeline"><div class="step done">Submitted</div><div class="step">Provider/Admin Review</div><div class="step">Working</div><div class="step">Completed</div></div><div class="actions"><a class="btn" href="/track/service/${encodeURIComponent(id)}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Track Request</a><a class="btn secondary" href="/services">Back to Services</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'services'));
+});
+
+
+async function sendTelegramReadinessTest() {
+  const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || '';
+  const chatId = process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID || '';
+  if (!token || !chatId) return { ok: false, message: 'Telegram token/chat id missing' };
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: 'GOVO launch readiness Telegram test successful', disable_web_page_preview: true }),
+    });
+    if (!resp.ok) return { ok: false, message: await resp.text() };
+    return { ok: true, message: 'Telegram test sent successfully' };
+  } catch (e) {
+    return { ok: false, message: e.message };
+  }
+}
+
+function readinessBadge(ok) {
+  return `<span class="badge ${ok ? 'available' : 'failed'}">${ok ? 'READY' : 'NEEDS ATTENTION'}</span>`;
+}
+
+app.get('/admin/launch-checklist', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    let dbOk = false;
+    let dbMessage = 'Database check failed';
+    try {
+      await pool.query('SELECT 1');
+      dbOk = true;
+      dbMessage = 'Database connected';
+    } catch (e) {
+      dbMessage = e.message;
+    }
+    const telegramOk = Boolean((process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN) && (process.env.TELEGRAM_CHAT_ID || process.env.ADMIN_CHAT_ID));
+    const uploadsExists = fs.existsSync(govoUploadsDir);
+    let uploadsWritable = false;
+    try {
+      fs.accessSync(govoUploadsDir, fs.constants.W_OK);
+      uploadsWritable = true;
+    } catch {}
+    const [merchants, providers, riders, orders, requests] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_merchant_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_service_providers`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_rider_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`),
+    ]);
+    const m = merchants.rows[0] || {};
+    const p = providers.rows[0] || {};
+    const r = riders.rows[0] || {};
+    const o = orders.rows[0] || {};
+    const sr = requests.rows[0] || {};
+    const source = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+    const adminLeakPatterns = ["['" + "admin'", '/admin/os' + '?pin', 'name=' + '"pin"', 'ADMIN_PIN ? `?' + 'pin='];
+    const leakHits = adminLeakPatterns.filter((pat) => source.includes(pat));
+    const leakOk = leakHits.length === 0;
+    const checklist = [
+      ['Health endpoint', true, 'GET /health exists'],
+      ['Database connection', dbOk, dbMessage],
+      ['Telegram env', telegramOk, telegramOk ? 'Telegram token/chat id available' : 'Telegram token/chat id missing'],
+      ['Approved merchants', Number(m.approved || 0) > 0, `${m.approved || 0} approved of ${m.total || 0}`],
+      ['Approved providers', Number(p.approved || 0) > 0, `${p.approved || 0} approved of ${p.total || 0}`],
+      ['Approved riders', Number(r.approved || 0) > 0, `${r.approved || 0} approved of ${r.total || 0}`],
+      ['Uploads folder', uploadsExists && uploadsWritable, `${govoUploadsDir} ${uploadsExists ? 'exists' : 'missing'} / ${uploadsWritable ? 'writable' : 'not writable'}`],
+      ['Public admin link leak check', leakOk, leakOk ? 'No obvious public admin PIN/link patterns found' : `Review patterns: ${leakHits.join(', ')}`],
+    ];
+    const ready = dbOk && telegramOk && Number(m.approved || 0) > 0 && Number(p.approved || 0) > 0 && Number(r.approved || 0) > 0 && uploadsExists && uploadsWritable && leakOk;
+    const fixNext = checklist.filter((x) => !x[1]).map((x) => `<li><b>${esc(x[0])}</b>: ${esc(x[2])}</li>`).join('') || '<li>No blocker found for internal pilot testing.</li>';
+    const metric = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
+    const rows = checklist.map(([label, ok, detail]) => `<div class="card"><div class="section-head"><h2>${esc(label)}</h2>${readinessBadge(ok)}</div><p>${esc(detail)}</p></div>`).join('');
+    res.send(page('Launch Checklist', `<section class="card app-hero"><h1>GOVO Launch Checklist</h1><p>Production pilot readiness for customer, merchant, provider, rider and admin flows.</p><div class="actions">${readinessBadge(ready)}<a class="btn secondary" href="/admin/qa">QA Center</a><a class="btn secondary" href="/admin/os">Admin OS</a></div><h2>${ready ? 'Ready for internal test' : 'Not ready yet'}</h2></section><section class="grid">${metric('Total Merchants', m.total, 'Registered merchants')}${metric('Approved Merchants', m.approved, 'Visible shops')}${metric('Total Providers', p.total, 'Registered providers')}${metric('Approved Providers', p.approved, 'Visible services')}${metric('Total Riders', r.total, 'Registered riders')}${metric('Approved Riders', r.approved, 'Assignable riders')}${metric('Total Orders', o.total, 'All delivery orders')}${metric('Pending Orders', o.pending, 'Waiting action')}${metric('Delivered Orders', o.delivered, 'Completed orders')}${metric('Total Service Requests', sr.total, 'All service requests')}${metric('Pending Service Requests', sr.pending, 'Waiting action')}${metric('Completed Service Requests', sr.completed, 'Completed jobs')}</section><section class="card"><h2>Readiness Checks</h2></section><section class="cards">${rows}</section><section class="card"><h2>What To Fix Next</h2><ul>${fixNext}</ul><div class="actions"><form method="POST" action="/admin/seed-demo-data"><button>Seed Demo Data</button></form><form method="POST" action="/admin/telegram-test"><button class="secondary">Telegram Test</button></form></div></section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+app.get('/admin/qa', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const demoMerchantPhone = '01700000001';
+    const demoProviderPhone = '01700000002';
+    const demoRiderPhone = '01700000003';
+    const link = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
+    res.send(page('QA Center', `<section class="card app-hero"><h1>GOVO QA Center</h1><p>Quick links for real pilot testing across customer, merchant, provider, rider and admin flows.</p><div class="actions"><a class="btn" href="/admin/launch-checklist">Launch Checklist</a><a class="btn secondary" href="/admin/os">Admin OS</a></div></section><section class="card"><h2>Customer QA</h2><div class="toolbar">${link('Open customer app','/app')}${link('Open shops','/shops')}${link('Open services','/services')}${link('Place order','/order')}${link('Track order','/track')}</div></section><section class="card"><h2>Operator QA</h2><div class="toolbar">${link('Merchant dashboard test', `/merchant/dashboard?phone=${demoMerchantPhone}`)}${link('Provider dashboard test', `/provider/dashboard?phone=${demoProviderPhone}`)}${link('Rider dashboard test', `/rider/dashboard?phone=${demoRiderPhone}`)}${link('Admin orders','/admin/orders')}${link('Admin service requests','/admin/service-requests')}${link('Admin launch checklist','/admin/launch-checklist')}</div></section><section class="card"><h2>Setup Actions</h2><div class="actions"><form method="POST" action="/admin/seed-demo-data"><button>Seed Demo Data</button></form><form method="POST" action="/admin/telegram-test"><button class="secondary">Telegram Test</button></form></div></section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/seed-demo-data', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const merchantPhone = '01700000001';
+    const providerPhone = '01700000002';
+    const riderPhone = '01700000003';
+    let merchant = (await pool.query(`SELECT * FROM govo_merchant_leads WHERE phone=$1 LIMIT 1`, [merchantPhone])).rows[0];
+    if (!merchant) {
+      merchant = (await pool.query(`INSERT INTO govo_merchant_leads (shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, status, shop_description, shop_address, is_verified, is_trusted, is_available, rating_avg, rating_count, created_at, updated_at) VALUES ('GOVO Demo Food Shop','Demo Merchant',$1,$1,'Meherpur','Restaurant','Yes','approved','Demo merchant for launch QA','Meherpur Sadar',true,true,true,5,1,NOW(),NOW()) RETURNING *`, [merchantPhone])).rows[0];
+    }
+    let provider = (await pool.query(`SELECT * FROM govo_service_providers WHERE phone=$1 LIMIT 1`, [providerPhone])).rows[0];
+    if (!provider) {
+      provider = (await pool.query(`INSERT INTO govo_service_providers (provider_name, phone, whatsapp, service_type, area, address, experience, description, status, is_verified, is_trusted, is_available, emergency_available, rating_avg, rating_count, created_at, updated_at) VALUES ('GOVO Demo Electrician',$1,$1,'Electrician','Meherpur','Meherpur Sadar','5 years','Demo provider for launch QA','approved',true,true,true,true,5,1,NOW(),NOW()) RETURNING *`, [providerPhone])).rows[0];
+    }
+    let rider = (await pool.query(`SELECT * FROM govo_rider_leads WHERE phone=$1 LIMIT 1`, [riderPhone])).rows[0];
+    if (!rider) {
+      rider = (await pool.query(`INSERT INTO govo_rider_leads (rider_name, name, phone, location, vehicle_type, experience, status, created_at, updated_at) VALUES ('GOVO Demo Rider','GOVO Demo Rider',$1,'Meherpur','Bike','Demo rider for launch QA','approved',NOW(),NOW()) RETURNING *`, [riderPhone])).rows[0];
+    }
+    const existingOrder = await pool.query(`SELECT id FROM govo_orders WHERE customer_phone='01700000991' AND item_details='GOVO demo order item' LIMIT 1`);
+    if (!existingOrder.rows.length) {
+      await pool.query(`INSERT INTO govo_orders (merchant_lead_id, shop_name, merchant_phone, customer_name, customer_phone, pickup_location, drop_location, item_details, note, customer_note, status, merchant_status, created_at, updated_at) VALUES ($1,$2,$3,'Demo Customer','01700000991','Demo pickup','Demo delivery address','GOVO demo order item','Demo order for launch QA','Demo order for launch QA','pending','pending',NOW(),NOW())`, [merchant.id, merchant.shop_name || 'GOVO Demo Food Shop', merchant.phone || merchantPhone]);
+    }
+    const existingRequest = await pool.query(`SELECT id FROM govo_service_requests WHERE customer_phone='01700000992' AND problem_details='GOVO demo service problem' LIMIT 1`);
+    if (!existingRequest.rows.length) {
+      await pool.query(`INSERT INTO govo_service_requests (provider_id, provider_name, provider_phone, service_type, customer_name, customer_phone, service_address, problem_details, preferred_time, note, customer_note, status, created_at, updated_at) VALUES ($1,$2,$3,$4,'Demo Service Customer','01700000992','Demo service address','GOVO demo service problem','Today','Demo service request for launch QA','Demo service request for launch QA','pending',NOW(),NOW())`, [provider.id, provider.provider_name || 'GOVO Demo Electrician', provider.phone || providerPhone, provider.service_type || 'Electrician']);
+    }
+    res.send(page('Demo Data Seeded', `<section class="card app-hero"><h1>Demo Data Ready</h1><p>Idempotent demo merchant, provider, rider, order and service request are available for QA.</p><div class="detail-grid"><div><b>Merchant</b><span>${merchantPhone}</span></div><div><b>Provider</b><span>${providerPhone}</span></div><div><b>Rider</b><span>${riderPhone}</span></div></div><div class="actions"><a class="btn" href="/admin/qa">QA Center</a><a class="btn secondary" href="/admin/launch-checklist">Launch Checklist</a></div></section>`, 'admin'));
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/telegram-test', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const result = await sendTelegramReadinessTest();
+    res.status(result.ok ? 200 : 500).send(page('Telegram Test', `<section class="card app-hero"><h1>Telegram Test</h1><div class="actions">${readinessBadge(result.ok)}</div><p>${esc(result.message)}</p><div class="actions"><a class="btn" href="/admin/launch-checklist">Launch Checklist</a><a class="btn secondary" href="/admin/qa">QA Center</a></div></section>`, 'admin'));
+  } catch (e) { next(e); }
 });
 
 app.get('/admin/reviews', async (req, res, next) => {
