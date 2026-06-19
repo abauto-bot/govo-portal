@@ -235,6 +235,33 @@ function boolish(v) {
   return v === true || v === 1 || String(v || '').toLowerCase() === 'true' || String(v || '') === '1';
 }
 
+function normalizeStatus(status) {
+  const s = String(status == null ? '' : status).trim().toLowerCase();
+  if (!s) return 'pending';
+  if (['approve', 'approved', 'accepted', 'active', 'true', '1'].includes(s)) return 'approved';
+  if (['reject', 'rejected', 'declined', 'false', '0'].includes(s)) return 'rejected';
+  if (s === 'pending') return 'pending';
+  return 'pending';
+}
+
+const approvalPendingSql = `(status IS NULL OR TRIM(status)='' OR LOWER(TRIM(status))='pending')`;
+const approvalApprovedSql = `LOWER(TRIM(COALESCE(status,'')))='approved'`;
+const approvalRejectedSql = `LOWER(TRIM(COALESCE(status,'')))='rejected'`;
+
+function approvalStatusWhere(alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  return {
+    pending: `(${prefix}status IS NULL OR TRIM(${prefix}status)='' OR LOWER(TRIM(${prefix}status))='pending')`,
+    approved: `LOWER(TRIM(COALESCE(${prefix}status,'')))='approved'`,
+    rejected: `LOWER(TRIM(COALESCE(${prefix}status,'')))='rejected'`,
+  };
+}
+
+function approvalFilterLinks(basePath, current) {
+  const items = [['pending', 'Pending'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['all', 'All']];
+  return `<div class="toolbar">${items.map(([key, label]) => `<a class="btn ${current === key ? '' : 'secondary'}" href="${basePath}?status=${key}">${label}</a>`).join('')}</div>`;
+}
+
 function ratingText(x) {
   const avg = Number(x.rating_avg || 0);
   const count = Number(x.rating_count || 0);
@@ -399,9 +426,9 @@ app.get('/admin/os', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending') IN ('accepted','preparing','merchant_confirmed'))::int active_merchant, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='ready')::int ready, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='picked_up')::int picked_up, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted FROM govo_merchant_leads`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved FROM govo_rider_leads`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted, COUNT(*) FILTER (WHERE COALESCE(emergency_available,false)=true AND COALESCE(is_available,true)=true)::int emergency_available FROM govo_service_providers`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted FROM govo_merchant_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved FROM govo_rider_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted, COUNT(*) FILTER (WHERE COALESCE(emergency_available,false)=true AND COALESCE(is_available,true)=true)::int emergency_available FROM govo_service_providers`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='working')::int working, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`),
       pool.query(`SELECT id, shop_name, customer_name, customer_phone, drop_location, COALESCE(status,'pending') AS status, created_at FROM govo_orders ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, provider_name, service_type, customer_name, customer_phone, COALESCE(status,'pending') AS status, created_at FROM govo_service_requests ORDER BY id DESC LIMIT 5`),
@@ -430,9 +457,9 @@ app.get('/admin/pilot', async (req, res, next) => {
     let healthOk = false;
     try { await pool.query('SELECT 1'); healthOk = true; } catch {}
     const [merchants, providers, riders, orders, requests] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending FROM govo_merchant_leads`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending FROM govo_service_providers`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending FROM govo_rider_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending FROM govo_merchant_leads`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending FROM govo_service_providers`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending FROM govo_rider_leads`),
       pool.query(`SELECT COUNT(*) FILTER (WHERE ${today})::int total_today, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
       pool.query(`SELECT COUNT(*) FILTER (WHERE ${today})::int total_today, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`),
     ]);
@@ -448,16 +475,16 @@ app.get('/admin/leads', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const status = String(req.query.status || 'all').trim().toLowerCase();
+    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
-    if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
+    if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
-    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
-    const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int rejected FROM govo_merchant_leads`);
+    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_merchant_leads`);
     const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('merchant', x, pin)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
-    res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1><form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1>${approvalFilterLinks('/admin/leads', status)}<form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -466,10 +493,7 @@ app.post('/admin/merchant/status', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const id = String(req.body.id || req.body.lead_id || req.body.merchant_id || '').trim();
-    let status = String(req.body.status || req.body.action || 'pending').trim().toLowerCase();
-    if (status === 'approve') status = 'approved';
-    if (status === 'reject') status = 'rejected';
-    if (!['approved', 'rejected', 'pending'].includes(status)) status = 'pending';
+    const status = normalizeStatus(req.body.status || req.body.action);
     const r = await pool.query(`UPDATE govo_merchant_leads SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING id, shop_name, owner_name, phone, category, location, status, admin_note`, [status, String(req.body.admin_note || ''), id]);
     if (r.rows.length) {
       const x = r.rows[0];
@@ -483,16 +507,16 @@ app.get('/admin/riders', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const status = String(req.query.status || 'all').trim().toLowerCase();
+    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
-    if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
+    if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(vehicle_type,'')) LIKE $${params.length}`); }
-    const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, location, vehicle_type, experience, COALESCE(status,'pending') AS status, admin_note, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
-    const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='approved')::int approved, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='rejected')::int rejected FROM govo_rider_leads`);
+    const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, location, vehicle_type, experience, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_rider_leads`);
     const cards = riders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form></div>`).join('');
-    res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1><form class="filters" method="GET" action="/admin/riders"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1>${approvalFilterLinks('/admin/riders', status)}<form class="filters" method="GET" action="/admin/riders"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -517,10 +541,7 @@ app.post('/admin/rider/status', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    let status = String(req.body.status || 'pending').trim().toLowerCase();
-    if (status === 'approve') status = 'approved';
-    if (status === 'reject') status = 'rejected';
-    if (!['approved', 'rejected', 'pending'].includes(status)) status = 'pending';
+    const status = normalizeStatus(req.body.status);
     const r = await pool.query(`UPDATE govo_rider_leads SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING id, COALESCE(rider_name,name) AS rider_name, phone, vehicle_type, location, status, admin_note`, [status, String(req.body.admin_note || ''), String(req.body.id || '')]);
     if (r.rows.length) {
       const x = r.rows[0];
@@ -1363,15 +1384,15 @@ app.get('/admin/providers', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const status = String(req.query.status || 'all').trim().toLowerCase();
+    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
     const q = String(req.query.q || '').trim().toLowerCase();
     const params = [];
     const where = [];
-    if (status !== 'all') { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
+    if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(address,'')) LIKE $${params.length}`); }
-    const providers = await pool.query(`SELECT * FROM govo_service_providers ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const providers = await pool.query(`SELECT *, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status FROM govo_service_providers ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('provider', x, pin)}<div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
-    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1><form class="filters" method="GET" action="/admin/providers"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1>${approvalFilterLinks('/admin/providers', status)}<form class="filters" method="GET" action="/admin/providers"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1379,8 +1400,7 @@ app.post('/admin/provider/status', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    let status = String(req.body.status || 'pending').trim().toLowerCase();
-    if (!['approved', 'rejected', 'pending'].includes(status)) status = 'pending';
+    const status = normalizeStatus(req.body.status);
     const r = await pool.query(`UPDATE govo_service_providers SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING *`, [status, req.body.admin_note || '', req.body.id || '']);
     if (r.rows.length) {
       const x = r.rows[0];
