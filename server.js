@@ -271,7 +271,7 @@ function page(title, body, active = '') {
   const robots = isAdmin ? '<meta name="robots" content="noindex,nofollow">' : '';
   const showBottom = !['admin', 'merchant', 'rider'].includes(active);
   const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="/track">Track</a><a href="/merchant">Join</a></nav>` : '';
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
+  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO</h2><p>Meherpur Super App</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
 }
 
 function badge(status) {
@@ -485,7 +485,46 @@ app.use((req, res, next) => {
   return next();
 });
 
-app.get('/', (req, res) => res.redirect('/merchant'));
+function publicContactLinks() {
+  const whatsapp = process.env.GOVO_WHATSAPP_PUBLIC_URL || process.env.GOVO_WHATSAPP_URL || process.env.GOVO_WHATSAPP || process.env.WHATSAPP || '';
+  const facebook = process.env.GOVO_FACEBOOK_URL || '';
+  const tiktok = process.env.GOVO_TIKTOK_URL || '';
+  const waHref = whatsapp ? (/^https?:\/\//i.test(whatsapp) ? whatsapp : `https://wa.me/${String(whatsapp).replace(/\D/g, '')}`) : '';
+  const links = [
+    ['WhatsApp', waHref],
+    ['Facebook', facebook],
+    ['TikTok', tiktok],
+  ].filter((x) => x[1]);
+  if (!links.length) return '<span class="pill">Contact GOVO</span>';
+  return links.map(([label, href]) => `<a class="btn secondary" href="${esc(href)}">${esc(label)}</a>`).join('');
+}
+
+app.get('/', (req, res) => {
+  res.send(page('GOVO', `
+    <section class="card app-hero">
+      <span class="pill">GOVO</span>
+      <h1>GOVO Express — Meherpur Super App</h1>
+      <p style="color:var(--muted);font-size:16px;line-height:1.55">Local shop, service & delivery in one place.</p>
+      <div class="actions">
+        <a class="btn" href="/app">Open App</a>
+        <a class="btn secondary" href="/shops">Shops</a>
+        <a class="btn secondary" href="/services">Services</a>
+        <a class="btn secondary" href="/track">Track</a>
+      </div>
+    </section>
+    <section class="card"><h2>What you can do</h2><div class="item-grid">
+      <div class="item-box"><b>Order from shops</b><span>Find local GOVO partner shops and place delivery orders.</span></div>
+      <div class="item-box"><b>Request services</b><span>Book approved local providers for home, repair, health and more.</span></div>
+      <div class="item-box"><b>Track delivery</b><span>Check order and service request status by ID or phone.</span></div>
+    </div></section>
+    <section class="card"><h2>Join GOVO</h2><div class="quick-grid">
+      <a class="btn secondary" href="/merchant">Merchant</a>
+      <a class="btn secondary" href="/provider">Provider</a>
+      <a class="btn secondary" href="/rider">Rider</a>
+    </div></section>
+    <section class="card social-footer"><h2>Contact</h2><div class="toolbar">${publicContactLinks()}</div></section>
+  `, 'app'));
+});
 app.get('/health', (req, res) => res.json({ ok: true, service: 'govo-portal', version: 'v1.0-clean-phase1' }));
 
 app.get('/merchant', (req, res) => {
@@ -1397,34 +1436,28 @@ app.get('/app', async (req, res, next) => {
     const [merchantResult, providerResult] = await Promise.all([approvedMerchants(), approvedProviders()]);
     const merchants = uniqueByIdentity(merchantResult.rows, 'merchant');
     const providers = uniqueByIdentity(providerResult.rows, 'provider');
-    const matchedMerchants = (q ? merchants.filter((x) => merchantSearchText(x).includes(q)) : merchants.filter((x) => boolish(x.is_verified) || boolish(x.is_trusted))).slice(0, 4);
-    const matchedProviders = (q ? providers.filter((x) => providerSearchText(x).includes(q)) : providers.filter((x) => boolish(x.is_trusted) || boolish(x.is_verified))).slice(0, 4);
-    const categoryLinks = [
-      ['Food', '/shops?q=food'], ['Grocery', '/shops?q=grocery'], ['Medicine', '/shops?q=medicine'], ['Electronics', '/shops?q=electronics'],
-      ['Technician', '/services?q=technician'], ['Doctor', '/services?q=doctor'], ['Transport', '/services?q=transport'], ['House Rent', '/services?q=house%20rent'],
-    ].map(([label, href]) => `<a class="card compact-card" style="text-decoration:none" href="${href}"><h2>${esc(label)}</h2></a>`).join('');
-    const appShopCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.shop_name || 'GOVO Shop')}</h2><span class="pill">${esc(x.category || 'Shop')}</span></div>${trustBadges(x)}<div class="compact-meta"><span>${esc(x.shop_address || x.location || 'Meherpur')}</span></div><div class="actions"><a class="btn" href="/shop/${encodeURIComponent(x.id)}">View Shop</a></div></div>`;
-    const appProviderCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.provider_name || 'Provider')}</h2><span class="pill">${esc(x.service_type || 'Service')}</span></div>${trustBadges(x)}<div class="compact-meta"><span>${esc(x.area || x.address || 'Meherpur')}</span></div><div class="actions"><a class="btn" href="/service/${encodeURIComponent(x.id)}#request_form">Request Service</a></div></div>`;
-    const social = publicContactLinks();
+    const matchedMerchants = q ? merchants.filter((x) => merchantSearchText(x).includes(q)).slice(0, 8) : merchants.filter((x) => boolish(x.is_verified) || boolish(x.is_trusted)).slice(0, 5);
+    const matchedProviders = q ? providers.filter((x) => providerSearchText(x).includes(q)).slice(0, 8) : providers.filter((x) => boolish(x.is_trusted) || boolish(x.is_verified)).slice(0, 5);
+    const emergencyProviders = providers.filter((x) => boolish(x.emergency_available) && boolish(x.is_available)).slice(0, 5);
+    const cats = ['food','grocery','pharmacy','electronics','fashion','agriculture','technician','home-service','doctor','transport','house-rent'].map((slug) => categoryForSlug(slug)).filter(Boolean);
+    const categoryGrid = cats.map((cat) => `<a class="card" style="text-decoration:none;padding:14px" href="/category/${encodeURIComponent(cat.slug)}"><div style="font-size:28px">${cat.icon}</div><h2 style="font-size:18px;margin:8px 0 4px">${esc(cat.title.replace(' / Restaurant','').replace(' / Mobile',''))}</h2><p style="color:var(--muted);margin:0;font-size:13px">${esc(cat.desc)}</p></a>`).join('');
+    const shopFeature = matchedMerchants.length ? `<section class="card"><div class="section-head"><h2>${q ? 'Search Results: Shops' : 'Featured Shops'}</h2><a class="btn secondary" href="/shops${q ? `?q=${encodeURIComponent(q)}` : ''}">View All</a></div></section><section class="cards">${matchedMerchants.map(compactMerchantCard).join('')}</section>` : '';
+    const providerFeature = matchedProviders.length ? `<section class="card"><div class="section-head"><h2>${q ? 'Search Results: Services' : 'Trusted Providers'}</h2><a class="btn secondary" href="/services${q ? `?q=${encodeURIComponent(q)}` : ''}">View All</a></div></section><section class="cards">${matchedProviders.map(compactProviderCard).join('')}</section>` : '';
+    const emergencyFeature = emergencyProviders.length ? `<section class="card"><div class="section-head"><h2>Emergency Available Services</h2><a class="btn secondary" href="/services?q=emergency">View</a></div></section><section class="cards">${emergencyProviders.map(compactProviderCard).join('')}</section>` : '';
     res.send(page('GOVO Customer App', `
-      <style>.public .topbar .nav{display:none}.public .topbar .brand h2{font-size:0}.public .topbar .brand h2:before{content:"GOVO.";font-size:15px}.public .topbar .brand p{font-size:0}.public .topbar .brand p:before{content:"Meherpur Super App";font-size:10px}.app-home-note{color:var(--muted);font-weight:900;margin-top:6px}</style>
       <section class="card app-hero">
-        <span class="pill">GOVO Express</span>
+        <span class="pill">Meherpur Super App</span>
         <h1>GOVO Express — Meherpur Super App</h1>
-        <p style="color:var(--muted);font-size:16px;line-height:1.55">Local shop, service, delivery & tracking in one place.</p>
-        <p class="app-home-note">Go local, get it done.</p>
-        <p class="app-home-note">মেহেরপুরের দোকান, সার্ভিস ও ডেলিভারি এক জায়গায়</p>
-        <div class="actions"><a class="btn" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a><a class="btn secondary" href="/track">Track</a></div>
+        <p style="color:var(--muted);font-size:16px;line-height:1.55">Order food, find local shops, book services, request emergency help and track deliveries from one place.</p>
+        <form method="GET" action="/app" style="margin-top:14px"><input name="q" value="${esc(q)}" placeholder="Search shops, services, products, location"><button>Search GOVO</button></form>
       </section>
-      <section class="card"><form method="GET" action="/app"><input name="q" value="${esc(q)}" placeholder="Search shop, service, product or area"><button>Search</button></form></section>
-      <section class="card"><h2>Quick Actions</h2><div class="quick-grid"><a class="btn" href="/shops">Shops</a><a class="btn" href="/services">Services</a><a class="btn secondary" href="/order">Order</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/services?q=emergency">Emergency</a><a class="btn secondary" href="/pilot">Join</a></div></section>
-      <section class="card"><div class="section-head"><h2>Categories</h2><span class="pill">8</span></div><div class="item-grid">${categoryLinks}</div></section>
-      <section class="card"><div class="section-head"><h2>${q ? 'Shop Results' : 'Featured Verified Shops'}</h2><a class="btn secondary" href="/shops${q ? `?q=${encodeURIComponent(q)}` : ''}">View All</a></div></section>
-      <section class="cards">${matchedMerchants.map(appShopCard).join('') || '<div class="card compact-card"><h2>Pilot shops are being added.</h2></div>'}</section>
-      <section class="card"><div class="section-head"><h2>${q ? 'Service Results' : 'Trusted Providers'}</h2><a class="btn secondary" href="/services${q ? `?q=${encodeURIComponent(q)}` : ''}">View All</a></div></section>
-      <section class="cards">${matchedProviders.map(appProviderCard).join('') || '<div class="card compact-card"><h2>Pilot providers are being added.</h2></div>'}</section>
-      <section class="card compact-card"><div class="section-head"><h2>Need urgent help?</h2><a class="btn" href="/services?q=emergency">Emergency</a></div></section>
-      ${social ? `<section class="card social-footer"><div class="toolbar">${social}</div></section>` : ''}
+      <section class="card"><h2>Quick Actions</h2><div class="quick-grid">
+        <a class="btn" href="/shops">Shops</a><a class="btn" href="/services">Request Service</a><a class="btn secondary" href="/services?q=emergency">Emergency Service</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/order">Order</a><a class="btn secondary" href="/merchant">Join Merchant</a><a class="btn secondary" href="/provider">Join Provider</a><a class="btn secondary" href="/category/food">Food</a>
+      </div></section>
+      <section class="card"><div class="section-head"><h2>Explore GOVO</h2><span class="pill">Popular</span></div><div class="item-grid">${categoryGrid}</div></section>
+      ${shopFeature || (q ? '<section class="card compact-card"><h2>No matching shop</h2><p style="color:var(--muted)">Try product, shop, category or location.</p></section>' : (merchants.length ? '' : pilotPartnerEmpty('merchant')))}
+      ${providerFeature || (q ? '<section class="card compact-card"><h2>No matching service</h2><p style="color:var(--muted)">Try service, area, provider name or phone.</p></section>' : (providers.length ? '' : pilotPartnerEmpty('provider')))}
+      ${emergencyFeature}
     `, 'app'));
   } catch (e) { next(e); }
 });
