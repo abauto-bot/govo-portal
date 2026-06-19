@@ -310,6 +310,45 @@ function approvalFilterLinks(basePath, current) {
   return `<div class="toolbar">${items.map(([key, label]) => `<a class="btn ${current === key ? '' : 'secondary'}" href="${basePath}?status=${key}">${label}</a>`).join('')}</div>`;
 }
 
+function visibilityFilterLinks(basePath, status, current) {
+  const items = [['visible', 'Visible'], ['hidden', 'Hidden'], ['demo', 'Demo/Test'], ['all', 'All']];
+  const qs = status ? `status=${encodeURIComponent(status)}&` : '';
+  return `<div class="toolbar">${items.map(([key, label]) => `<a class="btn ${current === key ? '' : 'secondary'}" href="${basePath}?${qs}visibility=${key}">${label}</a>`).join('')}</div>`;
+}
+
+function visibilityWhere(alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  return {
+    visible: `COALESCE(${prefix}public_visible,true)=true AND COALESCE(${prefix}is_demo,false)=false`,
+    hidden: `COALESCE(${prefix}public_visible,true)=false`,
+    demo: `COALESCE(${prefix}is_demo,false)=true`,
+    all: 'TRUE',
+  };
+}
+
+function publicVisibilitySql(alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  return `COALESCE(${prefix}public_visible,true)=true AND COALESCE(${prefix}is_demo,false)=false`;
+}
+
+function visibilityBadges(x) {
+  const visible = !['false', '0'].includes(String(x.public_visible ?? 'true').toLowerCase());
+  return `<div class="actions trust-row"><span class="badge ${visible ? 'available' : 'unavailable'}">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(x.is_demo) ? '<span class="badge warning">Demo/Test</span>' : ''}</div>`;
+}
+
+function adminVisibilityControls(type, x) {
+  const action = `/admin/${type}/visibility`;
+  const visible = !['false', '0'].includes(String(x.public_visible ?? 'true').toLowerCase());
+  const demo = boolish(x.is_demo);
+  return `<div class="actions"><form method="POST" action="${action}"><input type="hidden" name="id" value="${esc(x.id)}"><button class="${visible ? 'secondary' : ''}" name="action" value="show_public">Show Public</button></form><form method="POST" action="${action}"><input type="hidden" name="id" value="${esc(x.id)}"><button class="${visible ? '' : 'secondary'}" name="action" value="hide_public">Hide Public</button></form><form method="POST" action="${action}"><input type="hidden" name="id" value="${esc(x.id)}"><button class="${demo ? 'secondary' : ''}" name="action" value="mark_demo">Mark Demo</button></form><form method="POST" action="${action}"><input type="hidden" name="id" value="${esc(x.id)}"><button class="${demo ? '' : 'secondary'}" name="action" value="unmark_demo">Not Demo</button></form></div>`;
+}
+
+function pilotPartnerEmpty(type) {
+  const join = type === 'provider' ? '/provider' : '/merchant';
+  const label = type === 'provider' ? 'Join Provider' : 'Join Merchant';
+  return `<div class="card compact-card"><h2>Pilot partners are being added.</h2><p style="color:var(--muted)">Please check again soon.</p><div class="actions"><a class="btn" href="${join}">${label}</a><a class="btn secondary" href="/app">Back to App</a></div></div>`;
+}
+
 
 function normalizedKey(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '').trim();
@@ -412,12 +451,21 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_items (id SERIAL PRIMARY KEY, merchant_phone TEXT, item_name TEXT, price TEXT, details TEXT, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW())`);
 
   const add = async (table, columnSql) => pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${columnSql}`);
-  for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
-  for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
+  for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
+  for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
   for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', 'preferred_time TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'merchant_status TEXT', 'admin_note TEXT', 'merchant_note TEXT', 'provider_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'assigned_rider_id INT', 'assigned_rider_name TEXT', 'assigned_rider_phone TEXT', 'rider_note TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
-  for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
+  for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
 
+  await markDemoRecords();
+}
+
+async function markDemoRecords() {
+  const demoPhones = ['01700000000', '01700000001', '01700000002', '01700000003', '01799999999', '01711111111', '01811111111'];
+  const demoNameSql = `demo|test|telegram|final test|db test|sample`;
+  await pool.query(`UPDATE govo_merchant_leads SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'')) ~ $2)`, [demoPhones, demoNameSql]);
+  await pool.query(`UPDATE govo_service_providers SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR whatsapp = ANY($1::text[]) OR LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(service_type,'')) ~ $2)`, [demoPhones, demoNameSql]);
+  await pool.query(`UPDATE govo_rider_leads SET is_demo=true, public_visible=false, updated_at=NOW() WHERE COALESCE(is_demo,false)=false AND (phone = ANY($1::text[]) OR LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'')) ~ $2)`, [demoPhones, demoNameSql]);
 }
 
 function domainType(req) {
@@ -563,15 +611,17 @@ app.get('/admin/leads', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
+    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || 'all').trim().toLowerCase()) ? String(req.query.visibility || 'all').trim().toLowerCase() : 'all';
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
     if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
+    if (visibility !== 'all') { where.push(visibilityWhere()[visibility]); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
-    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_merchant_leads`);
-    const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('merchant', x, pin)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
-    res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1>${approvalFilterLinks('/admin/leads', status)}<form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
+    const cards = merchants.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
+    res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1>${approvalFilterLinks('/admin/leads', status)}${visibilityFilterLinks('/admin/leads', status, visibility)}<form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -595,15 +645,17 @@ app.get('/admin/riders', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
+    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || 'all').trim().toLowerCase()) ? String(req.query.visibility || 'all').trim().toLowerCase() : 'all';
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
     if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
+    if (visibility !== 'all') { where.push(visibilityWhere()[visibility]); }
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(rider_name,'') || ' ' || COALESCE(name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(vehicle_type,'')) LIKE $${params.length}`); }
-    const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, location, vehicle_type, experience, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
+    const riders = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, location, vehicle_type, experience, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, created_at FROM govo_rider_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_rider_leads`);
-    const cards = riders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form></div>`).join('');
-    res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1>${approvalFilterLinks('/admin/riders', status)}<form class="filters" method="GET" action="/admin/riders"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
+    const cards = riders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div>${visibilityBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.location)}</span></div><div><b>Vehicle</b><span>${esc(x.vehicle_type)}</span></div><div><b>Experience</b><span>${esc(x.experience)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/rider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminVisibilityControls('rider', x)}</div>`).join('');
+    res.send(page('Admin Riders', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Riders</h1>${approvalFilterLinks('/admin/riders', status)}${visibilityFilterLinks('/admin/riders', status, visibility)}<form class="filters" method="GET" action="/admin/riders"><input name="q" value="${esc(q)}" placeholder="Search riders"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -621,6 +673,52 @@ app.post('/admin/merchant/trust', async (req, res, next) => {
       await sendTelegram(['GOVO Merchant Trust Updated', '', `Merchant ID: #${x.id}`, `Shop: ${x.shop_name || ''}`, `Phone: ${x.phone || ''}`, `Verified: ${x.is_verified}`, `Trusted: ${x.is_trusted}`, `Available: ${x.is_available}`, `Emergency: ${x.emergency_available}`].join('\n'));
     }
     res.redirect(`/admin/leads`);
+  } catch (e) { next(e); }
+});
+
+
+async function updateVisibilityRecord(req, res, table, type, returnFields, redirectPath) {
+  if (!requireAdmin(req, res)) return null;
+  const id = String(req.body.id || '').trim();
+  const action = String(req.body.action || '').trim().toLowerCase();
+  const map = {
+    show_public: { public_visible: true },
+    hide_public: { public_visible: false },
+    mark_demo: { is_demo: true, public_visible: false },
+    unmark_demo: { is_demo: false },
+  };
+  const nextState = map[action];
+  if (!id || !nextState) {
+    res.status(400).send(page('Invalid Visibility Action', '<section class="card"><h1>Invalid visibility action</h1></section>', 'admin'));
+    return null;
+  }
+  const sets = Object.keys(nextState).map((key, i) => `${key}=$${i + 1}`);
+  const values = Object.values(nextState);
+  values.push(id);
+  const r = await pool.query(`UPDATE ${table} SET ${sets.join(', ')}, updated_at=NOW() WHERE id=$${values.length} RETURNING ${returnFields}`, values);
+  if (r.rows.length) {
+    const x = r.rows[0];
+    await sendTelegram([`GOVO ${type} Visibility Updated`, '', `ID: #${x.id}`, `Name: ${x.name || x.shop_name || x.provider_name || x.rider_name || ''}`, `Phone: ${x.phone || ''}`, `Action: ${action}`, `Public Visible: ${x.public_visible}`, `Demo/Test: ${x.is_demo}`].join('\n'));
+  }
+  res.redirect(redirectPath);
+  return r.rows[0] || null;
+}
+
+app.post('/admin/merchant/visibility', async (req, res, next) => {
+  try {
+    await updateVisibilityRecord(req, res, 'govo_merchant_leads', 'Merchant', 'id, shop_name, phone, public_visible, is_demo', '/admin/leads');
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/provider/visibility', async (req, res, next) => {
+  try {
+    await updateVisibilityRecord(req, res, 'govo_service_providers', 'Provider', 'id, provider_name, phone, public_visible, is_demo', '/admin/providers');
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/rider/visibility', async (req, res, next) => {
+  try {
+    await updateVisibilityRecord(req, res, 'govo_rider_leads', 'Rider', 'id, COALESCE(rider_name,name) AS rider_name, phone, public_visible, is_demo', '/admin/riders');
   } catch (e) { next(e); }
 });
 
@@ -741,12 +839,12 @@ async function approvedMerchants() {
     SELECT l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed,
            COALESCE(l.status,'pending') AS status, l.shop_description, l.shop_address, l.products, l.image_url,
            COALESCE(l.is_verified,false) AS is_verified, COALESCE(l.is_trusted,false) AS is_trusted, COALESCE(l.is_available,true) AS is_available,
-           COALESCE(l.emergency_available,false) AS emergency_available, COALESCE(l.rating_avg,0) AS rating_avg, COALESCE(l.rating_count,0) AS rating_count, l.created_at,
+           COALESCE(l.emergency_available,false) AS emergency_available, COALESCE(l.rating_avg,0) AS rating_avg, COALESCE(l.rating_count,0) AS rating_count, COALESCE(l.public_visible,true) AS public_visible, COALESCE(l.is_demo,false) AS is_demo, l.created_at,
            COALESCE(string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' '), '') AS product_search
     FROM govo_merchant_leads l
     LEFT JOIN govo_shop_products p ON (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false
-    WHERE COALESCE(l.status,'pending')='approved'
-    GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.is_verified, l.is_trusted, l.is_available, l.emergency_available, l.rating_avg, l.rating_count, l.created_at
+    WHERE COALESCE(l.status,'pending')='approved' AND ${publicVisibilitySql('l')}
+    GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.is_verified, l.is_trusted, l.is_available, l.emergency_available, l.rating_avg, l.rating_count, l.public_visible, l.is_demo, l.created_at
     ORDER BY l.id DESC
     LIMIT 500
   `);
@@ -770,7 +868,7 @@ app.get('/shops', async (req, res, next) => {
       </section>
       <section class="card"><div class="section-head"><h2>Categories</h2><span class="pill">${superAppCategories.length}</span></div><div class="chips">${chips}</div></section>
       <section class="card"><div class="section-head"><h2>${q ? 'Shop Search Results' : 'Featured Verified Shops'}</h2><span class="pill">${rows.length} showing</span></div></section>
-      <section class="cards">${cards || '<div class="card"><h2>No shop found</h2><p style="color:var(--muted)">Try another product, location, phone number or category.</p><div class="actions"><a class="btn" href="/shops">Clear Search</a><a class="btn secondary" href="/services">Browse Services</a></div></div>'}</section>
+      <section class="cards">${cards || pilotPartnerEmpty('merchant')}</section>
     `, 'shops'));
   } catch (e) { next(e); }
 });
@@ -797,16 +895,16 @@ app.get('/category/:slug', async (req, res, next) => {
         </form>
       </section>
       <section class="card"><div class="actions" style="justify-content:space-between"><h2>Approved ${esc(cat.title)}</h2><span class="pill">${rows.length}</span></div></section>
-      <section class="cards">${cards || '<div class="card"><h2>No approved provider found</h2><p>Try another search or check back later.</p></div>'}</section>
+      <section class="cards">${cards || pilotPartnerEmpty('merchant')}</section>
     `, 'shops'));
   } catch (e) { next(e); }
 });
 
 app.get('/shop/:id', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
-    if (!x) return res.status(404).send(page('Shop Not Found', '<section class="card"><h1>Shop Not Found</h1><p>This shop is not approved or not found.</p></section>'));
+    if (!x) return res.status(404).send(page('Shop Not Found', `<section class="card"><h1>Shop Not Found</h1><p>This shop is not public right now.</p></section>${pilotPartnerEmpty('merchant')}`, 'shops'));
     const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 120`, [x.id, x.phone]);
     const productHtml = products.rows.map((p) => {
       const itemValue = `${p.product_name || 'Product'}${p.price ? ` - ${p.price}` : ''}`;
@@ -1250,7 +1348,7 @@ function providerCard(x) {
 }
 
 async function approvedProviders() {
-  return pool.query(`SELECT * FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 500`);
+  return pool.query(`SELECT * FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} ORDER BY id DESC LIMIT 500`);
 }
 
 
@@ -1318,8 +1416,8 @@ app.get('/app', async (req, res, next) => {
         <a class="btn" href="/shops">Shops</a><a class="btn" href="/services">Request Service</a><a class="btn secondary" href="/services?q=emergency">Emergency Service</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/order">Order</a><a class="btn secondary" href="/merchant">Join Merchant</a><a class="btn secondary" href="/provider">Join Provider</a><a class="btn secondary" href="/category/food">Food</a>
       </div></section>
       <section class="card"><div class="section-head"><h2>Explore GOVO</h2><span class="pill">Popular</span></div><div class="item-grid">${categoryGrid}</div></section>
-      ${shopFeature || (q ? '<section class="card compact-card"><h2>No matching shop</h2><p style="color:var(--muted)">Try product, shop, category or location.</p></section>' : '')}
-      ${providerFeature || (q ? '<section class="card compact-card"><h2>No matching service</h2><p style="color:var(--muted)">Try service, area, provider name or phone.</p></section>' : '')}
+      ${shopFeature || (q ? '<section class="card compact-card"><h2>No matching shop</h2><p style="color:var(--muted)">Try product, shop, category or location.</p></section>' : (merchants.length ? '' : pilotPartnerEmpty('merchant')))}
+      ${providerFeature || (q ? '<section class="card compact-card"><h2>No matching service</h2><p style="color:var(--muted)">Try service, area, provider name or phone.</p></section>' : (providers.length ? '' : pilotPartnerEmpty('provider')))}
       ${emergencyFeature}
     `, 'app'));
   } catch (e) { next(e); }
@@ -1397,7 +1495,7 @@ app.get('/services', async (req, res, next) => {
       <section class="card app-hero"><span class="pill">GOVO Services</span><h1>Book trusted local service providers</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Find approved providers for repair, health, agriculture, transport, rent and home support.</p><form method="GET" action="/services"><input name="q" value="${esc(q)}" placeholder="Search service, area, name, phone"><button>Search Services</button></form><div class="toolbar"><a class="btn secondary" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/provider">Become Provider</a></div></section>
       <section class="card"><div class="section-head"><h2>Service Categories</h2><span class="pill">${serviceCategories.length}</span></div><div class="chips">${chips}</div></section>
       <section class="card"><div class="section-head"><h2>${q ? 'Service Search Results' : 'Featured Trusted Providers'}</h2><span class="pill">${rows.length} showing</span></div></section>
-      <section class="cards">${cards || '<div class="card"><h2>No service provider found</h2><p style="color:var(--muted)">Try another service, area, phone number or provider name.</p><div class="actions"><a class="btn" href="/services">Clear Search</a><a class="btn secondary" href="/app">Back to App</a></div></div>'}</section>
+      <section class="cards">${cards || pilotPartnerEmpty('provider')}</section>
     `, 'services'));
   } catch (e) { next(e); }
 });
@@ -1425,9 +1523,9 @@ function serviceDetailPage(provider, data = {}, error = '') {
 
 app.get('/service/:id', async (req, res, next) => {
   try {
-    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [req.params.id]);
+    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} LIMIT 1`, [req.params.id]);
     const provider = r.rows[0];
-    if (!provider) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not approved or not found.</p><a class="btn" href="/services">Back Services</a></section>`, 'services'));
+    if (!provider) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not public right now.</p><a class="btn" href="/services">Back Services</a></section>${pilotPartnerEmpty('provider')}`, 'services'));
     res.send(serviceDetailPage(provider));
   } catch (e) { next(e); }
 });
@@ -1435,9 +1533,9 @@ app.get('/service/:id', async (req, res, next) => {
 app.post('/service/request', async (req, res, next) => {
   try {
     const data = normalizeServiceRequestBody(req.body);
-    const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [data.provider_id || '']);
+    const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND COALESCE(status,'pending')='approved' AND ${publicVisibilitySql()} LIMIT 1`, [data.provider_id || '']);
     const p = provider.rows[0];
-    if (!p) return res.status(404).send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="/services">Back Services</a></section>`, 'services'));
+    if (!p) return res.status(404).send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="/services">Back Services</a></section>${pilotPartnerEmpty('provider')}`, 'services'));
     const missing = [];
     for (const [field, label] of [['provider_id', 'Provider'], ['customer_name', 'Your name'], ['customer_phone', 'Your phone'], ['service_address', 'Service address'], ['problem_details', 'Problem details']]) {
       if (!data[field]) missing.push(label);
@@ -1474,14 +1572,16 @@ app.get('/admin/providers', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
     const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
+    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || 'all').trim().toLowerCase()) ? String(req.query.visibility || 'all').trim().toLowerCase() : 'all';
     const q = String(req.query.q || '').trim().toLowerCase();
     const params = [];
     const where = [];
     if (status !== 'all') { where.push(approvalStatusWhere()[status]); }
+    if (visibility !== 'all') { where.push(visibilityWhere()[visibility]); }
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(provider_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(service_type,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(address,'')) LIKE $${params.length}`); }
     const providers = await pool.query(`SELECT *, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status FROM govo_service_providers ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
-    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div>${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('provider', x, pin)}<div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
-    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1>${approvalFilterLinks('/admin/providers', status)}<form class="filters" method="GET" action="/admin/providers"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
+    const cards = providers.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.provider_name || '')}</h2>${badge(x.status)}</div>${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>WhatsApp</b><span>${esc(x.whatsapp)}</span></div><div><b>Service</b><span>${esc(x.service_type)}</span></div><div><b>Area</b><span>${esc(x.area)}</span></div><div><b>Address</b><span>${esc(x.address)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/provider/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminTrustControls('provider', x, pin)}${adminVisibilityControls('provider', x)}<div class="actions"><a class="btn secondary" href="/provider/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/service/${encodeURIComponent(x.id)}">Service Page</a></div></div>`).join('');
+    res.send(page('Admin Providers', `<section class="card"><h1>Admin Providers</h1>${approvalFilterLinks('/admin/providers', status)}${visibilityFilterLinks('/admin/providers', status, visibility)}<form class="filters" method="GET" action="/admin/providers"><input name="q" value="${esc(q)}" placeholder="Search provider, phone, service, area"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a></div></section><section class="cards">${cards || '<div class="card"><h2>No provider found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
