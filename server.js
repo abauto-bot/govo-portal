@@ -201,19 +201,30 @@ body{background:var(--bg)!important;color:var(--text)!important}.topbar{backgrou
 [data-theme="light"] .badge.verified{background:#e0f2fe;border-color:#0284c7;color:#075985}[data-theme="light"] .badge.trusted,[data-theme="light"] .badge.available{background:#dcfce7;border-color:#16a34a;color:#14532d}[data-theme="light"] .badge.rating{background:#fef3c7;border-color:#d97706;color:#78350f}[data-theme="light"] .badge.emergency{background:#ffedd5;border-color:#ea580c;color:#7c2d12}[data-theme="light"] .badge.rejected,[data-theme="light"] .badge.cancelled,[data-theme="light"] .badge.failed,[data-theme="light"] .badge.unavailable{background:#fee2e2;border-color:#dc2626;color:#7f1d1d}
 @media(max-width:760px){.header-actions{width:100%;justify-content:space-between}.theme-toggle{width:auto!important;min-height:32px;padding:7px 9px}.brand-row{gap:10px}.nav{overflow-x:auto;flex-wrap:nowrap}.nav a{white-space:nowrap}}
 
+/* GOVO Final UI Designer Pass v3 */
+:root,[data-theme="dark"]{--info:#38bdf8;--shadow:0 18px 50px rgba(0,0,0,.28);--soft:rgba(255,255,255,.045);--hero1:#102016;--hero2:#0f172a}
+[data-theme="light"]{--info:#0284c7;--shadow:0 14px 34px rgba(15,23,42,.10);--soft:rgba(22,163,74,.055);--hero1:#e8f8ee;--hero2:#ffffff}
+body{font-size:14px;line-height:1.45;background:linear-gradient(180deg,var(--bg),color-mix(in srgb,var(--bg) 92%,#000 8%))!important}.app{max-width:1080px;padding:14px}.topbar{position:relative!important;top:auto!important;border-radius:16px;margin-bottom:14px;box-shadow:var(--shadow);padding:12px}.brand-row{align-items:center}.brand{min-width:0}.brand h2{font-size:17px;letter-spacing:0}.brand p{font-size:11px}.logo{width:38px;height:38px;border-radius:11px;flex:0 0 auto}.nav{gap:7px;margin-top:10px;overflow-x:auto;scrollbar-width:thin}.nav a{border-radius:999px;font-size:12px;padding:8px 10px;white-space:nowrap}.admin-nav{position:relative}.card{border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 0 rgba(255,255,255,.03)}.card h1{font-size:clamp(24px,5vw,40px);line-height:1.08;margin-bottom:10px}.card h2{font-size:18px;line-height:1.2;margin-bottom:8px}.card p{margin:6px 0 10px}.app-hero{border-color:color-mix(in srgb,var(--primary) 32%,var(--border));background:radial-gradient(circle at 12% 0%,rgba(34,197,94,.24),transparent 32%),linear-gradient(180deg,var(--hero1),var(--hero2))!important}.grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.cards{gap:10px}.stat{border-radius:13px;padding:12px}.stat .label{font-size:11px;letter-spacing:.02em}.stat .value{font-size:24px;margin-top:4px}.section-head{align-items:flex-start}.toolbar,.actions{gap:7px;margin:9px 0}.btn,button{border-radius:11px;min-height:38px;padding:9px 11px;font-size:13px;line-height:1.15}.actions .btn,.toolbar .btn,.actions button,.toolbar button{flex:0 1 auto}.three{gap:7px}.three button{width:100%}.quick-grid{grid-template-columns:repeat(auto-fit,minmax(116px,1fr));gap:8px}.quick-grid .btn{min-height:46px}.chips{gap:7px;padding-bottom:6px}.chips .btn{white-space:nowrap}.filters{grid-template-columns:minmax(180px,1fr) minmax(120px,.35fr) auto;gap:7px}form{gap:9px}label{font-size:13px}input,select,textarea{border-radius:11px;padding:10px 11px;font-size:14px;min-height:40px}textarea{min-height:82px}.detail-grid,.item-grid{gap:8px;margin:10px 0}.detail-grid div,.item-box{border-radius:11px;padding:9px}.detail-grid b,.item-box b{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em}.detail-grid span,.item-box span{font-size:14px;color:var(--text)}.badge,.pill{font-size:11px;padding:5px 8px;letter-spacing:.01em}.trust-row{margin:7px 0}.timeline{grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:7px;margin:10px 0}.step{border-radius:11px;padding:8px;font-size:11px}.bottom-nav{position:fixed!important;box-shadow:var(--shadow)}.bottom-nav a{font-size:11px}.table-wrap{border:1px solid var(--border);border-radius:12px}.admin-table{min-width:760px}.admin-table th,.admin-table td{padding:8px}.social-footer{padding:12px;text-align:center}.wa{background:#16a34a!important;color:#fff!important}.reject{background:var(--danger)!important}.header-actions .pill{display:none}.theme-toggle{box-shadow:none!important}.compact-record .card{padding:11px}.empty-state{border:1px dashed var(--border);background:var(--surface);border-radius:14px;padding:18px;text-align:center;color:var(--muted)}
+.card form + form,.card form + .actions,.card .actions + form{margin-top:9px}.card img{box-shadow:0 8px 24px rgba(0,0,0,.16)}body.admin .card{padding:12px}.btn.secondary:hover,.nav a:hover{transform:translateY(-1px)}.btn,button,.nav a{transition:background .15s,border-color .15s,color .15s,transform .15s}.footer{padding:14px 0 10px}.lock-card{margin:28px auto}.public-contact{margin-top:8px}.group-note{font-size:13px}.big-status{font-size:14px;padding:7px 10px}.cards.compact{gap:8px}.cards.compact .card{padding:10px}.item-box .actions,.detail-grid .actions{margin-top:7px}
+@media(max-width:760px){body{font-size:13px}.app{padding:10px 10px 78px}.topbar{border-radius:14px;padding:10px;margin-bottom:10px}.brand-row{align-items:flex-start}.brand{gap:9px}.logo{width:34px;height:34px}.brand h2{font-size:15px}.brand p{font-size:10px}.header-actions{width:auto;margin-left:auto}.theme-toggle{min-height:30px!important;padding:6px 8px!important;font-size:11px}.nav{margin-top:8px;padding-bottom:2px}.nav a{font-size:11px;padding:7px 9px}.card{padding:11px;border-radius:13px;margin-bottom:10px}.card h1{font-size:24px}.card h2{font-size:16px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.quick-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.quick-grid .btn{font-size:12px;min-height:42px;padding:8px}.toolbar,.actions{gap:6px}.toolbar .btn,.actions .btn,.toolbar button,.actions button{font-size:12px;min-height:36px;padding:8px 9px;width:auto}.actions form{width:100%}.actions form button{width:100%}.filters button{width:100%}.stat .value{font-size:21px}.timeline{grid-template-columns:repeat(2,minmax(0,1fr))}.bottom-nav{left:8px;right:8px;bottom:8px;border-radius:15px;padding:6px}.bottom-nav a{padding:7px 3px}.admin-table{min-width:640px}input,select,textarea{font-size:16px}.section-head{display:block}.section-head .btn,.section-head .pill{margin-top:6px}.trust-row{gap:5px}.badge,.pill{font-size:10px}.social-footer .toolbar{justify-content:flex-start}.app-hero{padding-top:13px;padding-bottom:13px}}
+@media(min-width:761px){.cards{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.cards>.card{margin-bottom:0}.cards.compact{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.item-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}}
+
 `;
 
 function adminNav(active) {
   const links = [
     ['Dashboard', '/admin/os'],
     ['Orders', '/admin/orders'],
-    ['Merchants', '/admin/leads'],
-    ['Riders', '/admin/riders'],
-    ['Providers', '/admin/providers'],
     ['Service Requests', '/admin/service-requests'],
-    ['Reviews', '/admin/reviews'],
+    ['Merchants', '/admin/leads'],
+    ['Providers', '/admin/providers'],
+    ['Riders', '/admin/riders'],
+    ['WhatsApp', '/admin/whatsapp'],
+    ['QA', '/admin/qa'],
+    ['Launch', '/admin/launch-checklist'],
+    ['Pilot', '/admin/pilot'],
   ];
-  return `<nav class="nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<a href="/">Main Website</a><form method="POST" action="/admin/logout" style="display:inline"><button class="secondary" style="padding:9px 11px">Logout</button></form></nav>`;
+  return `<nav class="nav admin-nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<form method="POST" action="/admin/logout" style="display:inline"><button class="secondary" style="padding:8px 10px">Logout</button></form></nav>`;
 }
 
 
@@ -227,6 +238,11 @@ function themeToggle() {
 
 function themeRuntimeScript() {
   return `<script>(function(){function label(t){return t==='light'?'☀ Light':'☾ Dark'}function apply(t){if(t!=='light')t='dark';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('govo_theme',t)}catch(e){}var b=document.getElementById('themeToggle');if(b)b.textContent=label(t)}window.govoToggleTheme=function(){var cur=document.documentElement.getAttribute('data-theme')||'dark';apply(cur==='light'?'dark':'light')};apply(document.documentElement.getAttribute('data-theme')||'dark');})();</script>`;
+}
+
+function pageShell(title, content, options = {}) {
+  const active = typeof options === 'string' ? options : (options.active || '');
+  return page(title, content, active);
 }
 
 function page(title, body, active = '') {
@@ -244,7 +260,7 @@ function page(title, body, active = '') {
   const robots = isAdmin ? '<meta name="robots" content="noindex,nofollow">' : '';
   const showBottom = !['admin', 'merchant', 'rider'].includes(active);
   const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="/track">Track</a><a href="/merchant">Join</a></nav>` : '';
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
+  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
 }
 
 function badge(status) {
