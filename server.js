@@ -104,6 +104,9 @@ function bdTime(v) {
 
 const ADMIN_COOKIE = 'govo_admin_session';
 const ADMIN_SESSION_SECRET = String(process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || process.env.COOKIE_SECRET || ADMIN_PIN || 'govo-admin-session-secret').trim();
+const PORTAL_SESSION_SECRET = String(process.env.PORTAL_SESSION_SECRET || process.env.SESSION_SECRET || process.env.COOKIE_SECRET || 'govo-portal-session-secret').trim();
+const MERCHANT_COOKIE = 'govo_merchant_session';
+const RIDER_COOKIE = 'govo_rider_session';
 
 function rawPin(req) {
   return String((req.body && (req.body.admin_pin || req.body.pin)) || (req.query && req.query.pin) || '').trim();
@@ -132,6 +135,48 @@ function safeEqual(a, b) {
   return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
 }
 
+function sessionCookieName(type) {
+  return type === 'rider' ? RIDER_COOKIE : MERCHANT_COOKIE;
+}
+
+function sessionPath(type) {
+  return type === 'rider' ? '/rider' : '/merchant';
+}
+
+function portalSessionSignature(type, id) {
+  return crypto.createHmac('sha256', PORTAL_SESSION_SECRET).update(`${type}:${id}`).digest('hex');
+}
+
+function portalSessionValue(type, id) {
+  return `${id}.${portalSessionSignature(type, id)}`;
+}
+
+function readPortalSession(req, type) {
+  const raw = parseCookies(req)[sessionCookieName(type)];
+  const parts = String(raw || '').split('.');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return '';
+  return safeEqual(parts[1], portalSessionSignature(type, parts[0])) ? parts[0] : '';
+}
+
+function setPortalSession(req, res, type, id) {
+  res.cookie(sessionCookieName(type), portalSessionValue(type, id), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: requestIsHttps(req),
+    path: sessionPath(type),
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+  });
+}
+
+function clearPortalSession(req, res, type) {
+  res.clearCookie(sessionCookieName(type), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: requestIsHttps(req),
+    path: sessionPath(type),
+  });
+}
+
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(String(password || ''), salt, 120000, 32, 'sha256').toString('hex');
@@ -150,7 +195,7 @@ function verifyPassword(password, salt, hash) {
 }
 
 function accountBadges(x = {}) {
-  return `<div class="actions trust-row"><span class="badge ${x.password_hash ? 'available' : 'unavailable'}">${x.password_hash ? 'Password Set' : 'No Password'}</span>${x.reset_requested_at ? '<span class="badge emergency">Reset Requested</span>' : ''}</div>`;
+  return `<div class="actions trust-row"><span class="badge ${x.password_hash ? 'available' : 'unavailable'}">${x.password_hash ? 'Password Set' : 'Password Not Set'}</span>${x.reset_requested_at ? '<span class="badge emergency">Reset Requested</span>' : '<span class="badge clear">No Reset Request</span>'}</div>`;
 }
 
 function adminPasswordResetForm(type, x = {}) {
@@ -159,18 +204,24 @@ function adminPasswordResetForm(type, x = {}) {
 }
 
 function merchantLoginPage(prefill = '', message = '') {
-  return page('Merchant Dashboard Login', `<section class="card app-hero"><h1>Merchant Dashboard</h1><p class="form-hint">Phone + password diye shop dashboard open korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/merchant/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/merchant/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Merchant Account</a><a class="btn secondary" href="/merchant/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="/merchant">Register Merchant</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'merchant');
+  return page('Merchant Dashboard Login', `<section class="card app-hero"><h1>Merchant Dashboard</h1><p class="form-hint">Phone + password diye shop dashboard open korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/merchant/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/merchant/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Account</a><a class="btn secondary" href="/merchant/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="/merchant">Register</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'merchant');
 }
 
 function riderLoginPage(prefill = '', message = '') {
-  return page('Rider Login', `<section class="card app-hero"><h1>Rider Login</h1><p class="form-hint">Phone + password diye assigned delivery orders dekhun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/rider/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/rider/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Rider Account</a><a class="btn secondary" href="/rider/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="/rider/register">Register Rider</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'rider');
+  return page('Rider Login', `<section class="card app-hero"><h1>Rider Login</h1><p class="form-hint">Phone + password diye assigned delivery orders dekhun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/rider/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/rider/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Account</a><a class="btn secondary" href="/rider/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="/rider/register">Register</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'rider');
 }
 
 function accountCreatePage(type, prefill = '', message = '') {
   const title = type === 'merchant' ? 'Create Merchant Account' : 'Create Rider Account';
   const action = type === 'merchant' ? '/merchant/account/create' : '/rider/account/create';
   const register = type === 'merchant' ? '/merchant' : '/rider/register';
-  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Age register kora phone number diye password set korun. Notun ${type === 'merchant' ? 'shop' : 'rider'} hole registration korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Registered Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" minlength="6" required><label>Confirm Password</label><input name="confirm_password" type="password" minlength="6" required><button>Set Password</button></form><div class="actions"><a class="btn secondary" href="${register}">Register First</a><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/dashboard' : 'rider'}">Back to Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
+  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Registered phone number diye password set korun. Notun ${type === 'merchant' ? 'shop' : 'rider'} hole age registration korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" minlength="6" required><label>Confirm Password</label><input name="confirm_password" type="password" minlength="6" required><button>Create Account</button></form><div class="actions"><a class="btn secondary" href="${register}">Register</a><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/dashboard' : 'rider'}">Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
+}
+
+function accountCreateSuccessPage(type, phone = '') {
+  const title = type === 'merchant' ? 'Merchant Account Created' : 'Rider Account Created';
+  const login = type === 'merchant' ? '/merchant/dashboard' : '/rider';
+  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Password set hoyeche. Login kore dashboard open korun.</p><div class="actions"><a class="btn" href="${login}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Login</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, type);
 }
 
 function forgotPasswordPage(type, prefill = '', message = '') {
@@ -625,6 +676,7 @@ app.post('/merchant', async (req, res, next) => {
 });
 
 app.get('/rider', (req, res) => {
+  if (readPortalSession(req, 'rider')) return res.redirect('/rider/dashboard');
   res.send(riderLoginPage(String(req.query.phone || '').trim()));
 });
 
@@ -653,10 +705,10 @@ app.post('/merchant/account/create', async (req, res, next) => {
     if (password.length < 6) return res.status(400).send(accountCreatePage('merchant', phone, 'Password minimum 6 characters.'));
     if (password !== confirm) return res.status(400).send(accountCreatePage('merchant', phone, 'Confirm password did not match.'));
     const r = await pool.query(`SELECT id, shop_name, phone, whatsapp FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!r.rows.length) return res.status(404).send(accountCreatePage('merchant', phone, 'No merchant found for this phone. Register merchant first.'));
+    if (!r.rows.length) return res.status(404).send(accountCreatePage('merchant', phone, 'No registered merchant found for this phone. Please register first.'));
     const hp = hashPassword(password);
     await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
-    res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(r.rows[0].phone || phone)}&auth=basic`);
+    res.send(accountCreateSuccessPage('merchant', r.rows[0].phone || phone));
   } catch (e) { next(e); }
 });
 
@@ -667,12 +719,18 @@ app.post('/merchant/login', async (req, res, next) => {
     if (!phone || !password) return res.status(400).send(merchantLoginPage(phone, 'Phone and password required.'));
     const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, password_hash, password_salt FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     const m = r.rows[0];
-    if (!m) return res.status(404).send(merchantLoginPage(phone, 'No merchant found. Register merchant first.'));
+    if (!m) return res.status(404).send(merchantLoginPage(phone, 'No registered merchant found. Use Register or Create Account.'));
     if (!m.password_hash || !m.password_salt) return res.status(403).send(merchantLoginPage(phone, 'Password not set. Create account first.'));
     if (!verifyPassword(password, m.password_salt, m.password_hash)) return res.status(401).send(merchantLoginPage(phone, 'Wrong phone or password.'));
     await pool.query(`UPDATE govo_merchant_leads SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1`, [m.id]);
-    res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(m.phone || phone)}&auth=basic`);
+    setPortalSession(req, res, 'merchant', m.id);
+    res.redirect('/merchant/dashboard');
   } catch (e) { next(e); }
+});
+
+app.all('/merchant/logout', (req, res) => {
+  clearPortalSession(req, res, 'merchant');
+  res.redirect('/merchant/dashboard');
 });
 
 app.get('/merchant/forgot-password', (req, res) => {
@@ -705,10 +763,10 @@ app.post('/rider/account/create', async (req, res, next) => {
     if (password.length < 6) return res.status(400).send(accountCreatePage('rider', phone, 'Password minimum 6 characters.'));
     if (password !== confirm) return res.status(400).send(accountCreatePage('rider', phone, 'Confirm password did not match.'));
     const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!r.rows.length) return res.status(404).send(accountCreatePage('rider', phone, 'No rider found for this phone. Register rider first.'));
+    if (!r.rows.length) return res.status(404).send(accountCreatePage('rider', phone, 'No registered rider found for this phone. Please register first.'));
     const hp = hashPassword(password);
     await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
-    res.redirect(`/rider/dashboard?phone=${encodeURIComponent(r.rows[0].phone || phone)}&auth=basic`);
+    res.send(accountCreateSuccessPage('rider', r.rows[0].phone || phone));
   } catch (e) { next(e); }
 });
 
@@ -719,12 +777,18 @@ app.post('/rider/login', async (req, res, next) => {
     if (!phone || !password) return res.status(400).send(riderLoginPage(phone, 'Phone and password required.'));
     const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, password_hash, password_salt FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     const rd = r.rows[0];
-    if (!rd) return res.status(404).send(riderLoginPage(phone, 'No rider found. Register rider first.'));
+    if (!rd) return res.status(404).send(riderLoginPage(phone, 'No registered rider found. Use Register or Create Account.'));
     if (!rd.password_hash || !rd.password_salt) return res.status(403).send(riderLoginPage(phone, 'Password not set. Create account first.'));
     if (!verifyPassword(password, rd.password_salt, rd.password_hash)) return res.status(401).send(riderLoginPage(phone, 'Wrong phone or password.'));
     await pool.query(`UPDATE govo_rider_leads SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1`, [rd.id]);
-    res.redirect(`/rider/dashboard?phone=${encodeURIComponent(rd.phone || phone)}&auth=basic`);
+    setPortalSession(req, res, 'rider', rd.id);
+    res.redirect('/rider/dashboard');
   } catch (e) { next(e); }
+});
+
+app.all('/rider/logout', (req, res) => {
+  clearPortalSession(req, res, 'rider');
+  res.redirect('/rider');
 });
 
 app.get('/rider/forgot-password', (req, res) => {
@@ -1014,7 +1078,7 @@ app.post('/admin/merchant/password-reset', async (req, res, next) => {
     const temporaryPassword = String(req.body.temporary_password || '');
     if (!id || temporaryPassword.length < 6) return res.status(400).send(page('Invalid Password Reset', '<section class="card"><h1>Invalid password reset</h1><p>Temporary password must be at least 6 characters.</p><a class="btn secondary" href="/admin/leads">Back Merchants</a></section>', 'admin'));
     const hp = hashPassword(temporaryPassword);
-    const r = await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), reset_requested_at=NULL, reset_note='reset completed by admin', updated_at=NOW() WHERE id=$3 RETURNING id, shop_name, owner_name, phone`, [hp.hash, hp.salt, id]);
+    const r = await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), reset_requested_at=NULL, reset_note=NULL, updated_at=NOW() WHERE id=$3 RETURNING id, shop_name, owner_name, phone`, [hp.hash, hp.salt, id]);
     if (r.rows.length) {
       const m = r.rows[0];
       sendTelegram(['GOVO Admin Reset Merchant Password', '', `Merchant ID: #${m.id}`, `Shop: ${m.shop_name || ''}`, `Owner: ${m.owner_name || ''}`, `Phone: ${m.phone || ''}`].join('\n')).catch(() => {});
@@ -1030,7 +1094,7 @@ app.post('/admin/rider/password-reset', async (req, res, next) => {
     const temporaryPassword = String(req.body.temporary_password || '');
     if (!id || temporaryPassword.length < 6) return res.status(400).send(page('Invalid Password Reset', '<section class="card"><h1>Invalid password reset</h1><p>Temporary password must be at least 6 characters.</p><a class="btn secondary" href="/admin/riders">Back Riders</a></section>', 'admin'));
     const hp = hashPassword(temporaryPassword);
-    const r = await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), reset_requested_at=NULL, reset_note='reset completed by admin', updated_at=NOW() WHERE id=$3 RETURNING id, COALESCE(rider_name,name) AS rider_name, phone`, [hp.hash, hp.salt, id]);
+    const r = await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), reset_requested_at=NULL, reset_note=NULL, updated_at=NOW() WHERE id=$3 RETURNING id, COALESCE(rider_name,name) AS rider_name, phone`, [hp.hash, hp.salt, id]);
     if (r.rows.length) {
       const rd = r.rows[0];
       sendTelegram(['GOVO Admin Reset Rider Password', '', `Rider ID: #${rd.id}`, `Name: ${rd.rider_name || ''}`, `Phone: ${rd.phone || ''}`].join('\n')).catch(() => {});
@@ -1406,19 +1470,25 @@ async function approvedMerchantByPhone(phone) {
 
 app.get('/merchant/dashboard', async (req, res, next) => {
   try {
-    const phone = String(req.query.phone || '').trim();
-    if (!phone) return res.send(merchantLoginPage());
-    const check = await approvedMerchantByPhone(phone);
-    if (!check.lead) return res.send(page('Merchant Dashboard', '<section class="card"><h1>No merchant found</h1><a class="btn" href="/merchant">Register Merchant</a></section>', 'merchant'));
-    if (!check.approved) return res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Pending</h1><p>Merchant status is ${esc(check.lead.status || 'pending')}.</p><a class="btn secondary" href="/app">Back to App</a></section>`, 'merchant'));
-    const m = check.lead;
+    const prefill = String(req.query.phone || '').trim();
+    const merchantSessionId = readPortalSession(req, 'merchant');
+    if (!merchantSessionId) return res.send(merchantLoginPage(prefill));
+    const merchantResult = await pool.query(`SELECT * FROM govo_merchant_leads WHERE id=$1 LIMIT 1`, [merchantSessionId]);
+    const m = merchantResult.rows[0];
+    if (!m) {
+      clearPortalSession(req, res, 'merchant');
+      return res.status(401).send(merchantLoginPage('', 'Session expired. Please login again.'));
+    }
+    const merchantStatus = String(m.status || 'pending').toLowerCase();
+    if (merchantStatus !== 'approved') return res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Pending</h1><p>Merchant status is ${esc(m.status || 'pending')}.</p><div class="actions"><a class="btn secondary" href="/merchant/logout">Logout</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'merchant'));
+    const phone = String(m.phone || m.whatsapp || '').trim();
     const prof = (await pool.query(`SELECT * FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone])).rows[0] || {};
     const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_lead_id=$1 OR merchant_phone=$2 OR merchant_phone=$3 OR shop_name=$4 ORDER BY id DESC LIMIT 100`, [m.id, m.phone || '', m.whatsapp || '', m.shop_name || '']);
     const orderActions = (x) => `<form method="POST" action="/merchant/order/status"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="merchant_note" value="${esc(x.merchant_note || '')}" placeholder="Merchant note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="preparing">Preparing</button><button name="status" value="ready">Ready</button></div><div class="actions"><button class="reject" name="status" value="rejected">Reject</button></div></form>`;
     const orderCards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.customer_name || 'Customer')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Merchant Status</b><span>${esc(x.merchant_status || 'No update')}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${orderActions(x)}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track</a></div></div>`).join('');
     const items = await pool.query(`SELECT id, item_name, price, details FROM govo_shop_items WHERE merchant_phone=$1 AND COALESCE(is_active,true)=true ORDER BY id DESC LIMIT 50`, [phone]);
     const itemHtml = items.rows.map((i) => `<div class="item-box"><b>${esc(i.item_name || '')}</b><span>${esc(i.price || '')}</span><br><span>${esc(i.details || '')}</span><div class="actions"><a class="btn secondary" href="/merchant/item/${encodeURIComponent(i.id)}/delete?phone=${encodeURIComponent(phone)}">Remove</a></div></div>`).join('');
-    res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1>${listingImage(m.image_url || prof.logo_image, m.shop_name, true)}<div class="detail-grid"><div><b>Shop</b><span>${esc(m.shop_name || '')}</span></div><div><b>Phone</b><span>${esc(m.whatsapp || m.phone || phone)}</span></div><div><b>Category</b><span>${esc(m.category || '')}</span></div><div><b>Status</b><span>${badge(m.status)}</span></div><div><b>Trust</b><span>${trustBadges(m)}</span></div><div><b>Rating</b><span>${esc(ratingText(m))}</span></div></div><div class="actions"><a class="btn" href="/merchant/products?phone=${encodeURIComponent(phone)}">Products</a><a class="btn secondary" href="#orders">Orders</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/app">Back to App</a></div></section><section class="card"><h2>Shop Profile</h2><form method="POST" action="/merchant/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || m.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || m.owner_name || '')}"><label>Area</label><input name="location" value="${esc(prof.location || m.location || '')}"><label>Address</label><textarea name="shop_address">${esc(m.shop_address || '')}</textarea><label>Category</label><input name="category" value="${esc(prof.category || m.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label><input type="checkbox" name="is_available" ${boolish(m.is_available) ? 'checked' : ''}> Shop Available</label><label><input type="checkbox" name="delivery_available" ${boolish(m.delivery_available) ? 'checked' : ''}> Delivery Available</label><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || m.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || m.shop_description || '')}</textarea><label>Shop Image / Logo</label><input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(m.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><h2>Add Product / Service</h2><form method="POST" action="/merchant/item"><input type="hidden" name="phone" value="${esc(phone)}"><label>Item Name</label><input name="item_name" required><label>Price</label><input name="price"><label>Details</label><textarea name="details"></textarea><button>Add Item</button></form><h2>Current Items</h2><div class="item-grid">${itemHtml || '<p>No item added yet.</p>'}</div></section><section class="card" id="orders"><div class="section-head"><h2>Incoming Orders</h2><span class="pill">${esc(orders.rows.length)} orders</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, prepare, mark ready, or reject.</p></section><section class="cards">${orderCards || '<div class="card"><h2>No orders yet</h2><p style="color:var(--muted);font-weight:900">Customer orders from your shop will appear here.</p></div>'}</section>`, 'merchant'));
+    res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1>${listingImage(m.image_url || prof.logo_image, m.shop_name, true)}<div class="detail-grid"><div><b>Shop</b><span>${esc(m.shop_name || '')}</span></div><div><b>Phone</b><span>${esc(m.whatsapp || m.phone || phone)}</span></div><div><b>Category</b><span>${esc(m.category || '')}</span></div><div><b>Status</b><span>${badge(m.status)}</span></div><div><b>Trust</b><span>${trustBadges(m)}</span></div><div><b>Rating</b><span>${esc(ratingText(m))}</span></div></div><div class="actions"><a class="btn" href="/merchant/products?phone=${encodeURIComponent(phone)}">Products</a><a class="btn secondary" href="#orders">Orders</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Shop Profile</h2><form method="POST" action="/merchant/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || m.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || m.owner_name || '')}"><label>Area</label><input name="location" value="${esc(prof.location || m.location || '')}"><label>Address</label><textarea name="shop_address">${esc(m.shop_address || '')}</textarea><label>Category</label><input name="category" value="${esc(prof.category || m.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label><input type="checkbox" name="is_available" ${boolish(m.is_available) ? 'checked' : ''}> Shop Available</label><label><input type="checkbox" name="delivery_available" ${boolish(m.delivery_available) ? 'checked' : ''}> Delivery Available</label><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || m.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || m.shop_description || '')}</textarea><label>Shop Image / Logo</label><input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(m.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><h2>Add Product / Service</h2><form method="POST" action="/merchant/item"><input type="hidden" name="phone" value="${esc(phone)}"><label>Item Name</label><input name="item_name" required><label>Price</label><input name="price"><label>Details</label><textarea name="details"></textarea><button>Add Item</button></form><h2>Current Items</h2><div class="item-grid">${itemHtml || '<p>No item added yet.</p>'}</div></section><section class="card" id="orders"><div class="section-head"><h2>Incoming Orders</h2><span class="pill">${esc(orders.rows.length)} orders</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, prepare, mark ready, or reject.</p></section><section class="cards">${orderCards || '<div class="card"><h2>No orders yet</h2><p style="color:var(--muted);font-weight:900">Customer orders from your shop will appear here.</p></div>'}</section>`, 'merchant'));
   } catch (e) { next(e); }
 });
 
@@ -1598,11 +1668,16 @@ app.all('/merchant/orders', async (req, res, next) => {
 
 app.all('/rider/dashboard', async (req, res, next) => {
   try {
-    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
-    if (!phone) return res.send(riderLoginPage());
-    const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, address, vehicle_type, nid, image_url, COALESCE(is_available,true) AS is_available, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!rider.rows.length) return res.send(page('Rider Not Found', `<section class="card"><h1>Rider Not Found</h1><p>No rider profile found for ${esc(phone)}.</p><div class="actions"><a class="btn" href="/rider">Register Rider</a><a class="btn secondary" href="/rider/dashboard">Try Another Phone</a></div></section>`, 'rider'));
+    const prefill = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
+    const riderSessionId = readPortalSession(req, 'rider');
+    if (!riderSessionId) return res.send(riderLoginPage(prefill));
+    const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, address, vehicle_type, nid, image_url, COALESCE(is_available,true) AS is_available, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE id=$1 LIMIT 1`, [riderSessionId]);
+    if (!rider.rows.length) {
+      clearPortalSession(req, res, 'rider');
+      return res.status(401).send(riderLoginPage('', 'Session expired. Please login again.'));
+    }
     const rd = rider.rows[0];
+    const phone = String(rd.phone || '').trim();
     const riderStatus = String(rd.status || 'pending').toLowerCase();
     const isApproved = riderStatus === 'approved';
     if (req.method === 'POST') {
@@ -1620,7 +1695,7 @@ app.all('/rider/dashboard', async (req, res, next) => {
     const orders = await pool.query(`SELECT * FROM govo_orders WHERE rider_phone=$1 OR assigned_rider_phone=$1 ORDER BY id DESC LIMIT 100`, [phone]);
     const actionButtons = (x) => `<form method="POST" action="/rider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="rider_note" value="${esc(x.rider_note || '')}" placeholder="Rider note optional"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="picked_up">Picked Up</button><button name="status" value="delivered">Delivered</button></div><div class="actions"><button class="reject" name="status" value="failed">Mark Failed</button></div></form>`;
     const cards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Order Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div></div>${isApproved ? actionButtons(x) : '<p style="color:var(--muted);font-weight:900">Rider actions unlock after admin approval.</p>'}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track Order</a></div></div>`).join('');
-    res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1>${listingImage(rd.image_url, rd.rider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(rd.rider_name || 'Rider')}</span></div><div><b>Phone</b><span>${esc(rd.whatsapp || rd.phone)}</span></div><div><b>Area</b><span>${esc(rd.area || rd.location || 'Not set')}</span></div><div><b>Status</b><span>${badge(rd.status)}</span></div><div><b>Vehicle</b><span>${esc(rd.vehicle_type || 'Not set')}</span></div><div><b>Orders</b><span>${esc(orders.rows.length)}</span></div></div><div class="actions"><a class="btn secondary" href="/rider/dashboard">Switch Rider</a><a class="btn secondary" href="/app">Back to App</a></div></section><section class="card"><h2>Rider Profile</h2><form method="POST" action="/rider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Rider Name</label><input name="rider_name" value="${esc(rd.rider_name || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(rd.whatsapp || '')}"><label>Area</label><input name="area" value="${esc(rd.area || rd.location || '')}"><label>Address</label><textarea name="address">${esc(rd.address || '')}</textarea><label>Vehicle Type</label><input name="vehicle_type" value="${esc(rd.vehicle_type || '')}"><label>NID</label><input name="nid" value="${esc(rd.nid || '')}"><label><input type="checkbox" name="is_available" ${boolish(rd.is_available) ? 'checked' : ''}> Available</label><label>Profile Image</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(rd.image_url || '')}"><button>Save Profile</button></form></section><section class="card"><h2>Assigned Orders</h2><p style="color:var(--muted);font-weight:900">Next action: accept, pick up, deliver, or mark failed.</p></section><section class="cards">${cards || '<div class="card"><h2>No assigned orders</h2><p style="color:var(--muted);font-weight:900">New orders will appear here after admin dispatch.</p></div>'}</section>`, 'rider'));
+    res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1>${listingImage(rd.image_url, rd.rider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(rd.rider_name || 'Rider')}</span></div><div><b>Phone</b><span>${esc(rd.whatsapp || rd.phone)}</span></div><div><b>Area</b><span>${esc(rd.area || rd.location || 'Not set')}</span></div><div><b>Status</b><span>${badge(rd.status)}</span></div><div><b>Vehicle</b><span>${esc(rd.vehicle_type || 'Not set')}</span></div><div><b>Orders</b><span>${esc(orders.rows.length)}</span></div></div><div class="actions"><a class="btn secondary" href="/rider/logout">Logout</a><a class="btn secondary" href="/app">Back to App</a></div></section><section class="card"><h2>Rider Profile</h2><form method="POST" action="/rider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Rider Name</label><input name="rider_name" value="${esc(rd.rider_name || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(rd.whatsapp || '')}"><label>Area</label><input name="area" value="${esc(rd.area || rd.location || '')}"><label>Address</label><textarea name="address">${esc(rd.address || '')}</textarea><label>Vehicle Type</label><input name="vehicle_type" value="${esc(rd.vehicle_type || '')}"><label>NID</label><input name="nid" value="${esc(rd.nid || '')}"><label><input type="checkbox" name="is_available" ${boolish(rd.is_available) ? 'checked' : ''}> Available</label><label>Profile Image</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(rd.image_url || '')}"><button>Save Profile</button></form></section><section class="card"><h2>Assigned Orders</h2><p style="color:var(--muted);font-weight:900">Next action: accept, pick up, deliver, or mark failed.</p></section><section class="cards">${cards || '<div class="card"><h2>No assigned orders</h2><p style="color:var(--muted);font-weight:900">New orders will appear here after admin dispatch.</p></div>'}</section>`, 'rider'));
   } catch (e) { next(e); }
 });
 
