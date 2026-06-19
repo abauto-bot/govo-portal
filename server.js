@@ -271,7 +271,7 @@ function page(title, body, active = '') {
   const robots = isAdmin ? '<meta name="robots" content="noindex,nofollow">' : '';
   const showBottom = !['admin', 'merchant', 'rider'].includes(active);
   const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="/track">Track</a><a href="/merchant">Join</a></nav>` : '';
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO Express</h2><p>Merchant, rider and delivery portal</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
+  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO</h2><p>Meherpur Super App</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
 }
 
 function badge(status) {
@@ -485,7 +485,46 @@ app.use((req, res, next) => {
   return next();
 });
 
-app.get('/', (req, res) => res.redirect('/merchant'));
+function publicContactLinks() {
+  const whatsapp = process.env.GOVO_WHATSAPP_PUBLIC_URL || process.env.GOVO_WHATSAPP_URL || process.env.GOVO_WHATSAPP || process.env.WHATSAPP || '';
+  const facebook = process.env.GOVO_FACEBOOK_URL || '';
+  const tiktok = process.env.GOVO_TIKTOK_URL || '';
+  const waHref = whatsapp ? (/^https?:\/\//i.test(whatsapp) ? whatsapp : `https://wa.me/${String(whatsapp).replace(/\D/g, '')}`) : '';
+  const links = [
+    ['WhatsApp', waHref],
+    ['Facebook', facebook],
+    ['TikTok', tiktok],
+  ].filter((x) => x[1]);
+  if (!links.length) return '<span class="pill">Contact GOVO</span>';
+  return links.map(([label, href]) => `<a class="btn secondary" href="${esc(href)}">${esc(label)}</a>`).join('');
+}
+
+app.get('/', (req, res) => {
+  res.send(page('GOVO', `
+    <section class="card app-hero">
+      <span class="pill">GOVO</span>
+      <h1>GOVO Express — Meherpur Super App</h1>
+      <p style="color:var(--muted);font-size:16px;line-height:1.55">Local shop, service & delivery in one place.</p>
+      <div class="actions">
+        <a class="btn" href="/app">Open App</a>
+        <a class="btn secondary" href="/shops">Shops</a>
+        <a class="btn secondary" href="/services">Services</a>
+        <a class="btn secondary" href="/track">Track</a>
+      </div>
+    </section>
+    <section class="card"><h2>What you can do</h2><div class="item-grid">
+      <div class="item-box"><b>Order from shops</b><span>Find local GOVO partner shops and place delivery orders.</span></div>
+      <div class="item-box"><b>Request services</b><span>Book approved local providers for home, repair, health and more.</span></div>
+      <div class="item-box"><b>Track delivery</b><span>Check order and service request status by ID or phone.</span></div>
+    </div></section>
+    <section class="card"><h2>Join GOVO</h2><div class="quick-grid">
+      <a class="btn secondary" href="/merchant">Merchant</a>
+      <a class="btn secondary" href="/provider">Provider</a>
+      <a class="btn secondary" href="/rider">Rider</a>
+    </div></section>
+    <section class="card social-footer"><h2>Contact</h2><div class="toolbar">${publicContactLinks()}</div></section>
+  `, 'app'));
+});
 app.get('/health', (req, res) => res.json({ ok: true, service: 'govo-portal', version: 'v1.0-clean-phase1' }));
 
 app.get('/merchant', (req, res) => {
