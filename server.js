@@ -124,9 +124,33 @@ function parseCookies(req) {
   }, {});
 }
 
-function adminToken() {
+function legacyAdminToken() {
   if (!ADMIN_PIN) return '';
   return crypto.createHmac('sha256', `${ADMIN_SESSION_SECRET}:${ADMIN_PIN}`).update('govo-admin-lock-v1').digest('hex');
+}
+
+function signAdminSession(ts) {
+  if (!ADMIN_PIN) return '';
+  return crypto.createHmac('sha256', `${ADMIN_SESSION_SECRET}:${ADMIN_PIN}`).update(`govo-admin-session-v1:${ts}`).digest('hex');
+}
+
+function adminCookieValue() {
+  const ts = Date.now();
+  const sig = signAdminSession(ts);
+  return sig ? `v1.${ts}.${sig}` : '';
+}
+
+function validAdminCookieValue(value) {
+  if (!ADMIN_PIN || !value) return false;
+  const legacy = legacyAdminToken();
+  if (legacy && safeEqual(value, legacy)) return true;
+  const parts = String(value || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'v1') return false;
+  const ts = Number(parts[1]);
+  if (!Number.isFinite(ts) || ts <= 0) return false;
+  const maxAgeMs = 12 * 60 * 60 * 1000;
+  if (Date.now() - ts > maxAgeMs) return false;
+  return safeEqual(parts[2], signAdminSession(ts));
 }
 
 function safeEqual(a, b) {
@@ -231,9 +255,7 @@ function forgotPasswordPage(type, prefill = '', message = '') {
 }
 
 function hasAdminCookie(req) {
-  const token = parseCookies(req)[ADMIN_COOKIE];
-  const expected = adminToken();
-  return Boolean(expected && token && safeEqual(token, expected));
+  return validAdminCookieValue(parseCookies(req)[ADMIN_COOKIE]);
 }
 
 function requestIsHttps(req) {
@@ -241,7 +263,9 @@ function requestIsHttps(req) {
 }
 
 function setAdminCookie(req, res) {
-  res.cookie(ADMIN_COOKIE, adminToken(), { httpOnly: true, sameSite: 'lax', secure: requestIsHttps(req), path: '/admin' });
+  const value = adminCookieValue();
+  if (!value) return;
+  res.cookie(ADMIN_COOKIE, value, { httpOnly: true, sameSite: 'lax', secure: requestIsHttps(req), path: '/admin', maxAge: 12 * 60 * 60 * 1000 });
 }
 
 function clearAdminCookie(req, res) {
@@ -263,8 +287,8 @@ function adminLoginPage(message = '') {
 
 function requireAdmin(req, res) {
   if (isAdminAuthorized(req)) return true;
-  if (req.method === 'GET') return res.redirect('/admin'), false;
-  res.status(403).send(page('Unauthorized', '<section class="card lock-card"><h1>Unauthorized</h1><p>Admin login required.</p><a class="btn" href="/admin">Admin Login</a></section>', 'admin'));
+  if (req.method === 'GET') return res.redirect('/admin/login'), false;
+  res.status(403).send(page('Unauthorized', '<section class="card lock-card"><h1>Unauthorized</h1><p>Admin login required.</p><a class="btn" href="/admin/login">Admin Login</a></section>', 'admin'));
   return false;
 }
 
@@ -323,20 +347,22 @@ body{font-size:14px;line-height:1.45;background:linear-gradient(180deg,var(--bg)
 function adminNav(active) {
   const links = [
     ['Dashboard', '/admin/os'],
+    ['Command', '/admin/command'],
     ['Orders', '/admin/orders'],
     ['Service Requests', '/admin/service-requests'],
+    ['Support', '/admin/support'],
     ['Onboarding', '/admin/onboarding'],
     ['Tasks', '/admin/tasks'],
-    ['Merchants', '/admin/leads'],
-    ['Providers', '/admin/providers'],
-    ['Riders', '/admin/riders'],
+    ['Merchants', '/admin/leads?filter=all'],
+    ['Providers', '/admin/providers?filter=all'],
+    ['Riders', '/admin/riders?filter=all'],
     ['WhatsApp', '/admin/whatsapp'],
     ['QA', '/admin/qa'],
     ['Launch', '/admin/launch-checklist'],
     ['Pilot', '/admin/pilot'],
     ['CRM', '/admin/pilot-crm'],
   ];
-  return `<nav class="nav admin-nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<form method="POST" action="/admin/logout" style="display:inline"><button class="secondary" style="padding:8px 10px">Logout</button></form></nav>`;
+  return `<nav class="nav admin-nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<a href="/admin/logout">Logout</a></nav>`;
 }
 
 
@@ -840,13 +866,28 @@ app.use('/admin', (req, res, next) => {
   if (hasAdminCookie(req)) return next();
   if (hasValidAdminPin(req)) {
     setAdminCookie(req, res);
+    if (req.method === 'GET' && req.query && Object.prototype.hasOwnProperty.call(req.query, 'pin')) {
+      const qs = new URLSearchParams(req.query);
+      qs.delete('pin');
+      const cleanUrl = `${req.path}${qs.toString() ? `?${qs.toString()}` : ''}`;
+      return res.redirect(cleanUrl);
+    }
     return next();
   }
-  if (req.method === 'GET') return res.redirect('/admin');
-  return res.status(403).send(page('Unauthorized', '<section class="card lock-card"><h1>Unauthorized</h1><p>Admin login required.</p><a class="btn" href="/admin">Admin Login</a></section>', 'admin'));
+  if (req.method === 'GET') return res.redirect('/admin/login');
+  return res.status(403).send(page('Unauthorized', '<section class="card lock-card"><h1>Unauthorized</h1><p>Admin login required.</p><a class="btn" href="/admin/login">Admin Login</a></section>', 'admin'));
 });
 
 app.get('/admin', (req, res) => {
+  if (hasAdminCookie(req)) return res.redirect('/admin/os');
+  if (hasValidAdminPin(req)) {
+    setAdminCookie(req, res);
+    return res.redirect('/admin/os');
+  }
+  return res.redirect('/admin/login');
+});
+
+app.get('/admin/login', (req, res) => {
   if (hasAdminCookie(req)) return res.redirect('/admin/os');
   if (hasValidAdminPin(req)) {
     setAdminCookie(req, res);
@@ -865,7 +906,7 @@ app.post('/admin/login', (req, res) => {
 
 app.all('/admin/logout', (req, res) => {
   clearAdminCookie(req, res);
-  res.redirect('/admin');
+  res.redirect('/admin/login');
 });
 
 app.get('/admin/os', async (req, res, next) => {
@@ -900,7 +941,7 @@ app.get('/admin/os', async (req, res, next) => {
     const alertSection = alertItems.length ? alertItems.map(([label, count, href]) => alert(label, count, href)).join('') : '<div class="card compact-card alert-clear"><h2>All clear — no pending action.</h2><p>No approval or operation is waiting right now.</p></div>';
     const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="activity-list">${rows.length ? rows.map(render).join('') : '<div class="activity-row"><b>No recent activity</b><span>Nothing to show yet</span></div>'}</div></section>`;
     const recentCard = (title, status, details, href) => `<a class="activity-row" href="${href}"><span><b>${esc(title)}</b><span>${esc(details)}</span></span>${badge(status)}</a>`;
-    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Partner CRM', '/admin/onboarding')}${action('Merchant, Provider, Rider detail + follow-up history', '/admin/onboarding')}${action('Daily Command Center', '/admin/command')}${action('Order Dispatch', '/admin/orders')}${action('Service Requests', '/admin/service-requests')}${action('Support Inbox', '/admin/support')}${action('Pilot Onboarding', '/admin/onboarding')}${action('Launch Task Board', '/admin/tasks')}${action('Pilot CRM', '/admin/pilot-crm')}${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('Pilot Dashboard', '/admin/pilot')}${action('Public Pilot Page', '/pilot')}${action('Merchant Pilot Page', '/pilot/merchant')}${action('Provider Pilot Page', '/pilot/provider')}${action('Rider Pilot Page', '/pilot/rider')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alertSection}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
+    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Partner CRM', '/admin/onboarding')}${action('Merchant, Provider, Rider detail + follow-up history', '/admin/onboarding')}${action('Daily Command Center', '/admin/command')}${action('Order Dispatch', '/admin/orders')}${action('Service Requests', '/admin/service-requests')}${action('Support Inbox', '/admin/support')}${action('Pilot Onboarding', '/admin/onboarding')}${action('Launch Task Board', '/admin/tasks')}${action('Pilot CRM', '/admin/pilot-crm')}${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads?filter=all')}${action('Manage Riders', '/admin/riders?filter=all')}${action('Manage Providers', '/admin/providers?filter=all')}${action('Manage Service Requests', '/admin/service-requests')}${action('Pilot Dashboard', '/admin/pilot')}${action('Public Pilot Page', '/pilot')}${action('Merchant Pilot Page', '/pilot/merchant')}${action('Provider Pilot Page', '/pilot/provider')}${action('Rider Pilot Page', '/pilot/rider')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alertSection}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1164,7 +1205,7 @@ app.get('/admin/onboarding', async (req, res, next) => {
     const providerCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.provider_name || 'Unnamed Provider')}</h2>${badge(x.status)}</div><div class="actions trust-row">${publicStatus(x)}${imageStatus(x.image_url)}<span class="pill">${esc(x.service_type || 'Service')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(x.area || x.address || 'No area')}</span></div></div>${contactActions(x.phone, x.whatsapp, x.provider_name)}<div class="actions">${statusForm('provider', x.id)}${visibilityForm('provider', x.id, boolish(x.public_visible) ? 'hide_public' : 'show_public', boolish(x.public_visible) ? 'Hide Public' : 'Show Public')}${visibilityForm('provider', x.id, 'mark_demo', 'Mark Demo')}${editLink(`/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}&status=all&visibility=all`)}${editLink(`/admin/provider/${encodeURIComponent(x.id)}`, 'View Details')}${quickTaskForm('provider', x, x.provider_name, x.whatsapp || x.phone, x.area || x.address)}</div></div>`;
     const riderCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="actions trust-row">${publicStatus(x)}<span class="pill">${esc(x.vehicle_type || 'Vehicle not set')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(x.area || x.location || 'No area')}</span></div></div>${contactActions(x.phone, x.whatsapp, x.rider_name)}<div class="actions">${statusForm('rider', x.id)}${visibilityForm('rider', x.id, boolish(x.public_visible) ? 'hide_public' : 'show_public', boolish(x.public_visible) ? 'Hide Public' : 'Show Public')}${visibilityForm('rider', x.id, 'mark_demo', 'Mark Demo')}${editLink(`/admin/riders?q=${encodeURIComponent(x.phone || x.rider_name || x.id)}&status=all&visibility=all`)}${editLink(`/admin/rider/${encodeURIComponent(x.id)}`, 'View Details')}${quickTaskForm('rider', x, x.rider_name, x.whatsapp || x.phone, x.area || x.location)}</div></div>`;
     const checklistHtml = checklist.map(([label, ok]) => `<div class="activity-row"><span><b>${esc(label)}</b><span>${ok ? 'Ready for pilot' : 'Needs attention before launch'}</span></span><span class="badge ${ok ? 'available' : 'emergency'}">${ok ? 'PASS' : 'NEED WORK'}</span></div>`).join('');
-    res.send(page('Pilot Onboarding', `<section class="card app-hero"><h1>Real Pilot Onboarding</h1><p>Launch control for real merchants, providers and riders.</p><div class="actions"><a class="btn" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a><a class="btn secondary" href="/admin/onboarding">Partner CRM</a><a class="btn secondary" href="/admin/leads?status=all&visibility=all">Merchants</a><a class="btn secondary" href="/admin/providers?status=all&visibility=all">Providers</a><a class="btn secondary" href="/admin/riders?status=all&visibility=all">Riders</a></div></section><section class="grid">${stat('Total Real Merchants', mc.total)}${stat('Approved Merchants', mc.approved)}${stat('Visible Public Merchants', mc.visible)}${stat('Merchants Missing Image', mc.missing_image)}${stat('Merchants Missing Products', missingProducts)}${stat('Total Service Providers', pc.total)}${stat('Approved Providers', pc.approved)}${stat('Visible Public Providers', pc.visible)}${stat('Total Riders', rc.total)}${stat('Approved Riders', rc.approved)}${stat('Launch Ready Score', `${readyScore}%`, `${passCount}/${checklist.length} checks passing`)}</section><section class="card"><h2>Launch Checklist</h2><div class="activity-list">${checklistHtml}</div></section><section class="card"><div class="section-head"><h2>Merchant Onboarding</h2><span class="pill">${merchants.rows.length} showing</span></div></section><section class="cards">${merchants.rows.map(merchantCard).join('') || '<div class="card"><h2>No real merchants found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Provider Onboarding</h2><span class="pill">${providers.rows.length} showing</span></div></section><section class="cards">${providers.rows.map(providerCard).join('') || '<div class="card"><h2>No real providers found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Rider Onboarding</h2><span class="pill">${riders.rows.length} showing</span></div></section><section class="cards">${riders.rows.map(riderCard).join('') || '<div class="card"><h2>No real riders found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Pilot Onboarding', `<section class="card app-hero"><h1>Real Pilot Onboarding</h1><p>Launch control for real merchants, providers and riders.</p><div class="actions"><a class="btn" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a><a class="btn secondary" href="/admin/onboarding">Partner CRM</a><a class="btn secondary" href="/admin/leads?filter=all">Merchants</a><a class="btn secondary" href="/admin/providers?filter=all">Providers</a><a class="btn secondary" href="/admin/riders?filter=all">Riders</a></div></section><section class="grid">${stat('Total Real Merchants', mc.total)}${stat('Approved Merchants', mc.approved)}${stat('Visible Public Merchants', mc.visible)}${stat('Merchants Missing Image', mc.missing_image)}${stat('Merchants Missing Products', missingProducts)}${stat('Total Service Providers', pc.total)}${stat('Approved Providers', pc.approved)}${stat('Visible Public Providers', pc.visible)}${stat('Total Riders', rc.total)}${stat('Approved Riders', rc.approved)}${stat('Launch Ready Score', `${readyScore}%`, `${passCount}/${checklist.length} checks passing`)}</section><section class="card"><h2>Launch Checklist</h2><div class="activity-list">${checklistHtml}</div></section><section class="card"><div class="section-head"><h2>Merchant Onboarding</h2><span class="pill">${merchants.rows.length} showing</span></div></section><section class="cards">${merchants.rows.map(merchantCard).join('') || '<div class="card"><h2>No real merchants found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Provider Onboarding</h2><span class="pill">${providers.rows.length} showing</span></div></section><section class="cards">${providers.rows.map(providerCard).join('') || '<div class="card"><h2>No real providers found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Rider Onboarding</h2><span class="pill">${riders.rows.length} showing</span></div></section><section class="cards">${riders.rows.map(riderCard).join('') || '<div class="card"><h2>No real riders found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1185,7 +1226,7 @@ app.get('/admin/pilot', async (req, res, next) => {
     const ready = healthOk && Number(m.approved || 0) > 0 && Number(p.approved || 0) > 0 && Number(r.approved || 0) > 0;
     const stat = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
     const link = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
-    res.send(page('Pilot Dashboard', `<section class="card app-hero"><h1>GOVO Pilot Dashboard</h1><p>Control panel for first merchants, providers, riders and customer pilot traffic.</p><div class="actions"><span class="badge ${ready ? 'available' : 'failed'}">${ready ? 'ready' : 'needs attention'}</span><a class="btn secondary" href="/pilot">Public Pilot Page</a></div><h2>${ready ? 'Pilot can start with internal users' : 'Approve at least one merchant, provider and rider first'}</h2></section><section class="grid">${stat('Total Merchants', m.total, 'Registered')}${stat('Approved Merchants', m.approved, 'Ready for pilot')}${stat('Pending Merchants', m.pending, 'Need approval')}${stat('Total Providers', p.total, 'Registered')}${stat('Approved Providers', p.approved, 'Ready for pilot')}${stat('Pending Providers', p.pending, 'Need approval')}${stat('Total Riders', r.total, 'Registered')}${stat('Approved Riders', r.approved, 'Ready for dispatch')}${stat('Pending Riders', r.pending, 'Need approval')}${stat('Orders Today', o.total_today, 'Today')}${stat('Pending Orders', o.pending, 'Need action')}${stat('Delivered Today', o.delivered, 'Completed today')}${stat('Service Requests Today', sr.total_today, 'Today')}${stat('Pending Service Requests', sr.pending, 'Need action')}${stat('Completed Service Requests', sr.completed, 'Completed today')}</section><section class="card"><h2>Pilot Links</h2><div class="toolbar">${link('Pilot CRM','/admin/pilot-crm')}${link('Launch Checklist','/admin/launch-checklist')}${link('QA Center','/admin/qa')}${link('Orders','/admin/orders')}${link('Service Requests','/admin/service-requests')}${link('Merchants','/admin/leads')}${link('Providers','/admin/providers')}${link('Riders','/admin/riders')}${link('Public Pilot Page','/pilot')}</div></section>`, 'admin'));
+    res.send(page('Pilot Dashboard', `<section class="card app-hero"><h1>GOVO Pilot Dashboard</h1><p>Control panel for first merchants, providers, riders and customer pilot traffic.</p><div class="actions"><span class="badge ${ready ? 'available' : 'failed'}">${ready ? 'ready' : 'needs attention'}</span><a class="btn secondary" href="/pilot">Public Pilot Page</a></div><h2>${ready ? 'Pilot can start with internal users' : 'Approve at least one merchant, provider and rider first'}</h2></section><section class="grid">${stat('Total Merchants', m.total, 'Registered')}${stat('Approved Merchants', m.approved, 'Ready for pilot')}${stat('Pending Merchants', m.pending, 'Need approval')}${stat('Total Providers', p.total, 'Registered')}${stat('Approved Providers', p.approved, 'Ready for pilot')}${stat('Pending Providers', p.pending, 'Need approval')}${stat('Total Riders', r.total, 'Registered')}${stat('Approved Riders', r.approved, 'Ready for dispatch')}${stat('Pending Riders', r.pending, 'Need approval')}${stat('Orders Today', o.total_today, 'Today')}${stat('Pending Orders', o.pending, 'Need action')}${stat('Delivered Today', o.delivered, 'Completed today')}${stat('Service Requests Today', sr.total_today, 'Today')}${stat('Pending Service Requests', sr.pending, 'Need action')}${stat('Completed Service Requests', sr.completed, 'Completed today')}</section><section class="card"><h2>Pilot Links</h2><div class="toolbar">${link('Pilot CRM','/admin/pilot-crm')}${link('Launch Checklist','/admin/launch-checklist')}${link('QA Center','/admin/qa')}${link('Orders','/admin/orders')}${link('Service Requests','/admin/service-requests')}${link('Merchants','/admin/leads?filter=all')}${link('Providers','/admin/providers?filter=all')}${link('Riders','/admin/riders?filter=all')}${link('Public Pilot Page','/pilot')}</div></section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1193,8 +1234,11 @@ app.get('/admin/leads', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
-    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || 'all').trim().toLowerCase()) ? String(req.query.visibility || 'all').trim().toLowerCase() : 'all';
+    const filterAll = String(req.query.filter || '').trim().toLowerCase() === 'all';
+    const statusDefault = filterAll ? 'all' : 'pending';
+    const visibilityDefault = 'all';
+    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || statusDefault).trim().toLowerCase()) ? String(req.query.status || statusDefault).trim().toLowerCase() : statusDefault;
+    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || visibilityDefault).trim().toLowerCase()) ? String(req.query.visibility || visibilityDefault).trim().toLowerCase() : visibilityDefault;
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
@@ -1227,8 +1271,11 @@ app.get('/admin/riders', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
-    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || 'all').trim().toLowerCase()) ? String(req.query.visibility || 'all').trim().toLowerCase() : 'all';
+    const filterAll = String(req.query.filter || '').trim().toLowerCase() === 'all';
+    const statusDefault = filterAll ? 'all' : 'pending';
+    const visibilityDefault = 'all';
+    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || statusDefault).trim().toLowerCase()) ? String(req.query.status || statusDefault).trim().toLowerCase() : statusDefault;
+    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || visibilityDefault).trim().toLowerCase()) ? String(req.query.visibility || visibilityDefault).trim().toLowerCase() : visibilityDefault;
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
@@ -2725,8 +2772,11 @@ app.get('/admin/providers', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const pin = getPin(req);
-    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || 'pending').trim().toLowerCase()) ? String(req.query.status || 'pending').trim().toLowerCase() : 'pending';
-    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || 'all').trim().toLowerCase()) ? String(req.query.visibility || 'all').trim().toLowerCase() : 'all';
+    const filterAll = String(req.query.filter || '').trim().toLowerCase() === 'all';
+    const statusDefault = filterAll ? 'all' : 'pending';
+    const visibilityDefault = 'all';
+    const status = ['pending', 'approved', 'rejected', 'all'].includes(String(req.query.status || statusDefault).trim().toLowerCase()) ? String(req.query.status || statusDefault).trim().toLowerCase() : statusDefault;
+    const visibility = ['visible', 'hidden', 'demo', 'all'].includes(String(req.query.visibility || visibilityDefault).trim().toLowerCase()) ? String(req.query.visibility || visibilityDefault).trim().toLowerCase() : visibilityDefault;
     const q = String(req.query.q || '').trim().toLowerCase();
     const params = [];
     const where = [];
