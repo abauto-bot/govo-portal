@@ -11,3 +11,13 @@ server.js.bak.*
 server.js.before-*
 server.js.current-working-*
 server.js.fix-before-*
+
+# GOVO local secrets / runtime files
+.env
+.env.*
+.env.clean
+.env.clean.*
+uploads/
+*.before-*
+server.js.before-*
+server.js.after-*
