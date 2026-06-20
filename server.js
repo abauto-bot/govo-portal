@@ -569,6 +569,7 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_orders (id SERIAL PRIMARY KEY, shop_name TEXT, merchant_phone TEXT, customer_name TEXT, customer_phone TEXT, pickup_location TEXT, drop_location TEXT, item_details TEXT, note TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_order_events (id SERIAL PRIMARY KEY, order_id INTEGER, event_type TEXT, status TEXT, note TEXT, actor_type TEXT DEFAULT 'admin', actor_name TEXT, created_at TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_products (id SERIAL PRIMARY KEY, merchant_lead_id INT, shop_name TEXT, merchant_phone TEXT, product_name TEXT, price TEXT, category TEXT, description TEXT, image_url TEXT, is_available BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS govo_products (id SERIAL PRIMARY KEY, merchant_id INTEGER, merchant_name TEXT, name TEXT NOT NULL, category TEXT, price NUMERIC DEFAULT 0, description TEXT, image_url TEXT, stock_status TEXT DEFAULT 'available', public_visible BOOLEAN DEFAULT true, is_demo BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_profiles (id SERIAL PRIMARY KEY, merchant_lead_id INTEGER, shop_name TEXT, owner_name TEXT, phone TEXT UNIQUE, location TEXT, category TEXT, delivery_needed TEXT, description TEXT, opening_hours TEXT, delivery_area TEXT, logo_image TEXT, cover_image TEXT, whatsapp TEXT, status TEXT DEFAULT 'draft', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
@@ -586,6 +587,7 @@ async function ensureSchema() {
   for (const col of ['order_code TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'customer_area TEXT', 'customer_address TEXT', "order_type TEXT DEFAULT 'delivery'", 'merchant_id INTEGER NULL', 'merchant_name TEXT', 'shop_name TEXT', 'merchant_phone TEXT', 'provider_id INTEGER NULL', 'provider_name TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'assigned_rider_id INT', 'assigned_rider_name TEXT', 'assigned_rider_phone TEXT', 'items TEXT', 'item_details TEXT', 'note TEXT', 'preferred_time TEXT', 'customer_note TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'delivery_fee NUMERIC DEFAULT 0', 'subtotal NUMERIC DEFAULT 0', 'total_amount NUMERIC DEFAULT 0', "payment_method TEXT DEFAULT 'cash'", "payment_status TEXT DEFAULT 'unpaid'", "status TEXT DEFAULT 'new'", "priority TEXT DEFAULT 'normal'", 'merchant_status TEXT', 'admin_note TEXT', 'merchant_note TEXT', 'provider_note TEXT', 'rider_note TEXT', 'merchant_lead_id INTEGER', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
   for (const col of ['order_id INTEGER', 'event_type TEXT', 'status TEXT', 'note TEXT', "actor_type TEXT DEFAULT 'admin'", 'actor_name TEXT', 'created_at TIMESTAMP DEFAULT NOW()']) await add('govo_order_events', col);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS govo_orders_order_code_unique ON govo_orders(order_code) WHERE order_code IS NOT NULL`);
+  for (const col of ['merchant_id INTEGER', 'merchant_name TEXT', 'name TEXT', 'category TEXT', 'price NUMERIC DEFAULT 0', 'description TEXT', 'image_url TEXT', "stock_status TEXT DEFAULT 'available'", 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMP DEFAULT NOW()', 'updated_at TIMESTAMP DEFAULT NOW()']) await add('govo_products', col);
   for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'working_hours TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
   for (const col of ["lead_type TEXT NOT NULL DEFAULT 'merchant'", 'name TEXT', 'phone TEXT', 'whatsapp TEXT', 'area TEXT', 'category TEXT', 'source TEXT', "status TEXT DEFAULT 'new'", "priority TEXT DEFAULT 'normal'", 'note TEXT', 'next_followup_at TIMESTAMPTZ NULL', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_pilot_crm', col);
@@ -962,7 +964,9 @@ async function renderPartnerDetail(req, res, next, type) {
     const statusAction = `<form method="POST" action="/admin/${type}/status"><input type="hidden" name="id" value="${esc(id)}"><input type="hidden" name="admin_note" value="Partner CRM quick approve"><button name="status" value="approved">Approve</button></form>`;
     const visibilityAction = `<form method="POST" action="/admin/${type}/visibility"><input type="hidden" name="id" value="${esc(id)}"><button class="secondary" name="action" value="${visible ? 'hide_public' : 'show_public'}">${visible ? 'Hide Public' : 'Show Public'}</button></form>`;
     const noteForm = `<form method="POST" action="/admin/partner-notes/create"><input type="hidden" name="partner_type" value="${esc(type)}"><input type="hidden" name="partner_id" value="${esc(id)}"><input type="hidden" name="partner_name" value="${esc(name)}"><input type="hidden" name="phone" value="${esc(partner.phone || '')}"><div class="filters"><select name="note_type">${['followup','call','whatsapp','meeting','task','general'].map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select><select name="status">${['open','important','done'].map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select><input name="next_followup_at" placeholder="Next follow-up"></div><label>Note</label><textarea name="note" required placeholder="Add follow-up note"></textarea><button>Add Note</button></form>`;
-    res.send(page(`${name} CRM`, `<section class="card app-hero"><h1>${esc(name)}</h1><p>${esc(type)} partner detail and follow-up history.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a></div></section><section class="grid two"><div class="card compact-card"><div class="section-head"><h2>Profile</h2>${badge(partner.status)}</div>${listingImage(partner.image_url, name, true)}<div class="actions trust-row"><span class="pill">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(partner.is_demo) ? '<span class="pill danger">Demo/Test</span>' : '<span class="pill">Real Partner</span>'}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(partner.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(partner.area || 'No area')}</span></div><div><b>Category</b><span>${esc(partner.category || 'No category')}</span></div><div><b>Created</b><span>${bdTime(partner.created_at)}</span></div></div>${partner.admin_note ? `<p>${esc(partner.admin_note)}</p>` : ''}${contactHtml}<div class="actions"><a class="btn secondary" href="${editHref}">Edit / Manage</a>${statusAction}${visibilityAction}</div></div><div class="card"><h2>Add Follow-up Note</h2>${noteForm}</div></section><section class="grid two"><div class="card"><h2>Related Launch Tasks</h2><div class="activity-list">${taskCards}</div></div><div class="card"><h2>Follow-up History</h2><div class="activity-list">${timeline}</div></div></section>`, 'admin'));
+    const merchantProducts = type === 'merchant' ? (await pool.query(`SELECT id, name, category, price, stock_status, public_visible FROM govo_products WHERE merchant_id=$1 ORDER BY id DESC LIMIT 80`, [id])).rows : [];
+    const productSection = type === 'merchant' ? `<section class="card"><div class="section-head"><h2>Products / Menu</h2><span class="pill">${merchantProducts.length}</span></div><div class="activity-list">${merchantProducts.map((p) => `<div class="activity-row"><span><b>${esc(p.name || 'Product')}</b><span>${esc(p.category || 'Menu')} - ৳${esc(p.price || 0)} - ${esc(p.stock_status || 'available')}</span></span><form class="inline" method="POST" action="/admin/products/visibility"><input type="hidden" name="id" value="${esc(p.id)}"><input type="hidden" name="merchant_id" value="${esc(id)}"><button name="action" value="show" class="secondary">Show</button><button name="action" value="hide" class="reject">Hide</button></form></div>`).join('') || '<p style="color:var(--muted)">No products/menu yet.</p>'}</div></section>` : '';
+    res.send(page(`${name} CRM`, `<section class="card app-hero"><h1>${esc(name)}</h1><p>${esc(type)} partner detail and follow-up history.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a></div></section><section class="grid two"><div class="card compact-card"><div class="section-head"><h2>Profile</h2>${badge(partner.status)}</div>${listingImage(partner.image_url, name, true)}<div class="actions trust-row"><span class="pill">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(partner.is_demo) ? '<span class="pill danger">Demo/Test</span>' : '<span class="pill">Real Partner</span>'}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(partner.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(partner.area || 'No area')}</span></div><div><b>Category</b><span>${esc(partner.category || 'No category')}</span></div><div><b>Created</b><span>${bdTime(partner.created_at)}</span></div></div>${partner.admin_note ? `<p>${esc(partner.admin_note)}</p>` : ''}${contactHtml}<div class="actions"><a class="btn secondary" href="${editHref}">Edit / Manage</a>${statusAction}${visibilityAction}</div></div><div class="card"><h2>Add Follow-up Note</h2>${noteForm}</div></section><section class="grid two"><div class="card"><h2>Related Launch Tasks</h2><div class="activity-list">${taskCards}</div></div><div class="card"><h2>Follow-up History</h2><div class="activity-list">${timeline}</div></div></section>${productSection}`, 'admin'));
   } catch (e) { next(e); }
 }
 
@@ -989,6 +993,17 @@ app.post('/admin/partner-notes/update-status', async (req, res, next) => {
     const partnerId = String(req.body.partner_id || '').replace(/\D/g, '');
     await pool.query(`UPDATE govo_partner_notes SET status=$1, updated_at=NOW() WHERE id=$2`, [cleanNoteStatus(req.body.status), String(req.body.id || '')]);
     res.redirect(partnerDetailPath(type, partnerId));
+  } catch (e) { next(e); }
+});
+
+
+app.post('/admin/products/visibility', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const action = String(req.body.action || '').trim().toLowerCase();
+    const show = action === 'show';
+    await pool.query(`UPDATE govo_products SET stock_status=$1, public_visible=$2, updated_at=NOW() WHERE id=$3 AND merchant_id=$4`, [show ? 'available' : 'hidden', show, String(req.body.id || ''), String(req.body.merchant_id || '')]);
+    res.redirect(`/admin/merchant/${encodeURIComponent(String(req.body.merchant_id || ''))}`);
   } catch (e) { next(e); }
 });
 
@@ -1566,50 +1581,53 @@ app.get('/category/:slug', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+
+async function visibleShopProducts(merchantId, merchantPhone = '') {
+  const modern = await pool.query(`SELECT 'product' AS source, id, name, category, price::text AS price_text, description, image_url FROM govo_products WHERE merchant_id=$1 AND COALESCE(public_visible,true)=true AND COALESCE(is_demo,false)=false AND stock_status='available' ORDER BY category NULLS LAST, id DESC LIMIT 160`, [merchantId]);
+  const legacy = await pool.query(`SELECT 'legacy' AS source, id, product_name AS name, category, price AS price_text, description, image_url FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 160`, [merchantId, merchantPhone]);
+  return [...modern.rows, ...legacy.rows];
+}
+
 app.get('/shop/:id', async (req, res, next) => {
   try {
     const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
     if (!x) return res.status(404).send(page('Shop Not Found', `<section class="card"><h1>Shop Not Found</h1><p>This shop is not public right now.</p></section>${pilotPartnerEmpty('merchant')}`, 'shops'));
-    const products = await pool.query(`SELECT * FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false ORDER BY category NULLS LAST, id DESC LIMIT 120`, [x.id, x.phone]);
-    const productHtml = products.rows.map((p) => {
-      const itemValue = `${p.product_name || 'Product'}${p.price ? ` - ${p.price}` : ''}`;
-      return `<div class="card" style="padding:14px;margin:0"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><span class="pill">${esc(p.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(p.product_name || 'Product')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${esc(p.price || '')}</p></div>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.product_name || 'Product')}" style="width:86px;height:86px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(p.description || '')}</p><div class="actions"><button type="button" onclick="document.getElementById('item_details').value=${esc(JSON.stringify(itemValue))};document.getElementById('order_form').scrollIntoView({behavior:'smooth',block:'start'});">Add to Order</button><a class="btn secondary" href="/order?shop_id=${encodeURIComponent(x.id)}&shop_name=${encodeURIComponent(x.shop_name || '')}&merchant_phone=${encodeURIComponent(x.whatsapp || x.phone || '')}&pickup_address=${encodeURIComponent(x.shop_address || x.location || x.shop_name || '')}&item=${encodeURIComponent(itemValue)}">Order this</a></div></div>`;
+    const products = await visibleShopProducts(x.id, x.phone || x.whatsapp || '');
+    const productHtml = products.map((p) => {
+      const key = `${p.source}-${p.id}`;
+      const price = productPrice(p.price_text);
+      return `<div class="card" style="padding:14px;margin:0"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><span class="pill">${esc(p.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(p.name || 'Product')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${price ? `৳${esc(price)}` : esc(p.price_text || '')}</p></div>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name || 'Product')}" style="width:86px;height:86px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(p.description || '')}</p><label style="display:flex;align-items:center;gap:10px;margin-top:10px"><input type="checkbox" name="product_keys" value="${esc(key)}"> Add to order</label><label>Qty</label><input name="qty_${esc(key)}" type="number" min="1" max="50" value="1"></div>`;
     }).join('');
-    res.send(page(x.shop_name || 'GOVO Shop', `
-      <section class="card">
-        <a class="btn secondary" href="/shops">Back Shops</a>
-        <h1>${esc(x.shop_name || '')}</h1>
-        ${listingImage(x.image_url, x.shop_name, true)}
-        ${trustBadges(x)}
-        <div class="detail-grid">
-          <div><b>Owner</b><span>${esc(x.owner_name)}</span></div>
-          <div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div>
-          <div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div>
-          <div><b>Category</b><span>${esc(x.category)}</span></div>
-          <div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div>
-          <div><b>About</b><span>${esc(x.shop_description || '')}</span></div>
-        </div>
-      </section>
-      <section class="card">
-        <h2>Products / Menu</h2>
-        <div class="item-grid">${productHtml || '<p>No available product added yet.</p>'}</div>
-      </section>
-      <section class="card" id="order_form">
-        <h2>Order From This Shop</h2>
-        <form method="POST" action="/order">
-          <input type="hidden" name="shop_name" value="${esc(x.shop_name || '')}">
-          <input type="hidden" name="merchant_phone" value="${esc(x.whatsapp || x.phone || '')}">
-          <input type="hidden" name="pickup_location" value="${esc(x.shop_address || x.location || x.shop_name || '')}">
-          <label>Your Name</label><input name="customer_name" required>
-          <label>Your Phone</label><input name="customer_phone" required>
-          <label>Drop Location</label><input name="drop_location" required>
-          <label>Product / Menu Details</label><textarea id="item_details" name="item_details" required placeholder="Tap Add to Order, or write item details"></textarea>
-          <label>Note</label><textarea name="note"></textarea>
-          <button>Submit Order</button>
-        </form>
-      </section>
-    `, 'shops'));
+    const empty = '<div class="card"><h2>This shop is preparing its menu. Call or WhatsApp to order.</h2></div>';
+    res.send(page(x.shop_name || 'GOVO Shop', `<section class="card"><a class="btn secondary" href="/shops">Back Shops</a><h1>${esc(x.shop_name || '')}</h1>${listingImage(x.image_url, x.shop_name, true)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || '')}</span></div></div><div class="actions">${x.whatsapp || x.phone ? `<a class="btn secondary wa" href="https://wa.me/${esc(String(x.whatsapp || x.phone).replace(/\D/g,''))}">WhatsApp</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone)}">Call</a>` : ''}</div></section><form method="POST" action="/shop/${encodeURIComponent(x.id)}/order"><section class="card"><div class="section-head"><h2>Products / Menu</h2><span class="pill">${products.length}</span></div><p style="color:var(--muted);font-weight:900">Select items and place order</p><div class="item-grid">${productHtml || empty}</div></section><section class="card"><h2>Place Order</h2><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Your Area</label><input name="customer_area" placeholder="Meherpur / Mujibnagar"><label>Delivery Address</label><input name="customer_address" required><label>Payment Method</label><select name="payment_method"><option>cash</option><option>bKash</option><option>Nagad</option><option>card</option></select><label>Note</label><textarea name="note"></textarea><button ${products.length ? '' : 'disabled'}>Submit Shop Order</button></section></form>`, 'shops'));
+  } catch (e) { next(e); }
+});
+
+app.post('/shop/:id/order', async (req, res, next) => {
+  try {
+    const shop = await pool.query(`SELECT id, shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
+    const m = shop.rows[0];
+    if (!m) return res.status(404).send(page('Shop Not Found', '<section class="card"><h1>Shop not found</h1></section>', 'shops'));
+    const selected = Array.isArray(req.body.product_keys) ? req.body.product_keys : req.body.product_keys ? [req.body.product_keys] : [];
+    if (!selected.length) return res.status(400).send(page('Select Items', `<section class="card"><h1>Select at least one item</h1><a class="btn" href="/shop/${encodeURIComponent(m.id)}">Back to shop</a></section>`, 'shops'));
+    const products = await visibleShopProducts(m.id, m.phone || m.whatsapp || '');
+    const byKey = new Map(products.map((p) => [`${p.source}-${p.id}`, p]));
+    const lines = [];
+    let subtotal = 0;
+    for (const key of selected) {
+      const p = byKey.get(String(key));
+      if (!p) continue;
+      const qtyRaw = req.body[`qty_${key}`];
+      const qty = Math.max(1, Math.min(50, Number.parseInt(String(qtyRaw || '1'), 10) || 1));
+      const price = productPrice(p.price_text);
+      subtotal += price * qty;
+      lines.push(`${p.name || 'Product'} x${qty}${price ? ` @ ${price}` : ''}${price ? ` = ${price * qty}` : ''}`);
+    }
+    if (!lines.length) return res.status(400).send(page('Select Items', `<section class="card"><h1>Selected products are no longer available</h1><a class="btn" href="/shop/${encodeURIComponent(m.id)}">Back to shop</a></section>`, 'shops'));
+    const created = await createDispatchOrder({ customer_name: req.body.customer_name || '', customer_phone: req.body.customer_phone || '', customer_area: req.body.customer_area || '', customer_address: req.body.customer_address || '', order_type: 'shop', merchant_id: m.id, merchant_name: m.shop_name || '', items: lines.join('\n'), note: String(req.body.note || '').trim(), pickup_location: m.shop_address || m.location || m.shop_name || '', subtotal, total_amount: subtotal, payment_method: req.body.payment_method || 'cash', payment_status: 'unpaid', status: 'new', priority: 'normal' }, 'customer');
+    sendTelegram(['New GOVO Shop Order', '', `Order: ${created.code}`, `Shop: ${m.shop_name || ''}`, `Customer: ${req.body.customer_name || ''}`, `Phone: ${req.body.customer_phone || ''}`, `Address: ${req.body.customer_address || ''}`, `Items: ${lines.join('; ')}`, `Total: ${subtotal || 'N/A'}`].join('\n')).catch(() => {});
+    res.send(page('Order Submitted', `<section class="card app-hero"><span class="pill">Order Received</span><h1>Shop Order Submitted</h1><p>Your order has been sent to GOVO dispatch.</p><h2>Tracking Code: ${esc(created.code)}</h2><div class="actions"><a class="btn" href="/track?code=${encodeURIComponent(created.code)}">Track Order</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">Back to Shop</a><a class="btn secondary" href="/shops">All Shops</a></div></section>`, 'track'));
   } catch (e) { next(e); }
 });
 
@@ -1803,12 +1821,14 @@ app.get('/merchant/dashboard', async (req, res, next) => {
     if (merchantStatus !== 'approved') return res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Pending</h1><p>Merchant status is ${esc(m.status || 'pending')}.</p><div class="actions"><a class="btn secondary" href="/merchant/logout">Logout</a><a class="btn secondary" href="/app">Back to App</a></div></section>`, 'merchant'));
     const phone = String(m.phone || m.whatsapp || '').trim();
     const prof = (await pool.query(`SELECT * FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone])).rows[0] || {};
-    const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_lead_id=$1 OR merchant_phone=$2 OR merchant_phone=$3 OR shop_name=$4 ORDER BY id DESC LIMIT 100`, [m.id, m.phone || '', m.whatsapp || '', m.shop_name || '']);
+    const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_id=$1 OR merchant_lead_id=$1 OR merchant_phone=$2 OR merchant_phone=$3 OR shop_name=$4 OR merchant_name=$4 ORDER BY id DESC LIMIT 100`, [m.id, m.phone || '', m.whatsapp || '', m.shop_name || '']);
     const orderActions = (x) => `<form method="POST" action="/merchant/order/status"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="merchant_note" value="${esc(x.merchant_note || '')}" placeholder="Merchant note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="preparing">Preparing</button><button name="status" value="ready">Ready</button></div><div class="actions"><button class="reject" name="status" value="rejected">Reject</button></div></form>`;
     const orderCards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.customer_name || 'Customer')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Merchant Status</b><span>${esc(x.merchant_status || 'No update')}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${orderActions(x)}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track</a></div></div>`).join('');
     const items = await pool.query(`SELECT id, item_name, price, details FROM govo_shop_items WHERE merchant_phone=$1 AND COALESCE(is_active,true)=true ORDER BY id DESC LIMIT 50`, [phone]);
     const itemHtml = items.rows.map((i) => `<div class="item-box"><b>${esc(i.item_name || '')}</b><span>${esc(i.price || '')}</span><br><span>${esc(i.details || '')}</span><div class="actions"><a class="btn secondary" href="/merchant/item/${encodeURIComponent(i.id)}/delete?phone=${encodeURIComponent(phone)}">Remove</a></div></div>`).join('');
-    res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1>${listingImage(m.image_url || prof.logo_image, m.shop_name, true)}<div class="detail-grid"><div><b>Shop</b><span>${esc(m.shop_name || '')}</span></div><div><b>Phone</b><span>${esc(m.whatsapp || m.phone || phone)}</span></div><div><b>Category</b><span>${esc(m.category || '')}</span></div><div><b>Status</b><span>${badge(m.status)}</span></div><div><b>Trust</b><span>${trustBadges(m)}</span></div><div><b>Rating</b><span>${esc(ratingText(m))}</span></div></div><div class="actions"><a class="btn" href="/merchant/products?phone=${encodeURIComponent(phone)}">Products</a><a class="btn secondary" href="#orders">Orders</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Shop Profile</h2><form method="POST" action="/merchant/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || m.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || m.owner_name || '')}"><label>Area</label><input name="location" value="${esc(prof.location || m.location || '')}"><label>Address</label><textarea name="shop_address">${esc(m.shop_address || '')}</textarea><label>Category</label><input name="category" value="${esc(prof.category || m.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label><input type="checkbox" name="is_available" ${boolish(m.is_available) ? 'checked' : ''}> Shop Available</label><label><input type="checkbox" name="delivery_available" ${boolish(m.delivery_available) ? 'checked' : ''}> Delivery Available</label><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || m.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || m.shop_description || '')}</textarea><label>Shop Image / Logo</label><input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(m.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><h2>Add Product / Service</h2><form method="POST" action="/merchant/item"><input type="hidden" name="phone" value="${esc(phone)}"><label>Item Name</label><input name="item_name" required><label>Price</label><input name="price"><label>Details</label><textarea name="details"></textarea><button>Add Item</button></form><h2>Current Items</h2><div class="item-grid">${itemHtml || '<p>No item added yet.</p>'}</div></section><section class="card" id="orders"><div class="section-head"><h2>Incoming Orders</h2><span class="pill">${esc(orders.rows.length)} orders</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, prepare, mark ready, or reject.</p></section><section class="cards">${orderCards || '<div class="card"><h2>No orders yet</h2><p style="color:var(--muted);font-weight:900">Customer orders from your shop will appear here.</p></div>'}</section>`, 'merchant'));
+    const menuProducts = await pool.query(`SELECT id, name, category, price, stock_status, image_url FROM govo_products WHERE merchant_id=$1 ORDER BY CASE stock_status WHEN 'available' THEN 1 WHEN 'out_of_stock' THEN 2 ELSE 3 END, id DESC LIMIT 12`, [m.id]);
+    const menuProductHtml = menuProducts.rows.map((p) => `<div class="item-box"><b>${esc(p.name || '')}</b><span>৳${esc(p.price || 0)} - ${esc(p.stock_status || 'available')}</span><br><span>${esc(p.category || 'Menu')}</span></div>`).join('');
+    res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1>${listingImage(m.image_url || prof.logo_image, m.shop_name, true)}<div class="detail-grid"><div><b>Shop</b><span>${esc(m.shop_name || '')}</span></div><div><b>Phone</b><span>${esc(m.whatsapp || m.phone || phone)}</span></div><div><b>Category</b><span>${esc(m.category || '')}</span></div><div><b>Status</b><span>${badge(m.status)}</span></div><div><b>Trust</b><span>${trustBadges(m)}</span></div><div><b>Rating</b><span>${esc(ratingText(m))}</span></div></div><div class="actions"><a class="btn" href="/merchant/products">Products</a><a class="btn secondary" href="#orders">Orders</a><a class="btn secondary" href="/track">Track</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Shop Profile</h2><form method="POST" action="/merchant/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || m.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || m.owner_name || '')}"><label>Area</label><input name="location" value="${esc(prof.location || m.location || '')}"><label>Address</label><textarea name="shop_address">${esc(m.shop_address || '')}</textarea><label>Category</label><input name="category" value="${esc(prof.category || m.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label><input type="checkbox" name="is_available" ${boolish(m.is_available) ? 'checked' : ''}> Shop Available</label><label><input type="checkbox" name="delivery_available" ${boolish(m.delivery_available) ? 'checked' : ''}> Delivery Available</label><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || m.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || m.shop_description || '')}</textarea><label>Shop Image / Logo</label><input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(m.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><div class="section-head"><h2>Product / Menu</h2><span class="pill">${esc(menuProducts.rows.length)} shown</span></div><form method="POST" action="/merchant/products/create" enctype="multipart/form-data"><label>Product/Menu Name</label><input name="name" required><label>Price</label><input name="price" placeholder="120"><label>Category</label><input name="category"><label>Description</label><textarea name="description"></textarea><label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><button>Add Product</button></form><div class="actions"><a class="btn secondary" href="/merchant/products">Open Full Product Manager</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Public Shop</a></div><h2>Current Menu</h2><div class="item-grid">${menuProductHtml || '<p>No product added yet.</p>'}</div>${itemHtml ? `<details><summary>Legacy Items</summary><div class="item-grid">${itemHtml}</div></details>` : ''}</section><section class="card" id="orders"><div class="section-head"><h2>Incoming Orders</h2><span class="pill">${esc(orders.rows.length)} orders</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, prepare, mark ready, or reject.</p></section><section class="cards">${orderCards || '<div class="card"><h2>No orders yet</h2><p style="color:var(--muted);font-weight:900">Customer orders from your shop will appear here.</p></div>'}</section>`, 'merchant'));
   } catch (e) { next(e); }
 });
 
@@ -1865,100 +1885,97 @@ app.get('/merchant/item/:id/delete', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-app.all('/merchant/products', productUpload.single('product_image'), async (req, res, next) => {
+
+async function loggedMerchant(req, res) {
+  const merchantSessionId = readPortalSession(req, 'merchant');
+  if (!merchantSessionId) return { error: res.send(merchantLoginPage(String(req.query.phone || '').trim())) };
+  const merchant = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, image_url, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE id=$1 LIMIT 1`, [merchantSessionId]);
+  const m = merchant.rows[0];
+  if (!m) {
+    clearPortalSession(req, res, 'merchant');
+    return { error: res.status(401).send(merchantLoginPage('', 'Session expired. Please login again.')) };
+  }
+  return { merchant: m };
+}
+
+function productStockStatus(v) {
+  const s = String(v || 'available').trim().toLowerCase();
+  return ['available', 'out_of_stock', 'hidden'].includes(s) ? s : 'available';
+}
+
+function productPrice(v) {
+  const n = Number(String(v || '0').replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+app.get('/merchant/products', async (req, res, next) => {
   try {
-    const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
-    if (!phone) return res.send(page('Merchant Products', `<section class="card"><h1>Product / Menu Manager</h1><form method="GET" action="/merchant/products"><label>Merchant Phone</label><input name="phone" required><button>Open Product Manager</button></form></section>`, 'merchant'));
-    const merchant = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!merchant.rows.length) return res.send(page('Merchant Not Found', '<section class="card"><h1>No Merchant Found</h1></section>', 'merchant'));
-    const m = merchant.rows[0];
-    const selectedFilter = String((req.body && req.body.filter) || (req.query && req.query.filter) || 'all').trim().toLowerCase();
-    const redirect = () => res.redirect(`/merchant/products?phone=${encodeURIComponent(phone)}&filter=${encodeURIComponent(selectedFilter)}`);
-    const uploadedImageUrl = req.file ? `/uploads/${req.file.filename}` : '';
+    const ctx = await loggedMerchant(req, res);
+    if (ctx.error) return;
+    const m = ctx.merchant;
+    const selectedFilter = String(req.query.filter || 'all').trim().toLowerCase();
+    const filter = ['available', 'out_of_stock', 'hidden'].includes(selectedFilter) ? selectedFilter : 'all';
+    const where = ['merchant_id=$1'];
+    const params = [m.id];
+    if (filter !== 'all') { params.push(filter); where.push(`stock_status=$${params.length}`); }
+    const [products, counts] = await Promise.all([
+      pool.query(`SELECT id, merchant_id, merchant_name, name, category, price, description, image_url, stock_status, public_visible, is_demo, created_at, updated_at FROM govo_products WHERE ${where.join(' AND ')} ORDER BY CASE stock_status WHEN 'available' THEN 1 WHEN 'out_of_stock' THEN 2 ELSE 3 END, category NULLS LAST, id DESC LIMIT 200`, params),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE stock_status='available' AND COALESCE(public_visible,true)=true AND COALESCE(is_demo,false)=false)::int available, COUNT(*) FILTER (WHERE stock_status='out_of_stock')::int out_of_stock, COUNT(*) FILTER (WHERE stock_status='hidden' OR COALESCE(public_visible,true)=false)::int hidden FROM govo_products WHERE merchant_id=$1`, [m.id]),
+    ]);
+    const c = counts.rows[0] || {};
+    const filterLink = (label, value) => `<a class="btn ${filter === value ? '' : 'secondary'}" href="/merchant/products?filter=${encodeURIComponent(value)}">${esc(label)}</a>`;
+    const stockSelect = (x) => ['available', 'out_of_stock', 'hidden'].map((v) => `<option value="${v}" ${x.stock_status === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('');
+    const rows = products.rows.map((x) => `<div class="card" style="padding:14px"><div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start"><div style="min-width:0"><span class="pill">${esc(x.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(x.name || '')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">৳${esc(x.price || 0)}</p></div>${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.name || 'Product')}" style="width:82px;height:82px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(x.description || '')}</p><div class="actions trust-row">${badge(x.stock_status)}<span class="pill">${boolish(x.public_visible) ? 'Public Visible' : 'Hidden'}</span></div><form method="POST" action="/merchant/products/update" enctype="multipart/form-data" style="margin-top:12px"><input type="hidden" name="id" value="${esc(x.id)}"><label>Name</label><input name="name" value="${esc(x.name || '')}" required><label>Price</label><input name="price" value="${esc(x.price || 0)}"><label>Category</label><input name="category" value="${esc(x.category || '')}"><label>Description</label><textarea name="description">${esc(x.description || '')}</textarea><label>Status</label><select name="stock_status">${stockSelect(x)}</select><label>Current Image URL</label><input name="image_url" value="${esc(x.image_url || '')}"><label>Upload New Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><button>Save Product</button></form><form method="POST" action="/merchant/products/hide"><input type="hidden" name="id" value="${esc(x.id)}"><button class="reject">Hide Product</button></form></div>`).join('');
+    res.send(page('Product / Menu Manager', `<section class="card app-hero"><h1>Product / Menu Manager</h1><p>Shop: ${esc(m.shop_name || '')}</p><div class="actions"><a class="btn secondary" href="/merchant/dashboard">Dashboard</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Public Shop</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Add Product</h2><form method="POST" action="/merchant/products/create" enctype="multipart/form-data"><label>Product/Menu Name</label><input name="name" required><label>Price</label><input name="price" placeholder="120"><label>Category</label><input name="category" placeholder="Food / Grocery / Service"><label>Description</label><textarea name="description"></textarea><label>Status</label><select name="stock_status"><option>available</option><option>out_of_stock</option><option>hidden</option></select><label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Image URL</label><input name="image_url" placeholder="Optional image URL"><button>Add Product</button></form></section><section class="card"><div class="toolbar">${filterLink(`All ${c.total || 0}`, 'all')}${filterLink(`Available ${c.available || 0}`, 'available')}${filterLink(`Out ${c.out_of_stock || 0}`, 'out_of_stock')}${filterLink(`Hidden ${c.hidden || 0}`, 'hidden')}</div></section><section class="cards">${rows || '<div class="card"><h2>No product found</h2></div>'}</section>`, 'merchant'));
+  } catch (e) { next(e); }
+});
 
-    if (req.method === 'POST' && req.body.action === 'add') {
-      const imageUrl = uploadedImageUrl || String(req.body.image_url || '').trim();
-      await pool.query(`INSERT INTO govo_shop_products (merchant_lead_id, shop_name, merchant_phone, product_name, price, category, description, image_url, is_available, is_deleted, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,false,NOW())`, [m.id, m.shop_name || '', m.phone || '', req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', imageUrl]);
-      return redirect();
-    }
-    if (req.method === 'POST' && req.body.action === 'edit') {
-      const current = await pool.query(`SELECT image_url FROM govo_shop_products WHERE id=$1 AND merchant_phone=$2 AND COALESCE(is_deleted,false)=false LIMIT 1`, [req.body.id || '', phone]);
-      const currentImageUrl = current.rows[0] ? String(current.rows[0].image_url || '') : '';
-      const imageUrl = uploadedImageUrl || String(req.body.image_url || currentImageUrl || '').trim();
-      await pool.query(`UPDATE govo_shop_products SET product_name=$1, price=$2, category=$3, description=$4, image_url=$5, shop_name=$6, merchant_lead_id=$7, updated_at=NOW() WHERE id=$8 AND merchant_phone=$9 AND COALESCE(is_deleted,false)=false`, [req.body.product_name || '', req.body.price || '', req.body.category || '', req.body.description || '', imageUrl, m.shop_name || '', m.id, req.body.id || '', phone]);
-      return redirect();
-    }
-    if (req.method === 'POST' && req.body.action === 'toggle') {
-      await pool.query(`UPDATE govo_shop_products SET is_available=NOT COALESCE(is_available,true), updated_at=NOW() WHERE id=$1 AND merchant_phone=$2 AND COALESCE(is_deleted,false)=false`, [req.body.id || '', phone]);
-      return redirect();
-    }
-    if (req.method === 'POST' && req.body.action === 'delete') {
-      await pool.query(`UPDATE govo_shop_products SET is_deleted=true, is_available=false, updated_at=NOW() WHERE id=$1 AND merchant_phone=$2`, [req.body.id || '', phone]);
-      return redirect();
-    }
+app.post('/merchant/products/create', productUpload.single('product_image'), async (req, res, next) => {
+  try {
+    const ctx = await loggedMerchant(req, res);
+    if (ctx.error) return;
+    const m = ctx.merchant;
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).send(page('Invalid Product', '<section class="card"><h1>Product name required</h1><a class="btn" href="/merchant/products">Back</a></section>', 'merchant'));
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || '').trim();
+    await pool.query(`INSERT INTO govo_products (merchant_id, merchant_name, name, category, price, description, image_url, stock_status, public_visible, is_demo, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,NOW())`, [m.id, m.shop_name || '', name, String(req.body.category || '').trim(), productPrice(req.body.price), String(req.body.description || '').trim(), imageUrl, productStockStatus(req.body.stock_status), productStockStatus(req.body.stock_status) !== 'hidden']);
+    res.redirect('/merchant/products');
+  } catch (e) { next(e); }
+});
 
-    const filter = ['available', 'unavailable'].includes(selectedFilter) ? selectedFilter : 'all';
-    const conditions = [`(merchant_lead_id=$1 OR merchant_phone=$2)`, `COALESCE(is_deleted,false)=false`];
-    if (filter === 'available') conditions.push(`COALESCE(is_available,true)=true`);
-    if (filter === 'unavailable') conditions.push(`COALESCE(is_available,true)=false`);
-    const products = await pool.query(`SELECT * FROM govo_shop_products WHERE ${conditions.join(' AND ')} ORDER BY COALESCE(is_available,true) DESC, category NULLS LAST, id DESC LIMIT 200`, [m.id, phone]);
-    const count = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(is_available,true)=true AND COALESCE(is_deleted,false)=false)::int available, COUNT(*) FILTER (WHERE COALESCE(is_available,true)=false AND COALESCE(is_deleted,false)=false)::int unavailable FROM govo_shop_products WHERE (merchant_lead_id=$1 OR merchant_phone=$2) AND COALESCE(is_deleted,false)=false`, [m.id, phone]);
-    const c = count.rows[0] || {};
-    const filterLink = (label, value) => `<a class="btn ${filter === value ? '' : 'secondary'}" href="/merchant/products?phone=${encodeURIComponent(phone)}&filter=${encodeURIComponent(value)}">${label}</a>`;
-    const rows = products.rows.map((x) => `
-      <div class="card" style="padding:14px">
-        <div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start">
-          <div style="min-width:0">
-            <span class="pill">${esc(x.category || 'Menu')}</span>
-            <h2 style="font-size:22px;margin-top:10px">${esc(x.product_name || '')}</h2>
-            <p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${esc(x.price || '')}</p>
-          </div>
-          ${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.product_name || 'Product')}" style="width:82px;height:82px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}
-        </div>
-        <p>${esc(x.description || '')}</p>
-        ${badge(x.is_available ? 'available' : 'unavailable')}
-        <form method="POST" action="/merchant/products" enctype="multipart/form-data" style="margin-top:12px">
-          <input type="hidden" name="phone" value="${esc(phone)}">
-          <input type="hidden" name="filter" value="${esc(filter)}">
-          <input type="hidden" name="id" value="${esc(x.id)}">
-          <input type="hidden" name="action" value="edit">
-          <label>Name</label><input name="product_name" value="${esc(x.product_name || '')}" required>
-          <label>Price</label><input name="price" value="${esc(x.price || '')}">
-          <label>Category</label><input name="category" value="${esc(x.category || '')}">
-          <label>Description</label><textarea name="description">${esc(x.description || '')}</textarea>
-          <label>Current Image URL</label><input name="image_url" value="${esc(x.image_url || '')}" placeholder="Existing URL kept if no upload"><label>Upload New Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif">
-          <button>Save Product</button>
-        </form>
-        <div class="actions">
-          <form method="POST" action="/merchant/products"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="filter" value="${esc(filter)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="action" value="toggle"><button class="secondary">${x.is_available ? 'Mark Unavailable' : 'Mark Available'}</button></form>
-          <form method="POST" action="/merchant/products" onsubmit="return confirm('Hide this product from menu?')"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="filter" value="${esc(filter)}"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="action" value="delete"><button class="reject">Delete Safely</button></form>
-        </div>
-      </div>
-    `).join('');
-    res.send(page('Product / Menu Manager', `
-      <section class="card">
-        <h1>Product / Menu Manager</h1>
-        <p>Shop: ${esc(m.shop_name || '')} | Showing: ${esc(filter)}</p>
-        <div class="toolbar">
-          ${filterLink(`All ${c.total || 0}`, 'all')}
-          ${filterLink(`Available ${c.available || 0}`, 'available')}
-          ${filterLink(`Unavailable ${c.unavailable || 0}`, 'unavailable')}
-          <a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Shop</a>
-        </div>
-        <form method="POST" action="/merchant/products" enctype="multipart/form-data">
-          <input type="hidden" name="phone" value="${esc(phone)}">
-          <input type="hidden" name="filter" value="${esc(filter)}">
-          <input type="hidden" name="action" value="add">
-          <label>Product/Menu Name</label><input name="product_name" required>
-          <label>Price</label><input name="price" placeholder="৳120 / Negotiable">
-          <label>Category</label><input name="category" placeholder="Food / Grocery / Service">
-          <label>Description</label><textarea name="description"></textarea>
-          <label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Image URL</label><input name="image_url" placeholder="Optional legacy URL">
-          <button>Add Product</button>
-        </form>
-      </section>
-      <section class="cards">${rows || '<div class="card"><h2>No product found</h2></div>'}</section>
-    `, 'merchant'));
+app.post('/merchant/products/update', productUpload.single('product_image'), async (req, res, next) => {
+  try {
+    const ctx = await loggedMerchant(req, res);
+    if (ctx.error) return;
+    const m = ctx.merchant;
+    const current = await pool.query(`SELECT image_url FROM govo_products WHERE id=$1 AND merchant_id=$2 LIMIT 1`, [String(req.body.id || ''), m.id]);
+    if (!current.rows.length) return res.status(404).send(page('Product Not Found', '<section class="card"><h1>Product not found</h1><a class="btn" href="/merchant/products">Back</a></section>', 'merchant'));
+    const stock = productStockStatus(req.body.stock_status);
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || current.rows[0].image_url || '').trim();
+    await pool.query(`UPDATE govo_products SET name=$1, category=$2, price=$3, description=$4, image_url=$5, stock_status=$6, public_visible=$7, updated_at=NOW() WHERE id=$8 AND merchant_id=$9`, [String(req.body.name || '').trim(), String(req.body.category || '').trim(), productPrice(req.body.price), String(req.body.description || '').trim(), imageUrl, stock, stock !== 'hidden', String(req.body.id || ''), m.id]);
+    res.redirect('/merchant/products');
+  } catch (e) { next(e); }
+});
+
+app.post('/merchant/products/hide', async (req, res, next) => {
+  try {
+    const ctx = await loggedMerchant(req, res);
+    if (ctx.error) return;
+    await pool.query(`UPDATE govo_products SET stock_status='hidden', public_visible=false, updated_at=NOW() WHERE id=$1 AND merchant_id=$2`, [String(req.body.id || ''), ctx.merchant.id]);
+    res.redirect('/merchant/products');
+  } catch (e) { next(e); }
+});
+
+app.post('/merchant/products', productUpload.single('product_image'), async (req, res, next) => {
+  try {
+    const ctx = await loggedMerchant(req, res);
+    if (ctx.error) return;
+    const m = ctx.merchant;
+    if (String(req.body.action || '') === 'add') {
+      const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || '').trim();
+      await pool.query(`INSERT INTO govo_products (merchant_id, merchant_name, name, category, price, description, image_url, stock_status, public_visible, is_demo, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,'available',true,false,NOW())`, [m.id, m.shop_name || '', String(req.body.product_name || req.body.name || '').trim(), String(req.body.category || '').trim(), productPrice(req.body.price), String(req.body.description || '').trim(), imageUrl]);
+    }
+    res.redirect('/merchant/products');
   } catch (e) { next(e); }
 });
 
