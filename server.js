@@ -567,6 +567,7 @@ async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_leads (id SERIAL PRIMARY KEY, shop_name TEXT, owner_name TEXT, phone TEXT, location TEXT, category TEXT, delivery_needed TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_rider_leads (id SERIAL PRIMARY KEY, rider_name TEXT, phone TEXT, location TEXT, vehicle_type TEXT, experience TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_orders (id SERIAL PRIMARY KEY, shop_name TEXT, merchant_phone TEXT, customer_name TEXT, customer_phone TEXT, pickup_location TEXT, drop_location TEXT, item_details TEXT, note TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS govo_order_events (id SERIAL PRIMARY KEY, order_id INTEGER, event_type TEXT, status TEXT, note TEXT, actor_type TEXT DEFAULT 'admin', actor_name TEXT, created_at TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_products (id SERIAL PRIMARY KEY, merchant_lead_id INT, shop_name TEXT, merchant_phone TEXT, product_name TEXT, price TEXT, category TEXT, description TEXT, image_url TEXT, is_available BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE govo_shop_products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
@@ -582,7 +583,9 @@ async function ensureSchema() {
   const add = async (table, columnSql) => pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${columnSql}`);
   for (const col of ['shop_name TEXT', 'owner_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'location TEXT', 'category TEXT', 'delivery_needed TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'shop_description TEXT', 'shop_address TEXT', 'products TEXT', 'image_url TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'opening_hours TEXT', 'delivery_available BOOLEAN DEFAULT true', 'password_hash TEXT', 'password_salt TEXT', 'password_set_at TIMESTAMPTZ NULL', 'last_login_at TIMESTAMPTZ NULL', 'reset_requested_at TIMESTAMPTZ NULL', 'reset_note TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_merchant_leads', col);
   for (const col of ['rider_name TEXT', 'name TEXT', 'phone TEXT', 'location TEXT', 'vehicle_type TEXT', 'experience TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'whatsapp TEXT', 'area TEXT', 'address TEXT', 'nid TEXT', 'image_url TEXT', 'is_available BOOLEAN DEFAULT true', 'password_hash TEXT', 'password_salt TEXT', 'password_set_at TIMESTAMPTZ NULL', 'last_login_at TIMESTAMPTZ NULL', 'reset_requested_at TIMESTAMPTZ NULL', 'reset_note TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_rider_leads', col);
-  for (const col of ['shop_name TEXT', 'merchant_phone TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'item_details TEXT', 'note TEXT', 'preferred_time TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'merchant_status TEXT', 'admin_note TEXT', 'merchant_note TEXT', 'provider_note TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'assigned_rider_id INT', 'assigned_rider_name TEXT', 'assigned_rider_phone TEXT', 'rider_note TEXT', 'merchant_lead_id INTEGER', "order_type TEXT DEFAULT 'delivery'", 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
+  for (const col of ['order_code TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'customer_area TEXT', 'customer_address TEXT', "order_type TEXT DEFAULT 'delivery'", 'merchant_id INTEGER NULL', 'merchant_name TEXT', 'shop_name TEXT', 'merchant_phone TEXT', 'provider_id INTEGER NULL', 'provider_name TEXT', 'rider_id INT', 'rider_name TEXT', 'rider_phone TEXT', 'assigned_rider_id INT', 'assigned_rider_name TEXT', 'assigned_rider_phone TEXT', 'items TEXT', 'item_details TEXT', 'note TEXT', 'preferred_time TEXT', 'customer_note TEXT', 'pickup_location TEXT', 'drop_location TEXT', 'delivery_fee NUMERIC DEFAULT 0', 'subtotal NUMERIC DEFAULT 0', 'total_amount NUMERIC DEFAULT 0', "payment_method TEXT DEFAULT 'cash'", "payment_status TEXT DEFAULT 'unpaid'", "status TEXT DEFAULT 'new'", "priority TEXT DEFAULT 'normal'", 'merchant_status TEXT', 'admin_note TEXT', 'merchant_note TEXT', 'provider_note TEXT', 'rider_note TEXT', 'merchant_lead_id INTEGER', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_orders', col);
+  for (const col of ['order_id INTEGER', 'event_type TEXT', 'status TEXT', 'note TEXT', "actor_type TEXT DEFAULT 'admin'", 'actor_name TEXT', 'created_at TIMESTAMP DEFAULT NOW()']) await add('govo_order_events', col);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS govo_orders_order_code_unique ON govo_orders(order_code) WHERE order_code IS NOT NULL`);
   for (const col of ['provider_name TEXT', 'phone TEXT', 'whatsapp TEXT', 'service_type TEXT', 'area TEXT', 'address TEXT', 'experience TEXT', 'description TEXT', 'image_url TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'is_verified BOOLEAN DEFAULT false', 'is_trusted BOOLEAN DEFAULT false', 'is_available BOOLEAN DEFAULT true', 'emergency_available BOOLEAN DEFAULT false', 'rating_avg NUMERIC DEFAULT 0', 'rating_count INT DEFAULT 0', 'working_hours TEXT', 'public_visible BOOLEAN DEFAULT true', 'is_demo BOOLEAN DEFAULT false', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_providers', col);
   for (const col of ['provider_id INT', 'provider_name TEXT', 'provider_phone TEXT', 'service_type TEXT', 'customer_name TEXT', 'customer_phone TEXT', 'service_address TEXT', 'problem_details TEXT', 'preferred_time TEXT', 'note TEXT', 'customer_note TEXT', "status TEXT DEFAULT 'pending'", 'admin_note TEXT', 'provider_note TEXT', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_service_requests', col);
   for (const col of ["lead_type TEXT NOT NULL DEFAULT 'merchant'", 'name TEXT', 'phone TEXT', 'whatsapp TEXT', 'area TEXT', 'category TEXT', 'source TEXT', "status TEXT DEFAULT 'new'", "priority TEXT DEFAULT 'normal'", 'note TEXT', 'next_followup_at TIMESTAMPTZ NULL', 'created_at TIMESTAMPTZ DEFAULT NOW()', 'updated_at TIMESTAMPTZ DEFAULT NOW()']) await add('govo_pilot_crm', col);
@@ -859,7 +862,7 @@ app.get('/admin/os', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
     const [orders, merchants, riders, providers, serviceRequests, recentOrders, recentServiceRequests, recentMerchants, recentProviders] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending') IN ('accepted','preparing','merchant_confirmed'))::int active_merchant, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='ready')::int ready, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='picked_up')::int picked_up, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('new','pending'))::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('confirmed','accepted','preparing','merchant_confirmed'))::int active_merchant, COUNT(*) FILTER (WHERE COALESCE(status,'new')='ready')::int ready, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('picked_up','on_the_way'))::int picked_up, COUNT(*) FILTER (WHERE COALESCE(status,'new')='delivered')::int delivered FROM govo_orders`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted FROM govo_merchant_leads`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved FROM govo_rider_leads`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE COALESCE(is_verified,false)=true)::int verified, COUNT(*) FILTER (WHERE COALESCE(is_trusted,false)=true)::int trusted, COUNT(*) FILTER (WHERE COALESCE(emergency_available,false)=true AND COALESCE(is_available,true)=true)::int emergency_available FROM govo_service_providers`),
@@ -887,7 +890,7 @@ app.get('/admin/os', async (req, res, next) => {
     const alertSection = alertItems.length ? alertItems.map(([label, count, href]) => alert(label, count, href)).join('') : '<div class="card compact-card alert-clear"><h2>All clear — no pending action.</h2><p>No approval or operation is waiting right now.</p></div>';
     const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="activity-list">${rows.length ? rows.map(render).join('') : '<div class="activity-row"><b>No recent activity</b><span>Nothing to show yet</span></div>'}</div></section>`;
     const recentCard = (title, status, details, href) => `<a class="activity-row" href="${href}"><span><b>${esc(title)}</b><span>${esc(details)}</span></span>${badge(status)}</a>`;
-    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Partner CRM', '/admin/onboarding')}${action('Merchant, Provider, Rider detail + follow-up history', '/admin/onboarding')}${action('Pilot Onboarding', '/admin/onboarding')}${action('Launch Task Board', '/admin/tasks')}${action('Pilot CRM', '/admin/pilot-crm')}${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('Pilot Dashboard', '/admin/pilot')}${action('Public Pilot Page', '/pilot')}${action('Merchant Pilot Page', '/pilot/merchant')}${action('Provider Pilot Page', '/pilot/provider')}${action('Rider Pilot Page', '/pilot/rider')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alertSection}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
+    res.send(page('Admin OS', `<section class="card hero"><h1>GOVO Admin OS</h1><p>Operations Control Center for orders, dispatch, providers and approvals.</p><div class="toolbar"><a class="btn" href="/admin/os">Refresh</a><a class="btn secondary" href="/admin/orders?status=pending">Pending Orders</a><a class="btn secondary" href="/admin/service-requests?status=pending">Pending Services</a></div></section><section class="grid">${stat('Pending Orders', o.pending, 'Need merchant/admin action')}${stat('Accepted / Preparing', o.active_merchant, 'Merchant working')}${stat('Ready Orders', o.ready, 'Ready for rider')}${stat('Assigned Orders', o.assigned, 'Rider assigned')}${stat('Picked Up Orders', o.picked_up, 'On the way')}${stat('Delivered Orders', o.delivered, 'Completed deliveries')}${stat('Pending Service Requests', sr.pending, 'Need provider/admin action')}${stat('Working Service Requests', sr.working, 'Provider working')}${stat('Completed Service Requests', sr.completed, 'Finished service jobs')}${stat('Pending Merchants', m.pending, 'Waiting approval')}${stat('Pending Riders', r.pending, 'Waiting approval')}${stat('Pending Providers', p.pending, 'Waiting approval')}${stat('Total Orders', o.total, 'All customer orders')}${stat('Total Merchants', m.total, 'Merchant registrations')}${stat('Approved Merchants', m.approved, 'Visible in shops')}${stat('Total Riders', r.total, 'Rider registrations')}${stat('Approved Riders', r.approved, 'Assignable riders')}${stat('Total Service Providers', p.total, 'Provider registrations')}${stat('Approved Providers', p.approved, 'Visible in services')}${stat('Emergency Providers', p.emergency_available, 'Urgent support')}</section><section class="card"><h2>Quick Actions</h2><div class="toolbar">${action('Partner CRM', '/admin/onboarding')}${action('Merchant, Provider, Rider detail + follow-up history', '/admin/onboarding')}${action('Order Dispatch', '/admin/orders')}${action('Pilot Onboarding', '/admin/onboarding')}${action('Launch Task Board', '/admin/tasks')}${action('Pilot CRM', '/admin/pilot-crm')}${action('Manage Orders', '/admin/orders')}${action('Manage Merchants', '/admin/leads')}${action('Manage Riders', '/admin/riders')}${action('Manage Providers', '/admin/providers')}${action('Manage Service Requests', '/admin/service-requests')}${action('Pilot Dashboard', '/admin/pilot')}${action('Public Pilot Page', '/pilot')}${action('Merchant Pilot Page', '/pilot/merchant')}${action('Provider Pilot Page', '/pilot/provider')}${action('Rider Pilot Page', '/pilot/rider')}${action('View Shops', '/shops')}${action('View Services', '/services')}${action('Track Order', '/track')}${action('Main Website', '/')}</div></section><section class="card"><h2>Alerts</h2><div class="cards compact">${alertSection}</div></section><section class="grid two">${recentSection('Last 5 Orders', recentOrders.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Order'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.drop_location || 'No location'} - ${bdTime(x.created_at)}`, `/admin/orders?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Service Requests', recentServiceRequests.rows, (x) => recentCard(`#${x.id} ${x.service_type || 'Service'}`, x.status, `${x.customer_name || 'Customer'} - ${x.customer_phone || 'No phone'} - ${x.provider_name || 'Provider'} - ${bdTime(x.created_at)}`, `/admin/service-requests?q=${encodeURIComponent(x.id)}`))}${recentSection('Last 5 Merchant Leads', recentMerchants.rows, (x) => recentCard(`#${x.id} ${x.shop_name || 'Merchant'}`, x.status, `${x.owner_name || 'Owner'} - ${x.phone || 'No phone'} - ${x.category || 'No category'} - ${bdTime(x.created_at)}`, `/admin/leads?q=${encodeURIComponent(x.phone || x.shop_name || x.id)}`))}${recentSection('Last 5 Provider Leads', recentProviders.rows, (x) => recentCard(`#${x.id} ${x.provider_name || 'Provider'}`, x.status, `${x.phone || 'No phone'} - ${x.service_type || 'No service'} - ${x.area || 'No area'} - ${bdTime(x.created_at)}`, `/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}`))}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -959,7 +962,7 @@ async function renderPartnerDetail(req, res, next, type) {
     const statusAction = `<form method="POST" action="/admin/${type}/status"><input type="hidden" name="id" value="${esc(id)}"><input type="hidden" name="admin_note" value="Partner CRM quick approve"><button name="status" value="approved">Approve</button></form>`;
     const visibilityAction = `<form method="POST" action="/admin/${type}/visibility"><input type="hidden" name="id" value="${esc(id)}"><button class="secondary" name="action" value="${visible ? 'hide_public' : 'show_public'}">${visible ? 'Hide Public' : 'Show Public'}</button></form>`;
     const noteForm = `<form method="POST" action="/admin/partner-notes/create"><input type="hidden" name="partner_type" value="${esc(type)}"><input type="hidden" name="partner_id" value="${esc(id)}"><input type="hidden" name="partner_name" value="${esc(name)}"><input type="hidden" name="phone" value="${esc(partner.phone || '')}"><div class="filters"><select name="note_type">${['followup','call','whatsapp','meeting','task','general'].map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select><select name="status">${['open','important','done'].map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select><input name="next_followup_at" placeholder="Next follow-up"></div><label>Note</label><textarea name="note" required placeholder="Add follow-up note"></textarea><button>Add Note</button></form>`;
-    res.send(page(`${name} CRM`, `<section class="card app-hero"><h1>${esc(name)}</h1><p>${esc(type)} partner detail and follow-up history.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a></div></section><section class="grid two"><div class="card compact-card"><div class="section-head"><h2>Profile</h2>${badge(partner.status)}</div>${listingImage(partner.image_url, name, true)}<div class="actions trust-row"><span class="pill">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(partner.is_demo) ? '<span class="pill danger">Demo/Test</span>' : '<span class="pill">Real Partner</span>'}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(partner.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(partner.area || 'No area')}</span></div><div><b>Category</b><span>${esc(partner.category || 'No category')}</span></div><div><b>Created</b><span>${bdTime(partner.created_at)}</span></div></div>${partner.admin_note ? `<p>${esc(partner.admin_note)}</p>` : ''}${contactHtml}<div class="actions"><a class="btn secondary" href="${editHref}">Edit / Manage</a>${statusAction}${visibilityAction}</div></div><div class="card"><h2>Add Follow-up Note</h2>${noteForm}</div></section><section class="grid two"><div class="card"><h2>Related Launch Tasks</h2><div class="activity-list">${taskCards}</div></div><div class="card"><h2>Follow-up History</h2><div class="activity-list">${timeline}</div></div></section>`, 'admin'));
+    res.send(page(`${name} CRM`, `<section class="card app-hero"><h1>${esc(name)}</h1><p>${esc(type)} partner detail and follow-up history.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a></div></section><section class="grid two"><div class="card compact-card"><div class="section-head"><h2>Profile</h2>${badge(partner.status)}</div>${listingImage(partner.image_url, name, true)}<div class="actions trust-row"><span class="pill">${visible ? 'Public Visible' : 'Hidden'}</span>${boolish(partner.is_demo) ? '<span class="pill danger">Demo/Test</span>' : '<span class="pill">Real Partner</span>'}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(partner.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(partner.area || 'No area')}</span></div><div><b>Category</b><span>${esc(partner.category || 'No category')}</span></div><div><b>Created</b><span>${bdTime(partner.created_at)}</span></div></div>${partner.admin_note ? `<p>${esc(partner.admin_note)}</p>` : ''}${contactHtml}<div class="actions"><a class="btn secondary" href="${editHref}">Edit / Manage</a>${statusAction}${visibilityAction}</div></div><div class="card"><h2>Add Follow-up Note</h2>${noteForm}</div></section><section class="grid two"><div class="card"><h2>Related Launch Tasks</h2><div class="activity-list">${taskCards}</div></div><div class="card"><h2>Follow-up History</h2><div class="activity-list">${timeline}</div></div></section>`, 'admin'));
   } catch (e) { next(e); }
 }
 
@@ -1008,7 +1011,7 @@ app.get('/admin/tasks', async (req, res, next) => {
       return `<section class="card"><div class="section-head"><h2>${label}</h2><span class="pill">${rows.length}</span></div><div class="cards compact">${rows.map(taskCard).join('') || '<div class="card compact-card"><h2>No tasks</h2></div>'}</div></section>`;
     }).join('');
     const opt = (value, label) => `<option value="${value}">${label}</option>`;
-    res.send(page('Launch Task Board', `<section class="card app-hero"><h1>Launch Task Board</h1><p>Daily GOVO pilot follow-up board for merchants, providers, riders and general launch work.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a></div></section><section class="card"><h2>Add Task</h2><form method="POST" action="/admin/tasks/create"><label>Title</label><input name="title" required placeholder="Call merchant about product photos"><div class="filters"><select name="task_type">${['followup','profile','products','approval','training','delivery','general'].map((v) => opt(v, v)).join('')}</select><select name="partner_type">${['merchant','provider','rider','general'].map((v) => opt(v, v)).join('')}</select><select name="priority">${['normal','high','urgent','low'].map((v) => opt(v, v)).join('')}</select></div><label>Partner Name</label><input name="partner_name"><label>Phone</label><input name="phone"><label>Area</label><input name="area"><label>Due Date</label><input name="due_date" placeholder="Today / 2026-06-21"><label>Note</label><textarea name="note"></textarea><button>Add Task</button></form></section><section class="grid two">${columns}</section>`, 'admin'));
+    res.send(page('Launch Task Board', `<section class="card app-hero"><h1>Launch Task Board</h1><p>Daily GOVO pilot follow-up board for merchants, providers, riders and general launch work.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a></div></section><section class="card"><h2>Add Task</h2><form method="POST" action="/admin/tasks/create"><label>Title</label><input name="title" required placeholder="Call merchant about product photos"><div class="filters"><select name="task_type">${['followup','profile','products','approval','training','delivery','general'].map((v) => opt(v, v)).join('')}</select><select name="partner_type">${['merchant','provider','rider','general'].map((v) => opt(v, v)).join('')}</select><select name="priority">${['normal','high','urgent','low'].map((v) => opt(v, v)).join('')}</select></div><label>Partner Name</label><input name="partner_name"><label>Phone</label><input name="phone"><label>Area</label><input name="area"><label>Due Date</label><input name="due_date" placeholder="Today / 2026-06-21"><label>Note</label><textarea name="note"></textarea><button>Add Task</button></form></section><section class="grid two">${columns}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1085,7 +1088,7 @@ app.get('/admin/onboarding', async (req, res, next) => {
     const providerCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.provider_name || 'Unnamed Provider')}</h2>${badge(x.status)}</div><div class="actions trust-row">${publicStatus(x)}${imageStatus(x.image_url)}<span class="pill">${esc(x.service_type || 'Service')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(x.area || x.address || 'No area')}</span></div></div>${contactActions(x.phone, x.whatsapp, x.provider_name)}<div class="actions">${statusForm('provider', x.id)}${visibilityForm('provider', x.id, boolish(x.public_visible) ? 'hide_public' : 'show_public', boolish(x.public_visible) ? 'Hide Public' : 'Show Public')}${visibilityForm('provider', x.id, 'mark_demo', 'Mark Demo')}${editLink(`/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}&status=all&visibility=all`)}${editLink(`/admin/provider/${encodeURIComponent(x.id)}`, 'View Details')}${quickTaskForm('provider', x, x.provider_name, x.whatsapp || x.phone, x.area || x.address)}</div></div>`;
     const riderCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="actions trust-row">${publicStatus(x)}<span class="pill">${esc(x.vehicle_type || 'Vehicle not set')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(x.area || x.location || 'No area')}</span></div></div>${contactActions(x.phone, x.whatsapp, x.rider_name)}<div class="actions">${statusForm('rider', x.id)}${visibilityForm('rider', x.id, boolish(x.public_visible) ? 'hide_public' : 'show_public', boolish(x.public_visible) ? 'Hide Public' : 'Show Public')}${visibilityForm('rider', x.id, 'mark_demo', 'Mark Demo')}${editLink(`/admin/riders?q=${encodeURIComponent(x.phone || x.rider_name || x.id)}&status=all&visibility=all`)}${editLink(`/admin/rider/${encodeURIComponent(x.id)}`, 'View Details')}${quickTaskForm('rider', x, x.rider_name, x.whatsapp || x.phone, x.area || x.location)}</div></div>`;
     const checklistHtml = checklist.map(([label, ok]) => `<div class="activity-row"><span><b>${esc(label)}</b><span>${ok ? 'Ready for pilot' : 'Needs attention before launch'}</span></span><span class="badge ${ok ? 'available' : 'emergency'}">${ok ? 'PASS' : 'NEED WORK'}</span></div>`).join('');
-    res.send(page('Pilot Onboarding', `<section class="card app-hero"><h1>Real Pilot Onboarding</h1><p>Launch control for real merchants, providers and riders.</p><div class="actions"><a class="btn" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a><a class="btn secondary" href="/admin/onboarding">Partner CRM</a><a class="btn secondary" href="/admin/leads?status=all&visibility=all">Merchants</a><a class="btn secondary" href="/admin/providers?status=all&visibility=all">Providers</a><a class="btn secondary" href="/admin/riders?status=all&visibility=all">Riders</a></div></section><section class="grid">${stat('Total Real Merchants', mc.total)}${stat('Approved Merchants', mc.approved)}${stat('Visible Public Merchants', mc.visible)}${stat('Merchants Missing Image', mc.missing_image)}${stat('Merchants Missing Products', missingProducts)}${stat('Total Service Providers', pc.total)}${stat('Approved Providers', pc.approved)}${stat('Visible Public Providers', pc.visible)}${stat('Total Riders', rc.total)}${stat('Approved Riders', rc.approved)}${stat('Launch Ready Score', `${readyScore}%`, `${passCount}/${checklist.length} checks passing`)}</section><section class="card"><h2>Launch Checklist</h2><div class="activity-list">${checklistHtml}</div></section><section class="card"><div class="section-head"><h2>Merchant Onboarding</h2><span class="pill">${merchants.rows.length} showing</span></div></section><section class="cards">${merchants.rows.map(merchantCard).join('') || '<div class="card"><h2>No real merchants found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Provider Onboarding</h2><span class="pill">${providers.rows.length} showing</span></div></section><section class="cards">${providers.rows.map(providerCard).join('') || '<div class="card"><h2>No real providers found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Rider Onboarding</h2><span class="pill">${riders.rows.length} showing</span></div></section><section class="cards">${riders.rows.map(riderCard).join('') || '<div class="card"><h2>No real riders found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Pilot Onboarding', `<section class="card app-hero"><h1>Real Pilot Onboarding</h1><p>Launch control for real merchants, providers and riders.</p><div class="actions"><a class="btn" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/onboarding">Partner CRM</a><a class="btn secondary" href="/admin/leads?status=all&visibility=all">Merchants</a><a class="btn secondary" href="/admin/providers?status=all&visibility=all">Providers</a><a class="btn secondary" href="/admin/riders?status=all&visibility=all">Riders</a></div></section><section class="grid">${stat('Total Real Merchants', mc.total)}${stat('Approved Merchants', mc.approved)}${stat('Visible Public Merchants', mc.visible)}${stat('Merchants Missing Image', mc.missing_image)}${stat('Merchants Missing Products', missingProducts)}${stat('Total Service Providers', pc.total)}${stat('Approved Providers', pc.approved)}${stat('Visible Public Providers', pc.visible)}${stat('Total Riders', rc.total)}${stat('Approved Riders', rc.approved)}${stat('Launch Ready Score', `${readyScore}%`, `${passCount}/${checklist.length} checks passing`)}</section><section class="card"><h2>Launch Checklist</h2><div class="activity-list">${checklistHtml}</div></section><section class="card"><div class="section-head"><h2>Merchant Onboarding</h2><span class="pill">${merchants.rows.length} showing</span></div></section><section class="cards">${merchants.rows.map(merchantCard).join('') || '<div class="card"><h2>No real merchants found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Provider Onboarding</h2><span class="pill">${providers.rows.length} showing</span></div></section><section class="cards">${providers.rows.map(providerCard).join('') || '<div class="card"><h2>No real providers found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Rider Onboarding</h2><span class="pill">${riders.rows.length} showing</span></div></section><section class="cards">${riders.rows.map(riderCard).join('') || '<div class="card"><h2>No real riders found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -1311,6 +1314,52 @@ app.post('/admin/rider/password-reset', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+
+function cleanOrderStatus(v, fallback = 'new') {
+  const s = String(v || fallback).trim().toLowerCase();
+  return ['new', 'pending', 'confirmed', 'accepted', 'preparing', 'ready', 'assigned', 'picked_up', 'on_the_way', 'delivered', 'cancelled', 'rejected', 'failed'].includes(s) ? s : fallback;
+}
+
+function cleanOrderPriority(v) {
+  const s = String(v || 'normal').trim().toLowerCase();
+  return ['low', 'normal', 'high', 'urgent'].includes(s) ? s : 'normal';
+}
+
+function cleanPaymentStatus(v) {
+  const s = String(v || 'unpaid').trim().toLowerCase();
+  return ['unpaid', 'paid', 'partial', 'refunded'].includes(s) ? s : 'unpaid';
+}
+
+function orderCodeFromId(id) {
+  return `GOVO-${String(id || '').padStart(6, '0')}`;
+}
+
+async function recordOrderEvent(orderId, eventType, status, note, actorType = 'admin', actorName = '') {
+  if (!orderId) return;
+  await pool.query(`INSERT INTO govo_order_events (order_id, event_type, status, note, actor_type, actor_name, created_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())`, [orderId, eventType || 'status', status || '', note || '', actorType || 'admin', actorName || '']);
+}
+
+function orderBoardGroup(status) {
+  const s = String(status || 'new').toLowerCase();
+  if (['delivered', 'completed'].includes(s)) return 'delivered';
+  if (['cancelled', 'rejected', 'failed'].includes(s)) return 'cancelled';
+  if (['picked_up', 'on_the_way'].includes(s)) return 'on_the_way';
+  if (s === 'assigned') return 'assigned';
+  if (['confirmed', 'accepted', 'preparing', 'ready'].includes(s)) return 'confirmed';
+  return 'new';
+}
+
+function safeAmount(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function customerContactActions(phone, label = '') {
+  const raw = String(phone || '').trim();
+  const wa = raw.replace(/\D/g, '');
+  return `<div class="actions">${wa ? `<a class="btn secondary wa" href="https://wa.me/${esc(wa)}?text=${encodeURIComponent(`Assalamu alaikum ${label || ''}, GOVO order update.`)}">WhatsApp</a>` : ''}${raw ? `<a class="btn secondary" href="tel:${esc(raw)}">Call</a>` : ''}</div>`;
+}
+
 app.get('/admin/orders', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
@@ -1318,60 +1367,102 @@ app.get('/admin/orders', async (req, res, next) => {
     const q = String(req.query.q || '').trim();
     const params = [];
     const where = [];
-    const allowedFilters = ['pending', 'accepted', 'preparing', 'ready', 'assigned', 'picked_up', 'delivered', 'failed', 'rejected'];
-    if (status !== 'all' && allowedFilters.includes(status)) { params.push(status); where.push(`COALESCE(status,'pending')=$${params.length}`); }
+    const allowedFilters = ['new', 'pending', 'confirmed', 'accepted', 'preparing', 'ready', 'assigned', 'picked_up', 'on_the_way', 'delivered', 'cancelled', 'rejected', 'failed'];
+    if (status !== 'all' && allowedFilters.includes(status)) { params.push(status); where.push(`COALESCE(status,'new')=$${params.length}`); }
     if (q) {
       params.push(`%${q.toLowerCase()}%`);
-      where.push(`LOWER(CAST(id AS TEXT) || ' ' || COALESCE(shop_name,'') || ' ' || COALESCE(merchant_phone,'') || ' ' || COALESCE(customer_name,'') || ' ' || COALESCE(customer_phone,'') || ' ' || COALESCE(pickup_location,'') || ' ' || COALESCE(drop_location,'') || ' ' || COALESCE(item_details,'') || ' ' || COALESCE(rider_name,'') || ' ' || COALESCE(rider_phone,'') || ' ' || COALESCE(assigned_rider_name,'') || ' ' || COALESCE(assigned_rider_phone,'')) LIKE $${params.length}`);
+      where.push(`LOWER(COALESCE(order_code,'') || ' ' || CAST(id AS TEXT) || ' ' || COALESCE(customer_name,'') || ' ' || COALESCE(customer_phone,'') || ' ' || COALESCE(customer_area,'') || ' ' || COALESCE(customer_address,'') || ' ' || COALESCE(shop_name,'') || ' ' || COALESCE(merchant_name,'') || ' ' || COALESCE(provider_name,'') || ' ' || COALESCE(items,'') || ' ' || COALESCE(item_details,'') || ' ' || COALESCE(rider_name,'') || ' ' || COALESCE(rider_phone,'') || ' ' || COALESCE(assigned_rider_name,'') || ' ' || COALESCE(assigned_rider_phone,'')) LIKE $${params.length}`);
     }
     const [orders, riders, counts] = await Promise.all([
-      pool.query(`SELECT id, shop_name, merchant_phone, customer_name, customer_phone, pickup_location, drop_location, item_details, note, preferred_time, customer_note, COALESCE(status,'pending') AS status, COALESCE(merchant_status,'') AS merchant_status, admin_note, merchant_note, rider_id, rider_name, rider_phone, assigned_rider_id, assigned_rider_name, assigned_rider_phone, rider_note, created_at, updated_at FROM govo_orders ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params),
-      pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, location FROM govo_rider_leads WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 100`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='ready')::int ready, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='picked_up')::int picked_up, COUNT(*) FILTER (WHERE COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
+      pool.query(`SELECT id, order_code, customer_name, customer_phone, customer_area, customer_address, order_type, merchant_id, COALESCE(merchant_name, shop_name) AS merchant_name, shop_name, merchant_phone, provider_id, provider_name, rider_id, rider_name, rider_phone, assigned_rider_id, assigned_rider_name, assigned_rider_phone, COALESCE(items, item_details) AS items, item_details, note, customer_note, pickup_location, drop_location, delivery_fee, subtotal, total_amount, payment_method, payment_status, COALESCE(status,'new') AS status, priority, admin_note, rider_note, created_at, updated_at FROM govo_orders ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY CASE COALESCE(status,'new') WHEN 'new' THEN 1 WHEN 'pending' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'accepted' THEN 2 WHEN 'preparing' THEN 3 WHEN 'ready' THEN 3 WHEN 'assigned' THEN 4 WHEN 'picked_up' THEN 5 WHEN 'on_the_way' THEN 5 WHEN 'delivered' THEN 6 ELSE 7 END, id DESC LIMIT 250`, params),
+      pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(area,location) AS area FROM govo_rider_leads WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 150`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('new','pending'))::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('confirmed','accepted','preparing','ready'))::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('picked_up','on_the_way'))::int on_the_way, COUNT(*) FILTER (WHERE COALESCE(status,'new')='delivered')::int delivered, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('cancelled','rejected','failed'))::int cancelled FROM govo_orders`),
     ]);
-    const riderOptions = (selectedId) => riders.rows.map((r) => `<option value="${esc(r.id)}" ${String(selectedId || '') === String(r.id) ? 'selected' : ''}>${esc(r.rider_name || 'Rider')} - ${esc(r.phone || '')}${r.location ? ` (${esc(r.location)})` : ''}</option>`).join('');
-    const statusButton = (value, label, current, danger = false) => `<button class="${danger ? 'reject' : ''}" name="status" value="${esc(value)}" ${String(current || '').toLowerCase() === value ? 'style="outline:2px solid #bbf7d0"' : ''}>${esc(label)}</button>`;
-    const cards = orders.rows.map((x) => {
-      const assignedId = x.assigned_rider_id || x.rider_id || '';
-      const assignedName = x.assigned_rider_name || x.rider_name || 'Not assigned';
-      const assignedPhone = x.assigned_rider_phone || x.rider_phone || '';
-      return `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Merchant</b><span>${esc(x.shop_name)}<br>${esc(x.merchant_phone)}</span></div><div><b>Merchant Status</b><span>${esc(x.merchant_status || 'No merchant update')}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}<br>${esc(x.preferred_time ? `Preferred: ${x.preferred_time}` : '')}</span></div><div><b>Rider</b><span>${esc(assignedName)}<br>${esc(assignedPhone || '')}<br>${esc(x.rider_note || 'No rider note')}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div><form method="POST" action="/admin/order/assign"><input type="hidden" name="order_id" value="${esc(x.id)}"><label>Assign approved rider</label><select name="rider_id" required><option value="">Select Rider</option>${riderOptions(assignedId)}</select><button>Assign Rider</button></form><form method="POST" action="/admin/order/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" value="${esc(x.admin_note || '')}" placeholder="Admin note"><div class="three">${statusButton('pending', 'Pending', x.status)}${statusButton('accepted', 'Accepted', x.status)}${statusButton('preparing', 'Preparing', x.status)}</div><div class="three">${statusButton('ready', 'Ready', x.status)}${statusButton('assigned', 'Assigned', x.status)}${statusButton('picked_up', 'Picked Up', x.status)}</div><div class="three">${statusButton('delivered', 'Delivered', x.status)}${statusButton('failed', 'Failed', x.status, true)}${statusButton('rejected', 'Rejected', x.status, true)}</div></form></div>`;
-    }).join('');
+    const riderOptions = (selectedId) => riders.rows.map((r) => `<option value="${esc(r.id)}" ${String(selectedId || '') === String(r.id) ? 'selected' : ''}>${esc(r.rider_name || 'Rider')} - ${esc(r.phone || '')}${r.area ? ` (${esc(r.area)})` : ''}</option>`).join('');
+    const statusOptions = (current) => ['new','confirmed','preparing','assigned','picked_up','on_the_way','delivered','cancelled'].map((v) => `<option value="${v}" ${String(current || '').toLowerCase() === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('');
+    const eventForm = (x) => `<form method="POST" action="/admin/orders/add-event"><input type="hidden" name="order_id" value="${esc(x.id)}"><div class="filters"><select name="event_type"><option>note</option><option>call</option><option>whatsapp</option><option>dispatch</option><option>payment</option></select><input name="note" placeholder="Add dispatch note/event"></div><button class="secondary">Add Event</button></form>`;
+    const assignForm = (x) => `<form method="POST" action="/admin/orders/assign-rider"><input type="hidden" name="order_id" value="${esc(x.id)}"><label>Assign approved rider</label><select name="rider_id" required><option value="">Select Rider</option>${riderOptions(x.assigned_rider_id || x.rider_id)}</select><button>Assign Rider</button></form>`;
+    const updateForm = (x) => `<form method="POST" action="/admin/orders/update-status"><input type="hidden" name="id" value="${esc(x.id)}"><div class="filters"><select name="status">${statusOptions(x.status)}</select><input name="admin_note" value="${esc(x.admin_note || '')}" placeholder="Admin note"></div><button>Update Status</button></form>`;
+    const orderCard = (x) => {
+      const code = x.order_code || orderCodeFromId(x.id);
+      const riderName = x.assigned_rider_name || x.rider_name || 'Not assigned';
+      const riderPhone = x.assigned_rider_phone || x.rider_phone || '';
+      const address = x.customer_address || x.drop_location || '';
+      const merchant = x.provider_name || x.merchant_name || x.shop_name || 'GOVO Order';
+      const total = safeAmount(x.total_amount);
+      return `<div class="card compact-card"><div class="section-head"><h2>${esc(code)}</h2><div class="actions">${badge(x.status)}${badge(x.priority || 'normal')}</div></div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name || 'Customer')}<br>${esc(x.customer_phone || '')}<br>${esc(x.customer_area || '')}</span></div><div><b>Address</b><span>${esc(address || 'No address')}</span></div><div><b>Partner</b><span>${esc(merchant)}<br>${esc(x.order_type || 'delivery')}</span></div><div><b>Rider</b><span>${esc(riderName)}<br>${esc(riderPhone)}</span></div><div><b>Items</b><span>${esc(x.items || x.item_details || 'No items')}</span></div><div><b>Total / Payment</b><span>${esc(total ? `৳${total}` : 'Not set')}<br>${esc(x.payment_method || 'cash')} / ${esc(x.payment_status || 'unpaid')}</span></div><div><b>Note</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${customerContactActions(x.customer_phone, x.customer_name)}${customerContactActions(riderPhone, riderName)}${updateForm(x)}${assignForm(x)}${eventForm(x)}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Tracking</a></div></div>`;
+    };
+    const groups = { new: [], confirmed: [], assigned: [], on_the_way: [], delivered: [], cancelled: [] };
+    orders.rows.forEach((x) => groups[orderBoardGroup(x.status)].push(x));
+    const column = (key, title) => `<section class="card"><div class="section-head"><h2>${esc(title)}</h2><span class="pill">${groups[key].length}</span></div><div class="cards compact">${groups[key].map(orderCard).join('') || '<div class="card compact-card"><h2>No orders</h2></div>'}</div></section>`;
     const c = counts.rows[0] || {};
+    const stat = (label, value) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div></div>`;
     const opt = (v, label) => `<option value="${v}" ${status === v ? 'selected' : ''}>${label}</option>`;
-    res.send(page('Admin Orders', `<section class="grid"><div class="stat"><div class="label">Total</div><div class="value">${esc(c.total || 0)}</div></div><div class="stat"><div class="label">Pending</div><div class="value">${esc(c.pending || 0)}</div></div><div class="stat"><div class="label">Ready</div><div class="value">${esc(c.ready || 0)}</div></div><div class="stat"><div class="label">Assigned</div><div class="value">${esc(c.assigned || 0)}</div></div><div class="stat"><div class="label">Picked Up</div><div class="value">${esc(c.picked_up || 0)}</div></div><div class="stat"><div class="label">Delivered</div><div class="value">${esc(c.delivered || 0)}</div></div></section><section class="card"><h1>Admin Orders</h1><form class="filters" method="GET" action="/admin/orders"><input name="q" value="${esc(q)}" placeholder="Search ID, customer, item, rider, merchant"><select name="status"><option value="all">All</option>${opt('pending','Pending')}${opt('accepted','Accepted')}${opt('preparing','Preparing')}${opt('ready','Ready')}${opt('assigned','Assigned')}${opt('picked_up','Picked Up')}${opt('delivered','Delivered')}${opt('failed','Failed')}${opt('rejected','Rejected')}</select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/leads">Merchants</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/track">Track</a></div></section><section class="cards">${cards || '<div class="card"><h2>No orders found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Order Dispatch', `<section class="card app-hero"><h1>Order Dispatch</h1><p>Review customer orders, assign riders, and monitor delivery progress.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/onboarding">Pilot Onboarding</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a></div></section><section class="grid">${stat('Total', c.total)}${stat('New', c.new)}${stat('Confirmed', c.confirmed)}${stat('Assigned', c.assigned)}${stat('On The Way', c.on_the_way)}${stat('Delivered', c.delivered)}${stat('Cancelled', c.cancelled)}</section><section class="card"><h2>Create Order</h2><form method="POST" action="/admin/orders/create"><div class="filters"><input name="customer_name" placeholder="Customer name"><input name="customer_phone" required placeholder="Customer phone"><input name="customer_area" placeholder="Area"><select name="order_type"><option>delivery</option><option>service</option><option>shop</option><option>general</option></select></div><label>Customer Address</label><input name="customer_address"><label>Merchant / Provider</label><div class="filters"><input name="merchant_name" placeholder="Merchant name"><input name="provider_name" placeholder="Provider name"></div><label>Items</label><textarea name="items" required></textarea><div class="filters"><input name="delivery_fee" placeholder="Delivery fee"><input name="subtotal" placeholder="Subtotal"><input name="total_amount" placeholder="Total"><select name="payment_method"><option>cash</option><option>bKash</option><option>Nagad</option><option>card</option></select><select name="priority"><option>normal</option><option>high</option><option>urgent</option><option>low</option></select></div><label>Note</label><textarea name="note"></textarea><button>Create Order</button></form></section><section class="card"><h2>Filters</h2><form class="filters" method="GET" action="/admin/orders"><input name="q" value="${esc(q)}" placeholder="Search code, customer, item, rider, merchant"><select name="status"><option value="all">All</option>${opt('new','New')}${opt('confirmed','Confirmed')}${opt('assigned','Assigned')}${opt('on_the_way','On The Way')}${opt('delivered','Delivered')}${opt('cancelled','Cancelled')}</select><button>Search</button></form></section><section class="grid two">${column('new','New')}${column('confirmed','Confirmed')}${column('assigned','Assigned')}${column('on_the_way','On The Way')}${column('delivered','Delivered')}${column('cancelled','Cancelled')}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
-app.post('/admin/order/assign', async (req, res, next) => {
+async function createDispatchOrder(data, actorType = 'admin') {
+  const r = await pool.query(`INSERT INTO govo_orders (customer_name, customer_phone, customer_area, customer_address, order_type, merchant_id, merchant_name, shop_name, provider_id, provider_name, items, item_details, note, customer_note, pickup_location, drop_location, delivery_fee, subtotal, total_amount, payment_method, payment_status, status, priority, updated_at) VALUES ($1,$2,$3,$4,$5,NULLIF($6,'')::int,$7,$7,NULLIF($8,'')::int,$9,$10,$10,$11,$11,$12,$4,$13,$14,$15,$16,$17,$18,$19,NOW()) RETURNING id`, [data.customer_name || '', data.customer_phone || '', data.customer_area || '', data.customer_address || '', data.order_type || 'delivery', data.merchant_id || '', data.merchant_name || '', data.provider_id || '', data.provider_name || '', data.items || '', data.note || '', data.pickup_location || '', safeAmount(data.delivery_fee), safeAmount(data.subtotal), safeAmount(data.total_amount), data.payment_method || 'cash', data.payment_status || 'unpaid', data.status || 'new', cleanOrderPriority(data.priority)]);
+  const id = r.rows[0].id;
+  const code = orderCodeFromId(id);
+  await pool.query(`UPDATE govo_orders SET order_code=$1 WHERE id=$2 AND order_code IS NULL`, [code, id]);
+  await recordOrderEvent(id, 'created', data.status || 'new', data.note || 'Order created', actorType, actorType === 'admin' ? 'Admin' : 'Customer');
+  return { id, code };
+}
+
+app.post('/admin/orders/create', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
-    const pin = getPin(req);
-    const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone FROM govo_rider_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [String(req.body.rider_id || '')]);
-    if (!rider.rows.length) return res.status(404).send(page('Rider Not Found', `<section class="card"><h1>Rider Not Found</h1><a class="btn" href="/admin/orders">Back Orders</a></section>`));
-    const rd = rider.rows[0];
-    const order = await pool.query(`UPDATE govo_orders SET rider_id=$1, rider_name=$2, rider_phone=$3, assigned_rider_id=$1, assigned_rider_name=$2, assigned_rider_phone=$3, status='assigned', updated_at=NOW() WHERE id=$4 RETURNING *`, [rd.id, rd.rider_name, rd.phone, String(req.body.order_id || '')]);
-    if (order.rows.length) {
-      const o = order.rows[0];
-      await sendTelegram([`GOVO Rider Assigned`, `Order: #${o.id}`, `Rider: ${rd.rider_name || ''} (${rd.phone || ''})`, `Customer: ${o.customer_name || ''} (${o.customer_phone || ''})`, `Pickup: ${o.pickup_location || ''}`, `Delivery: ${o.drop_location || ''}`].join('\n'));
-    }
-    res.redirect(`/admin/orders`);
+    const phone = String(req.body.customer_phone || '').trim();
+    const items = String(req.body.items || '').trim();
+    if (!phone || !items) return res.status(400).send(page('Invalid Order', '<section class="card"><h1>Customer phone and items are required.</h1><a class="btn" href="/admin/orders">Back</a></section>', 'admin'));
+    const created = await createDispatchOrder({ ...req.body, customer_phone: phone, items, status: cleanOrderStatus(req.body.status, 'new') }, 'admin');
+    sendTelegram(['GOVO Admin Created Order', '', `Order: ${created.code}`, `Customer: ${req.body.customer_name || ''}`, `Phone: ${phone}`, `Items: ${items}`].join('\n')).catch(() => {});
+    res.redirect('/admin/orders');
   } catch (e) { next(e); }
 });
 
-app.post('/admin/order/status', async (req, res, next) => {
+async function assignOrderRider(orderId, riderId) {
+  const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone FROM govo_rider_leads WHERE id=$1 AND COALESCE(status,'pending')='approved' LIMIT 1`, [riderId]);
+  if (!rider.rows.length) return null;
+  const rd = rider.rows[0];
+  const order = await pool.query(`UPDATE govo_orders SET rider_id=$1, rider_name=$2, rider_phone=$3, assigned_rider_id=$1, assigned_rider_name=$2, assigned_rider_phone=$3, status='assigned', updated_at=NOW() WHERE id=$4 RETURNING *`, [rd.id, rd.rider_name, rd.phone, orderId]);
+  if (order.rows.length) await recordOrderEvent(orderId, 'assigned', 'assigned', `Assigned rider ${rd.rider_name || rd.phone || ''}`, 'admin', 'Admin');
+  return order.rows[0] || null;
+}
+
+app.post(['/admin/orders/assign-rider', '/admin/order/assign'], async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
-    const pin = getPin(req);
-    const allowed = ['pending', 'accepted', 'assigned', 'picked_up', 'delivered', 'rejected', 'failed', 'merchant_confirmed', 'preparing', 'ready'];
-    let status = String(req.body.status || 'pending').trim().toLowerCase();
-    if (!allowed.includes(status)) status = 'pending';
+    const orderId = String(req.body.order_id || '').trim();
+    const order = await assignOrderRider(orderId, String(req.body.rider_id || '').trim());
+    if (order) sendTelegram(['GOVO Rider Assigned', '', `Order: ${order.order_code || orderCodeFromId(order.id)}`, `Rider: ${order.rider_name || ''} (${order.rider_phone || ''})`, `Customer: ${order.customer_name || ''} (${order.customer_phone || ''})`, `Address: ${order.customer_address || order.drop_location || ''}`].join('\n')).catch(() => {});
+    res.redirect('/admin/orders');
+  } catch (e) { next(e); }
+});
+
+app.post(['/admin/orders/update-status', '/admin/order/status'], async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const status = cleanOrderStatus(req.body.status, 'new');
     const r = await pool.query(`UPDATE govo_orders SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING *`, [status, String(req.body.admin_note || ''), String(req.body.id || '')]);
     if (r.rows.length) {
       const x = r.rows[0];
-      await sendTelegram(['GOVO Order Status Updated', '', `Order ID: #${x.id}`, `Status: ${String(x.status || '').toUpperCase()}`, `Rider: ${x.rider_name || 'Not assigned'}`, `Shop: ${x.shop_name || ''}`, `Customer: ${x.customer_name || ''}`, `Drop: ${x.drop_location || ''}`, `Admin Note: ${x.admin_note || 'N/A'}`].join('\n'));
+      await recordOrderEvent(x.id, 'status', status, String(req.body.admin_note || ''), 'admin', 'Admin');
+      sendTelegram(['GOVO Order Status Updated', '', `Order: ${x.order_code || orderCodeFromId(x.id)}`, `Status: ${String(x.status || '').toUpperCase()}`, `Rider: ${x.rider_name || x.assigned_rider_name || 'Not assigned'}`, `Customer: ${x.customer_name || ''}`].join('\n')).catch(() => {});
     }
-    res.redirect(`/admin/orders`);
+    res.redirect('/admin/orders');
+  } catch (e) { next(e); }
+});
+
+app.post('/admin/orders/add-event', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const orderId = String(req.body.order_id || '').trim();
+    const note = String(req.body.note || '').trim();
+    if (orderId && note) await recordOrderEvent(orderId, String(req.body.event_type || 'note').trim() || 'note', '', note, 'admin', 'Admin');
+    res.redirect('/admin/orders');
   } catch (e) { next(e); }
 });
 
@@ -1523,22 +1614,29 @@ app.get('/shop/:id', async (req, res, next) => {
 });
 
 function orderForm(data = {}, error = '') {
-  const shopSummary = data.shop_name || data.item || data.pickup_address ? `<section class="card"><h2>Selected Order</h2><div class="detail-grid"><div><b>Shop</b><span>${esc(data.shop_name || 'Custom pickup')}</span></div><div><b>Pickup</b><span>${esc(data.pickup_address || '')}</span></div><div><b>Item</b><span>${esc(data.item_details || data.item || '')}</span></div><div><b>Time</b><span>${esc(data.preferred_time || 'Any time')}</span></div></div></section>` : '';
-  return page('Place Delivery Order', `${error ? `<section class="card"><h1>Check order details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><span class="pill">Fast Delivery</span><h1>Place Delivery Order</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Tell GOVO what to pick up, where to collect it, and where to deliver it. You will get a tracking ID after submission.</p><div class="actions"><a class="btn secondary" href="/app">Back to App</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/track">Track Order</a></div></section>${shopSummary}<section class="card"><h2>Delivery Details</h2><form method="POST" action="/order"><input type="hidden" name="shop_id" value="${esc(data.shop_id || '')}"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}" required><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Pickup Address</label><input name="pickup_address" value="${esc(data.pickup_address || data.pickup_location || '')}" placeholder="Shop or pickup point" required><label>Delivery Address</label><input name="delivery_address" value="${esc(data.delivery_address || data.drop_location || '')}" placeholder="Where should GOVO deliver?" required><label>Product / Parcel Details</label><textarea name="item_details" required placeholder="Example: 2 burgers, 1 cola / parcel details">${esc(data.item_details || data.item || '')}</textarea><label>Preferred Time <span style="color:var(--muted)">(optional)</span></label><input name="preferred_time" value="${esc(data.preferred_time || '')}" placeholder="Now / Today 6 PM"><label>Notes</label><textarea name="notes" placeholder="Any extra instruction for GOVO">${esc(data.notes || data.note || '')}</textarea><label>Shop Name <span style="color:var(--muted)">(optional)</span></label><input name="shop_name" value="${esc(data.shop_name || '')}"><input type="hidden" name="merchant_phone" value="${esc(data.merchant_phone || '')}"><button>Submit Order</button></form></section>`, 'track');
+  const partner = data.merchant_name || data.provider_name || data.shop_name || '';
+  return page('Place GOVO Order', `${error ? `<section class="card"><h1>Check order details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><span class="pill">Order Dispatch</span><h1>Place GOVO Order</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Submit a delivery, shop, service, or general request. GOVO admin will review and dispatch a rider when needed.</p><div class="actions"><a class="btn secondary" href="/app">Back to App</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a><a class="btn secondary" href="/track">Track Order</a></div></section><section class="card"><h2>Order Details</h2><form method="POST" action="/order"><input type="hidden" name="shop_id" value="${esc(data.shop_id || '')}"><input type="hidden" name="merchant_id" value="${esc(data.merchant_id || data.shop_id || '')}"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}" required><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || data.area || '')}" placeholder="Meherpur / Mujibnagar"><label>Delivery / Service Address</label><input name="customer_address" value="${esc(data.customer_address || data.delivery_address || data.drop_location || '')}" required><label>Order Type</label><select name="order_type"><option value="delivery" ${data.order_type === 'delivery' ? 'selected' : ''}>delivery</option><option value="shop" ${data.order_type === 'shop' ? 'selected' : ''}>shop</option><option value="service" ${data.order_type === 'service' ? 'selected' : ''}>service</option><option value="general" ${data.order_type === 'general' ? 'selected' : ''}>general</option></select><label>Merchant / Provider <span style="color:var(--muted)">(optional)</span></label><input name="merchant_name" value="${esc(partner)}" placeholder="Shop or provider name"><label>Items / Request Details</label><textarea name="items" required placeholder="Example: 2 burgers, 1 cola / AC repair request">${esc(data.items || data.item_details || data.item || '')}</textarea><label>Payment Method</label><select name="payment_method"><option value="cash">cash</option><option value="bKash">bKash</option><option value="Nagad">Nagad</option><option value="card">card</option></select><label>Notes</label><textarea name="note" placeholder="Any extra instruction for GOVO">${esc(data.note || data.notes || '')}</textarea><input type="hidden" name="merchant_phone" value="${esc(data.merchant_phone || '')}"><input type="hidden" name="pickup_location" value="${esc(data.pickup_location || data.pickup_address || '')}"><button>Submit Order</button></form></section>`, 'track');
 }
 
 function normalizeOrderBody(body = {}) {
+  const deliveryAddress = String(body.customer_address || body.delivery_address || body.drop_location || '').trim();
+  const items = String(body.items || body.item_details || body.item || '').trim();
   return {
     shop_id: String(body.shop_id || '').trim(),
-    shop_name: String(body.shop_name || body.shop || '').trim(),
+    merchant_id: String(body.merchant_id || body.shop_id || '').trim(),
+    merchant_name: String(body.merchant_name || body.shop_name || body.shop || '').trim(),
+    provider_id: String(body.provider_id || '').trim(),
+    provider_name: String(body.provider_name || '').trim(),
     merchant_phone: String(body.merchant_phone || '').trim(),
     customer_name: String(body.customer_name || '').trim(),
     customer_phone: String(body.customer_phone || '').trim(),
-    pickup_address: String(body.pickup_address || body.pickup_location || '').trim(),
-    delivery_address: String(body.delivery_address || body.drop_location || '').trim(),
-    item_details: String(body.item_details || body.item || '').trim(),
-    notes: String(body.notes || body.note || '').trim(),
-    preferred_time: String(body.preferred_time || '').trim(),
+    customer_area: String(body.customer_area || body.area || '').trim(),
+    customer_address: deliveryAddress,
+    order_type: String(body.order_type || 'delivery').trim().toLowerCase(),
+    items,
+    note: String(body.note || body.notes || '').trim(),
+    pickup_location: String(body.pickup_location || body.pickup_address || '').trim(),
+    payment_method: String(body.payment_method || 'cash').trim(),
   };
 }
 
@@ -1547,22 +1645,22 @@ app.all('/order', async (req, res, next) => {
     if (req.method === 'POST') {
       const order = normalizeOrderBody(req.body);
       const missing = [];
-      for (const [field, label] of [['customer_name', 'Your name'], ['customer_phone', 'Your phone'], ['pickup_address', 'Pickup address'], ['delivery_address', 'Delivery address'], ['item_details', 'Product / parcel details']]) {
+      for (const [field, label] of [['customer_name', 'Your name'], ['customer_phone', 'Your phone'], ['customer_address', 'Address'], ['items', 'Items / request details']]) {
         if (!order[field]) missing.push(label);
       }
       if (missing.length) return res.status(400).send(orderForm(order, `Please fill: ${missing.join(', ')}`));
-      const r = await pool.query(`INSERT INTO govo_orders (shop_name, merchant_phone, customer_name, customer_phone, pickup_location, drop_location, item_details, note, preferred_time, customer_note, status, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',NOW()) RETURNING id`, [order.shop_name, order.merchant_phone, order.customer_name, order.customer_phone, order.pickup_address, order.delivery_address, order.item_details, order.notes, order.preferred_time, order.notes]);
-      const id = r.rows[0].id;
-      sendTelegram(['New GOVO Order', '', `Order ID: #${id}`, `Shop: ${order.shop_name || 'Custom order'}`, `Merchant Phone: ${order.merchant_phone || 'N/A'}`, `Customer: ${order.customer_name}`, `Customer Phone: ${order.customer_phone}`, `Pickup: ${order.pickup_address}`, `Delivery: ${order.delivery_address}`, `Item: ${order.item_details}`, `Preferred: ${order.preferred_time || 'Any time'}`, `Note: ${order.notes || 'N/A'}`].join('\n')).catch(() => {});
-      return res.redirect(`/order/success?id=${encodeURIComponent(id)}&phone=${encodeURIComponent(order.customer_phone)}`);
+      const created = await createDispatchOrder({ ...order, status: 'new', payment_status: 'unpaid', priority: 'normal' }, 'customer');
+      sendTelegram(['New GOVO Order', '', `Order: ${created.code}`, `Type: ${order.order_type}`, `Partner: ${order.merchant_name || order.provider_name || 'N/A'}`, `Customer: ${order.customer_name}`, `Customer Phone: ${order.customer_phone}`, `Address: ${order.customer_address}`, `Items: ${order.items}`, `Payment: ${order.payment_method}`, `Note: ${order.note || 'N/A'}`].join('\n')).catch(() => {});
+      return res.redirect(`/order/success?code=${encodeURIComponent(created.code)}&phone=${encodeURIComponent(order.customer_phone)}`);
     }
     const q = req.query || {};
-    let data = normalizeOrderBody({ ...q, item_details: q.item || q.item_details, pickup_address: q.pickup_address || q.pickup_location, delivery_address: q.delivery_address || q.drop_location });
-    if (data.shop_name && !data.merchant_phone) {
-      const r = await pool.query(`SELECT shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE shop_name=$1 ORDER BY id DESC LIMIT 1`, [data.shop_name]);
+    let data = normalizeOrderBody({ ...q, items: q.item || q.items || q.item_details, customer_address: q.customer_address || q.delivery_address || q.drop_location, pickup_location: q.pickup_address || q.pickup_location });
+    if (data.merchant_name && !data.merchant_phone) {
+      const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE shop_name=$1 ORDER BY id DESC LIMIT 1`, [data.merchant_name]);
       if (r.rows.length) {
+        data.merchant_id = r.rows[0].id;
         data.merchant_phone = r.rows[0].whatsapp || r.rows[0].phone || '';
-        data.pickup_address = data.pickup_address || r.rows[0].shop_address || r.rows[0].location || '';
+        data.pickup_location = data.pickup_location || r.rows[0].shop_address || r.rows[0].location || '';
       }
     }
     res.send(orderForm(data));
@@ -1570,20 +1668,23 @@ app.all('/order', async (req, res, next) => {
 });
 
 app.get('/order/success', (req, res) => {
-  const id = String(req.query.id || '');
+  const code = String(req.query.code || req.query.id || '');
   const phone = String(req.query.phone || '');
-  res.send(page('Order Submitted', `<section class="card app-hero"><span class="pill">Order Received</span><h1>Order Submitted Successfully</h1><p>Your order has been received by GOVO. Save your tracking ID.</p><h2>Tracking ID: #${esc(id)}</h2><p style="color:var(--muted);font-weight:900">Customer phone: ${esc(phone || 'Not provided')}</p><div class="timeline"><div class="step done">Submitted</div><div class="step">Admin Review</div><div class="step">Rider Assigned</div><div class="step">Delivered</div></div><div class="actions"><a class="btn" href="/track/order/${encodeURIComponent(id)}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Track Order</a><a class="btn secondary" href="/app">Back to App</a><a class="btn secondary" href="/shops">Shops</a></div></section>`, 'track'));
+  res.send(page('Order Submitted', `<section class="card app-hero"><span class="pill">Order Received</span><h1>Order Submitted Successfully</h1><p>Your order has been received by GOVO. Save your tracking code.</p><h2>Tracking Code: ${esc(code)}</h2><p style="color:var(--muted);font-weight:900">Customer phone: ${esc(phone || 'Not provided')}</p><div class="timeline"><div class="step done">Submitted</div><div class="step">Admin Review</div><div class="step">Rider Assigned</div><div class="step">Delivered</div></div><div class="actions"><a class="btn" href="/track?code=${encodeURIComponent(code)}">Track Order</a><a class="btn secondary" href="/app">Back to App</a><a class="btn secondary" href="/shops">Shops</a></div></section>`, 'track'));
 });
 
 function statusMeaning(status) {
   const s = String(status || 'pending').toLowerCase();
   return {
+    new: 'waiting for admin review',
     pending: 'waiting for review',
+    confirmed: 'confirmed by GOVO',
     accepted: 'accepted and being processed',
     preparing: 'merchant preparing order',
     ready: 'merchant marked ready',
     assigned: 'assigned to rider/provider',
     picked_up: 'rider picked up',
+    on_the_way: 'rider is on the way',
     working: 'provider working',
     delivered: 'finished',
     completed: 'finished',
@@ -1597,10 +1698,10 @@ function progressStage(type, status) {
   const s = String(status || 'pending').toLowerCase();
   if (type === 'order') {
     if (['delivered', 'completed'].includes(s)) return 6;
-    if (s === 'picked_up') return 5;
+    if (['picked_up', 'on_the_way'].includes(s)) return 5;
     if (s === 'assigned') return 4;
-    if (['ready'].includes(s)) return 3;
-    if (['accepted', 'preparing', 'merchant_confirmed'].includes(s)) return 2;
+    if (['ready', 'preparing'].includes(s)) return 3;
+    if (['confirmed', 'accepted', 'merchant_confirmed'].includes(s)) return 2;
     if (['rejected', 'failed', 'cancelled'].includes(s)) return 6;
     return 1;
   }
@@ -1618,24 +1719,34 @@ function timelineHtml(type, status) {
 }
 
 function trackingOrderCard(x) {
+  const code = x.order_code || orderCodeFromId(x.id);
   const riderName = x.assigned_rider_name || x.rider_name || 'Not assigned';
   const riderPhone = x.assigned_rider_phone || x.rider_phone || '';
-  const merchantState = x.merchant_status || (['accepted', 'preparing', 'ready', 'rejected'].includes(String(x.status || '').toLowerCase()) ? x.status : 'waiting');
-  return `<div class="card"><div class="section-head"><h2>Delivery Order #${esc(x.id)}</h2><span class="badge big-status ${esc(String(x.status || 'pending').toLowerCase())}">${esc(x.status || 'pending')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('order', x.status)}<div class="detail-grid"><div><b>ID</b><span>#${esc(x.id)}</span></div><div><b>Type</b><span>Order</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Shop</b><span>${esc(x.shop_name || 'GOVO Order')}<br>${esc(x.merchant_phone || '')}</span></div><div><b>Merchant Status</b><span>${esc(merchantState)}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Drop / Details</b><span>${esc(x.drop_location)}<br>${esc(x.item_details)}</span></div><div><b>Rider</b><span>${esc(riderName)}<br>${esc(riderPhone)}<br>${esc(x.rider_note || 'No rider note')}</span></div><div><b>Notes</b><span>Admin: ${esc(x.admin_note || 'No note')}<br>Customer: ${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div><div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Open Tracking Link</a></div></div>`;
+  const merchantState = x.merchant_status || (['confirmed', 'accepted', 'preparing', 'ready', 'rejected'].includes(String(x.status || '').toLowerCase()) ? x.status : 'waiting');
+  const events = Array.isArray(x._events) ? x._events : [];
+  const eventHtml = events.length ? `<div class="activity-list">${events.map((e) => `<div class="activity-row"><b>${esc(e.event_type || 'status')}</b><span>${esc(e.status || '')} ${esc(bdTime(e.created_at))}</span>${e.note ? `<small>${esc(e.note)}</small>` : ''}</div>`).join('')}</div>` : '';
+  return `<div class="card"><div class="section-head"><h2>Delivery Order ${esc(code)}</h2><span class="badge big-status ${esc(String(x.status || 'new').toLowerCase())}">${esc(x.status || 'new')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('order', x.status)}<div class="detail-grid"><div><b>Tracking Code</b><span>${esc(code)}</span></div><div><b>Type</b><span>${esc(x.order_type || 'delivery')}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Partner</b><span>${esc(x.provider_name || x.merchant_name || x.shop_name || 'GOVO Order')}</span></div><div><b>Partner Status</b><span>${esc(merchantState)}<br>${esc(x.merchant_note || 'No partner update')}</span></div><div><b>Delivery Address</b><span>${esc(x.customer_address || x.drop_location)}</span></div><div><b>Items / Details</b><span>${esc(x.items || x.item_details)}</span></div><div><b>Rider</b><span>${esc(riderName)}<br>${esc(riderPhone)}<br>${esc(x.rider_note || 'No rider update')}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Payment</b><span>${esc(x.payment_method || 'cash')} / ${esc(x.payment_status || 'unpaid')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div>${eventHtml}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Open Tracking Link</a></div></div>`;
 }
 
 function trackingServiceCard(x) {
-  return `<div class="card"><div class="section-head"><h2>Service Request #${esc(x.id)}</h2><span class="badge big-status ${esc(String(x.status || 'pending').toLowerCase())}">${esc(x.status || 'pending')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('service', x.status)}<div class="detail-grid"><div><b>ID</b><span>#${esc(x.id)}</span></div><div><b>Type</b><span>Service</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Provider</b><span>${esc(x.provider_name || 'GOVO Provider')}<br>${esc(x.provider_phone || '')}</span></div><div><b>Provider Status</b><span>${esc(x.status || 'pending')}<br>${esc(x.provider_note || 'No provider note')}</span></div><div><b>Service Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Notes</b><span>Admin: ${esc(x.admin_note || 'No note')}<br>Customer: ${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div><div class="actions"><a class="btn secondary" href="/track/service/${encodeURIComponent(x.id)}">Open Tracking Link</a></div></div>`;
+  return `<div class="card"><div class="section-head"><h2>Service Request #${esc(x.id)}</h2><span class="badge big-status ${esc(String(x.status || 'pending').toLowerCase())}">${esc(x.status || 'pending')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('service', x.status)}<div class="detail-grid"><div><b>ID</b><span>#${esc(x.id)}</span></div><div><b>Type</b><span>Service</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Provider</b><span>${esc(x.provider_name || 'GOVO Provider')}<br>${esc(x.provider_phone || '')}</span></div><div><b>Provider Status</b><span>${esc(x.status || 'pending')}<br>${esc(x.provider_note || 'No provider note')}</span></div><div><b>Service Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div><div class="actions"><a class="btn secondary" href="/track/service/${encodeURIComponent(x.id)}">Open Tracking Link</a></div></div>`;
 }
 
-async function fetchTrackingResults({ id = '', phone = '', type = '' }) {
+async function fetchTrackingResults({ id = '', phone = '', type = '', code = '' }) {
   const out = { orders: [], services: [] };
+  const attachEvents = async () => {
+    for (const o of out.orders) {
+      o._events = (await pool.query(`SELECT event_type, status, note, created_at FROM govo_order_events WHERE order_id=$1 ORDER BY id ASC LIMIT 50`, [o.id])).rows;
+    }
+  };
   if (type !== 'service') {
-    if (id && phone) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 10`, [id, phone])).rows;
+    if (code) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE order_code=$1 ORDER BY id DESC LIMIT 10`, [code])).rows;
+    else if (id && phone) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 10`, [id, phone])).rows;
     else if (id) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE id=$1 ORDER BY id DESC LIMIT 10`, [id])).rows;
     else if (phone) out.orders = (await pool.query(`SELECT * FROM govo_orders WHERE customer_phone=$1 ORDER BY id DESC LIMIT 10`, [phone])).rows;
+    await attachEvents();
   }
-  if (type !== 'order') {
+  if (type !== 'order' && !code) {
     if (id && phone) out.services = (await pool.query(`SELECT * FROM govo_service_requests WHERE id=$1 AND customer_phone=$2 ORDER BY id DESC LIMIT 10`, [id, phone])).rows;
     else if (id) out.services = (await pool.query(`SELECT * FROM govo_service_requests WHERE id=$1 ORDER BY id DESC LIMIT 10`, [id])).rows;
     else if (phone) out.services = (await pool.query(`SELECT * FROM govo_service_requests WHERE customer_phone=$1 ORDER BY id DESC LIMIT 10`, [phone])).rows;
@@ -1643,20 +1754,21 @@ async function fetchTrackingResults({ id = '', phone = '', type = '' }) {
   return out;
 }
 
-function renderTrackPage({ id = '', phone = '', orders = [], services = [], direct = false }) {
-  const searched = !!(id || phone || direct);
+function renderTrackPage({ id = '', phone = '', code = '', orders = [], services = [], direct = false }) {
+  const searched = !!(id || phone || code || direct);
   const orderHtml = orders.map(trackingOrderCard).join('');
   const serviceHtml = services.map(trackingServiceCard).join('');
   const empty = searched && !orders.length && !services.length ? `<section class="card"><h2>No tracking found</h2><p style="color:var(--muted)">Check your order/request ID or phone number. Contact GOVO if you need help.</p><div class="actions"><a class="btn" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a></div></section>` : '';
-  return page('Track GOVO', `<section class="card app-hero"><span class="pill">Unified Tracking</span><h1>Track order or service request</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Search by tracking ID, request ID, or phone number. GOVO checks both delivery orders and service requests.</p><form method="GET" action="/track"><label>Order / Request ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Phone Number</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form><div class="actions"><a class="btn secondary" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a></div></section>${orderHtml ? `<section class="card"><div class="section-head"><h2>Delivery Orders</h2><span class="pill">${orders.length}</span></div></section><section class="cards">${orderHtml}</section>` : ''}${serviceHtml ? `<section class="card"><div class="section-head"><h2>Service Requests</h2><span class="pill">${services.length}</span></div></section><section class="cards">${serviceHtml}</section>` : ''}${empty}`, 'track');
+  return page('Track GOVO', `<section class="card app-hero"><span class="pill">Unified Tracking</span><h1>Track order or service request</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Search by tracking ID, request ID, or phone number. GOVO checks both delivery orders and service requests.</p><form method="GET" action="/track"><label>Tracking Code</label><input name="code" value="${esc(code)}" placeholder="GOVO-000001"><label>Order / Request ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Phone Number</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form><div class="actions"><a class="btn secondary" href="/app">Home</a><a class="btn secondary" href="/shops">Shops</a><a class="btn secondary" href="/services">Services</a></div></section>${orderHtml ? `<section class="card"><div class="section-head"><h2>Delivery Orders</h2><span class="pill">${orders.length}</span></div></section><section class="cards">${orderHtml}</section>` : ''}${serviceHtml ? `<section class="card"><div class="section-head"><h2>Service Requests</h2><span class="pill">${services.length}</span></div></section><section class="cards">${serviceHtml}</section>` : ''}${empty}`, 'track');
 }
 
 app.get('/track', async (req, res, next) => {
   try {
+    const code = String(req.query.code || '').trim();
     const id = String(req.query.id || '').trim();
     const phone = String(req.query.phone || '').trim();
-    const results = await fetchTrackingResults({ id, phone });
-    res.send(renderTrackPage({ id, phone, orders: results.orders, services: results.services }));
+    const results = await fetchTrackingResults({ id, phone, code });
+    res.send(renderTrackPage({ id, phone, code, orders: results.orders, services: results.services }));
   } catch (e) { next(e); }
 });
 
@@ -1889,21 +2001,46 @@ app.all('/rider/dashboard', async (req, res, next) => {
     const riderStatus = String(rd.status || 'pending').toLowerCase();
     const isApproved = riderStatus === 'approved';
     if (req.method === 'POST') {
-      const allowed = ['accepted', 'picked_up', 'delivered', 'failed'];
+      const allowed = ['picked_up', 'on_the_way', 'delivered'];
       const status = String(req.body.status || '').trim().toLowerCase();
       if (!isApproved) return res.status(403).send(page('Rider Pending', `<section class="card"><h1>Approval Required</h1><p>Your rider profile is ${esc(rd.status)}. GOVO admin must approve the rider before order updates.</p><a class="btn secondary" href="/rider/dashboard?phone=${encodeURIComponent(phone)}">Back Dashboard</a></section>`, 'rider'));
       if (!allowed.includes(status)) return res.status(400).send(page('Invalid Status', `<section class="card"><h1>Invalid rider action</h1><a class="btn secondary" href="/rider/dashboard?phone=${encodeURIComponent(phone)}">Back Dashboard</a></section>`, 'rider'));
-      const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_phone=$4 OR assigned_rider_phone=$4) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), phone]);
+      const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_id=$4 OR assigned_rider_id=$4 OR rider_phone=$5 OR assigned_rider_phone=$5) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), rd.id, phone]);
       if (updated.rows.length) {
         const o = updated.rows[0];
-        await sendTelegram([`GOVO Rider Order Update`, `Order: #${o.id}`, `Status: ${status}`, `Rider: ${rd.rider_name || ''} (${rd.phone || ''})`, `Customer: ${o.customer_name || ''} (${o.customer_phone || ''})`, `Pickup: ${o.pickup_location || ''}`, `Delivery: ${o.drop_location || ''}`].join('\n'));
+        await recordOrderEvent(o.id, 'rider_status', status, String(req.body.rider_note || ''), 'rider', rd.rider_name || rd.phone || 'Rider');
+        await sendTelegram([`GOVO Rider Order Update`, `Order: ${o.order_code || orderCodeFromId(o.id)}`, `Status: ${status}`, `Rider: ${rd.rider_name || ''} (${rd.phone || ''})`, `Customer: ${o.customer_name || ''} (${o.customer_phone || ''})`, `Pickup: ${o.pickup_location || ''}`, `Delivery: ${o.drop_location || ''}`].join('\n'));
       }
       return res.redirect(`/rider/dashboard?phone=${encodeURIComponent(phone)}`);
     }
-    const orders = await pool.query(`SELECT * FROM govo_orders WHERE rider_phone=$1 OR assigned_rider_phone=$1 ORDER BY id DESC LIMIT 100`, [phone]);
-    const actionButtons = (x) => `<form method="POST" action="/rider/dashboard"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="rider_note" value="${esc(x.rider_note || '')}" placeholder="Rider note optional"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="picked_up">Picked Up</button><button name="status" value="delivered">Delivered</button></div><div class="actions"><button class="reject" name="status" value="failed">Mark Failed</button></div></form>`;
-    const cards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Order Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div></div>${isApproved ? actionButtons(x) : '<p style="color:var(--muted);font-weight:900">Rider actions unlock after admin approval.</p>'}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track Order</a></div></div>`).join('');
+    const orders = await pool.query(`SELECT * FROM govo_orders WHERE rider_id=$1 OR assigned_rider_id=$1 OR rider_phone=$2 OR assigned_rider_phone=$2 ORDER BY CASE COALESCE(status,'new') WHEN 'assigned' THEN 1 WHEN 'picked_up' THEN 2 WHEN 'on_the_way' THEN 3 WHEN 'delivered' THEN 4 ELSE 5 END, id DESC LIMIT 100`, [rd.id, phone]);
+    const actionButtons = (x) => `<form method="POST" action="/rider/orders/update-status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="rider_note" value="${esc(x.rider_note || '')}" placeholder="Rider note optional"><div class="three"><button name="status" value="picked_up">Picked Up</button><button name="status" value="on_the_way">On The Way</button><button name="status" value="delivered">Delivered</button></div></form>`;
+    const cards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Tracking</b><span>${esc(x.order_code || orderCodeFromId(x.id))}</span></div><div><b>Order Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div></div>${isApproved ? actionButtons(x) : '<p style="color:var(--muted);font-weight:900">Rider actions unlock after admin approval.</p>'}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track Order</a></div></div>`).join('');
     res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1>${listingImage(rd.image_url, rd.rider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(rd.rider_name || 'Rider')}</span></div><div><b>Phone</b><span>${esc(rd.whatsapp || rd.phone)}</span></div><div><b>Area</b><span>${esc(rd.area || rd.location || 'Not set')}</span></div><div><b>Status</b><span>${badge(rd.status)}</span></div><div><b>Vehicle</b><span>${esc(rd.vehicle_type || 'Not set')}</span></div><div><b>Orders</b><span>${esc(orders.rows.length)}</span></div></div><div class="actions"><a class="btn secondary" href="/rider/logout">Logout</a><a class="btn secondary" href="/app">Back to App</a></div></section><section class="card"><h2>Rider Profile</h2><form method="POST" action="/rider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Rider Name</label><input name="rider_name" value="${esc(rd.rider_name || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(rd.whatsapp || '')}"><label>Area</label><input name="area" value="${esc(rd.area || rd.location || '')}"><label>Address</label><textarea name="address">${esc(rd.address || '')}</textarea><label>Vehicle Type</label><input name="vehicle_type" value="${esc(rd.vehicle_type || '')}"><label>NID</label><input name="nid" value="${esc(rd.nid || '')}"><label><input type="checkbox" name="is_available" ${boolish(rd.is_available) ? 'checked' : ''}> Available</label><label>Profile Image</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(rd.image_url || '')}"><button>Save Profile</button></form></section><section class="card"><h2>Assigned Orders</h2><p style="color:var(--muted);font-weight:900">Next action: accept, pick up, deliver, or mark failed.</p></section><section class="cards">${cards || '<div class="card"><h2>No assigned orders</h2><p style="color:var(--muted);font-weight:900">New orders will appear here after admin dispatch.</p></div>'}</section>`, 'rider'));
+  } catch (e) { next(e); }
+});
+
+
+app.post('/rider/orders/update-status', async (req, res, next) => {
+  try {
+    const riderSessionId = readPortalSession(req, 'rider');
+    if (!riderSessionId) return res.status(403).send(riderLoginPage('', 'Please login first.'));
+    const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE id=$1 LIMIT 1`, [riderSessionId]);
+    const rd = rider.rows[0];
+    if (!rd) {
+      clearPortalSession(req, res, 'rider');
+      return res.status(401).send(riderLoginPage('', 'Session expired. Please login again.'));
+    }
+    if (String(rd.status || '').toLowerCase() !== 'approved') return res.status(403).send(page('Rider Pending', `<section class="card"><h1>Approval Required</h1><a class="btn secondary" href="/rider/dashboard">Back Dashboard</a></section>`, 'rider'));
+    const status = cleanOrderStatus(req.body.status, 'picked_up');
+    if (!['picked_up', 'on_the_way', 'delivered'].includes(status)) return res.status(400).send(page('Invalid Status', `<section class="card"><h1>Invalid rider action</h1><a class="btn secondary" href="/rider/dashboard">Back Dashboard</a></section>`, 'rider'));
+    const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_id=$4 OR assigned_rider_id=$4 OR rider_phone=$5 OR assigned_rider_phone=$5) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), rd.id, rd.phone || '']);
+    if (updated.rows.length) {
+      const o = updated.rows[0];
+      await recordOrderEvent(o.id, 'rider_status', status, String(req.body.rider_note || ''), 'rider', rd.rider_name || rd.phone || 'Rider');
+      sendTelegram([`GOVO Rider Order Update`, `Order: ${o.order_code || orderCodeFromId(o.id)}`, `Status: ${status}`, `Rider: ${rd.rider_name || ''} (${rd.phone || ''})`, `Customer: ${o.customer_name || ''} (${o.customer_phone || ''})`, `Address: ${o.customer_address || o.drop_location || ''}`].join('\n')).catch(() => {});
+    }
+    res.redirect('/rider/dashboard');
   } catch (e) { next(e); }
 });
 
