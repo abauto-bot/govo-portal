@@ -399,7 +399,160 @@ function page(title, body, active = '') {
   const robots = isAdmin ? '<meta name="robots" content="noindex,nofollow">' : '';
   const showBottom = !['admin', 'merchant', 'rider'].includes(active);
   const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="/track">Track</a><a href="/merchant">Join</a></nav>` : '';
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO</h2><p>Meherpur Super App</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
+  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style>
+<style id="govo-app-brand-polish-v1">
+  .topbar{
+    background:
+      radial-gradient(circle at 10% 0%, rgba(34,197,94,.16), transparent 35%),
+      rgba(7,19,15,.88) !important;
+    border:1px solid rgba(34,197,94,.18) !important;
+    box-shadow:0 18px 55px rgba(0,0,0,.26) !important;
+    backdrop-filter:blur(18px) !important;
+  }
+
+  .brand-row{
+    align-items:center !important;
+    gap:14px !important;
+  }
+
+  .govo-app-brand{
+    display:flex !important;
+    align-items:center !important;
+    gap:13px !important;
+    min-width:0 !important;
+  }
+
+  .govo-app-wordmark{
+    display:inline-flex !important;
+    align-items:center !important;
+    text-decoration:none !important;
+    color:#f7fff8 !important;
+    font-weight:950 !important;
+    letter-spacing:-.08em !important;
+    font-size:clamp(34px, 8vw, 58px) !important;
+    line-height:.9 !important;
+    text-shadow:0 14px 45px rgba(0,0,0,.35) !important;
+    white-space:nowrap !important;
+  }
+
+  .govo-app-wordmark span{
+    color:#22c55e !important;
+    text-shadow:0 0 18px rgba(34,197,94,.75) !important;
+    margin-left:.02em !important;
+  }
+
+  .govo-app-brand-copy h2{
+    margin:0 !important;
+    font-size:18px !important;
+    line-height:1.05 !important;
+    letter-spacing:-.04em !important;
+    color:#f4fff7 !important;
+  }
+
+  .govo-app-brand-copy p{
+    margin:3px 0 0 !important;
+    color:rgba(244,255,247,.68) !important;
+    font-size:12px !important;
+    line-height:1.2 !important;
+  }
+
+  .header-actions{
+    gap:8px !important;
+    flex-wrap:wrap !important;
+    justify-content:flex-end !important;
+  }
+
+  .theme-toggle{
+    min-height:42px !important;
+    border-radius:999px !important;
+    padding:0 14px !important;
+    font-weight:800 !important;
+  }
+
+  .nav{
+    border-radius:22px !important;
+    background:rgba(255,255,255,.05) !important;
+    border:1px solid rgba(255,255,255,.08) !important;
+    padding:8px !important;
+    gap:6px !important;
+  }
+
+  .nav a{
+    border-radius:16px !important;
+    font-weight:800 !important;
+    padding:10px 12px !important;
+  }
+
+  .app-hero{
+    background:
+      radial-gradient(circle at 8% 0%, rgba(34,197,94,.18), transparent 38%),
+      rgba(255,255,255,.065) !important;
+    border:1px solid rgba(34,197,94,.18) !important;
+    box-shadow:0 20px 70px rgba(0,0,0,.22) !important;
+  }
+
+  .card{
+    border-radius:24px !important;
+    border:1px solid rgba(255,255,255,.11) !important;
+    box-shadow:0 16px 45px rgba(0,0,0,.18) !important;
+  }
+
+  .btn, button, input[type="submit"]{
+    border-radius:999px !important;
+    font-weight:850 !important;
+  }
+
+  @media(max-width:720px){
+    .topbar{
+      padding:14px !important;
+      border-radius:0 0 26px 26px !important;
+    }
+
+    .brand-row{
+      gap:10px !important;
+    }
+
+    .govo-app-wordmark{
+      font-size:clamp(38px, 12vw, 56px) !important;
+    }
+
+    .govo-app-brand-copy{
+      display:none !important;
+    }
+
+    .header-actions .pill{
+      display:none !important;
+    }
+
+    .theme-toggle{
+      min-width:74px !important;
+      padding:0 10px !important;
+      font-size:13px !important;
+    }
+
+    .nav{
+      overflow-x:auto !important;
+      flex-wrap:nowrap !important;
+      justify-content:flex-start !important;
+      -webkit-overflow-scrolling:touch !important;
+    }
+
+    .nav a{
+      white-space:nowrap !important;
+      flex-shrink:0 !important;
+    }
+
+    .app{
+      padding-bottom:100px !important;
+    }
+
+    h1{
+      letter-spacing:-.045em !important;
+      line-height:1.08 !important;
+    }
+  }
+</style>
+</head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO</h2><p>Meherpur Super App</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}</body></html>`;
 }
 
 function badge(status) {
