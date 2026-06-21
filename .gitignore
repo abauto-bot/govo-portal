@@ -21,3 +21,4 @@ uploads/
 *.before-*
 server.js.before-*
 server.js.after-*
+.aider*
