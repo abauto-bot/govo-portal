@@ -690,6 +690,341 @@ function homeStylePublicChromeV2() {
 `;
 }
 
+
+function govoPublicShellCssV5() {
+  return `
+/* GOVO CLEAN PUBLIC SHELL V5 */
+body.public{
+  background:
+    radial-gradient(circle at 18% 0%, rgba(34,197,94,.18), transparent 30%),
+    radial-gradient(circle at 88% 18%, rgba(22,163,74,.12), transparent 34%),
+    linear-gradient(180deg,#07130f 0%,#07110f 48%,#050b09 100%) !important;
+  color:#f7fff8 !important;
+}
+
+body.public:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+  opacity:.28;
+  background-image:
+    linear-gradient(rgba(34,197,94,.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,197,94,.13) 1px, transparent 1px);
+  background-size:72px 72px;
+}
+
+body.public .app{
+  width:min(1120px,calc(100% - 32px)) !important;
+  margin:0 auto !important;
+  padding:0 0 118px !important;
+}
+
+body.public .govo-clean-topbar{
+  margin:0 auto 30px !important;
+  padding:18px 20px !important;
+  border-radius:0 0 30px 30px !important;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(34,197,94,.20), transparent 35%),
+    linear-gradient(180deg, rgba(7,19,15,.98), rgba(7,19,15,.78)) !important;
+  border:1px solid rgba(34,197,94,.22) !important;
+  box-shadow:0 18px 65px rgba(0,0,0,.34) !important;
+  backdrop-filter:blur(18px) !important;
+}
+
+body.public .govo-clean-row{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:18px !important;
+}
+
+body.public .govo-clean-logo{
+  text-decoration:none !important;
+  color:#f8fff8 !important;
+  font-weight:950 !important;
+  letter-spacing:-.09em !important;
+  font-size:clamp(64px,9vw,98px) !important;
+  line-height:.78 !important;
+  white-space:nowrap !important;
+  text-shadow:0 14px 50px rgba(0,0,0,.44) !important;
+}
+
+body.public .govo-clean-logo span{
+  color:#22c55e !important;
+  text-shadow:0 0 20px rgba(34,197,94,.9) !important;
+  margin-left:.015em !important;
+}
+
+body.public .govo-clean-menu-btn{
+  width:58px !important;
+  height:58px !important;
+  border-radius:999px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  background:
+    radial-gradient(circle at 35% 20%, rgba(34,197,94,.22), transparent 38%),
+    rgba(7,19,15,.86) !important;
+  border:1px solid rgba(34,197,94,.45) !important;
+  box-shadow:0 16px 45px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08) !important;
+  backdrop-filter:blur(18px) !important;
+  flex-shrink:0 !important;
+  z-index:999999 !important;
+  padding:0 !important;
+}
+
+body.public .govo-clean-menu-btn i{
+  width:24px !important;
+  height:3px !important;
+  border-radius:99px !important;
+  background:#f4fff7 !important;
+  box-shadow:0 0 12px rgba(34,197,94,.36) !important;
+  transition:transform .22s ease, opacity .22s ease, width .22s ease !important;
+}
+
+body.public .govo-clean-menu-btn i:nth-child(2){
+  width:17px !important;
+  background:#22c55e !important;
+}
+
+body.public.govo-clean-menu-open .govo-clean-menu-btn i:nth-child(1){
+  transform:translateY(8px) rotate(45deg) !important;
+}
+body.public.govo-clean-menu-open .govo-clean-menu-btn i:nth-child(2){
+  opacity:0 !important;
+  width:0 !important;
+}
+body.public.govo-clean-menu-open .govo-clean-menu-btn i:nth-child(3){
+  transform:translateY(-8px) rotate(-45deg) !important;
+}
+
+body.public .govo-clean-menu-panel{
+  display:none !important;
+  position:fixed !important;
+  top:96px !important;
+  right:18px !important;
+  width:255px !important;
+  z-index:999999 !important;
+  padding:14px !important;
+  border-radius:26px !important;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(34,197,94,.18), transparent 44%),
+    rgba(7,19,15,.96) !important;
+  border:1px solid rgba(34,197,94,.40) !important;
+  box-shadow:0 24px 75px rgba(0,0,0,.52) !important;
+  backdrop-filter:blur(18px) !important;
+}
+
+body.public.govo-clean-menu-open .govo-clean-menu-panel{
+  display:block !important;
+}
+
+body.public .govo-clean-menu-panel a,
+body.public .govo-clean-menu-panel button{
+  width:100% !important;
+  min-height:50px !important;
+  margin:7px 0 !important;
+  border-radius:18px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  text-decoration:none !important;
+  font-weight:900 !important;
+  color:#f4fff7 !important;
+  background:rgba(255,255,255,.08) !important;
+  border:1px solid rgba(255,255,255,.13) !important;
+}
+
+body.public .govo-clean-menu-panel button:first-child{
+  color:#04110a !important;
+  background:linear-gradient(135deg,#22c55e,#16a34a) !important;
+}
+
+/* kill all old public header fragments */
+body.public .topbar:not(.govo-clean-topbar),
+body.public .brand .logo,
+body.public .brand h2,
+body.public .brand p,
+body.public .header-actions,
+body.public .theme-toggle,
+body.public #themeToggle,
+body.public .topbar > .nav,
+body.public #govo-shell-menu-btn,
+body.public #govo-shell-menu-panel,
+body.public #govo-public-menu-btn,
+body.public #govo-public-menu-panel,
+body.public #govo-more-btn,
+body.public #govo-more-panel{
+  display:none !important;
+}
+
+/* homepage-like cards and buttons */
+body.public .app-hero,
+body.public .card,
+body.public .compact-card,
+body.public .shop-card,
+body.public .provider-card,
+body.public .rider-card{
+  border-radius:30px !important;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(34,197,94,.14), transparent 38%),
+    rgba(255,255,255,.062) !important;
+  border:1px solid rgba(255,255,255,.13) !important;
+  box-shadow:0 20px 70px rgba(0,0,0,.24) !important;
+  backdrop-filter:blur(14px) !important;
+}
+
+body.public h1{
+  color:#22c55e !important;
+  letter-spacing:-.055em !important;
+  line-height:1.05 !important;
+  font-weight:950 !important;
+  text-shadow:0 0 26px rgba(34,197,94,.18) !important;
+}
+
+body.public h2,
+body.public h3{
+  letter-spacing:-.035em !important;
+  line-height:1.12 !important;
+}
+
+body.public p{
+  color:rgba(244,255,247,.72) !important;
+  line-height:1.72 !important;
+}
+
+body.public input,
+body.public textarea,
+body.public select{
+  border-radius:20px !important;
+  background:#020617 !important;
+  border:1px solid rgba(255,255,255,.12) !important;
+  color:#f8fff8 !important;
+}
+
+body.public .btn,
+body.public button,
+body.public input[type="submit"]{
+  border-radius:999px !important;
+  font-weight:900 !important;
+}
+
+body.public .btn:not(.secondary),
+body.public button:not(.secondary),
+body.public input[type="submit"]{
+  background:linear-gradient(135deg,#22c55e,#16a34a) !important;
+  color:#04110a !important;
+  box-shadow:0 16px 40px rgba(34,197,94,.28) !important;
+}
+
+body.public .secondary,
+body.public .btn.secondary,
+body.public a.secondary{
+  background:rgba(15,23,42,.88) !important;
+  color:#f5fff7 !important;
+  border:1px solid rgba(255,255,255,.12) !important;
+}
+
+body.public .bottom-nav{
+  position:fixed !important;
+  left:50% !important;
+  bottom:18px !important;
+  transform:translateX(-50%) !important;
+  width:min(720px,calc(100% - 28px)) !important;
+  padding:10px !important;
+  border-radius:30px !important;
+  background:rgba(4,12,22,.92) !important;
+  border:1px solid rgba(34,197,94,.38) !important;
+  box-shadow:0 20px 70px rgba(0,0,0,.42) !important;
+  backdrop-filter:blur(18px) !important;
+  z-index:99999 !important;
+}
+
+body.public .bottom-nav a{
+  border-radius:999px !important;
+  font-weight:900 !important;
+}
+
+@media(max-width:720px){
+  body.public .app{
+    width:100% !important;
+    padding:0 18px 122px !important;
+  }
+
+  body.public .govo-clean-topbar{
+    margin-left:-18px !important;
+    margin-right:-18px !important;
+    padding:15px 18px !important;
+    border-radius:0 0 24px 24px !important;
+  }
+
+  body.public .govo-clean-logo{
+    font-size:clamp(56px,16vw,82px) !important;
+    max-width:70vw !important;
+  }
+
+  body.public .govo-clean-menu-btn{
+    width:54px !important;
+    height:54px !important;
+  }
+
+  body.public .govo-clean-menu-panel{
+    top:86px !important;
+    right:16px !important;
+    width:240px !important;
+  }
+
+  body.public .app-hero,
+  body.public .card{
+    border-radius:26px !important;
+  }
+
+  body.public h1{
+    font-size:clamp(34px,9vw,54px) !important;
+  }
+}
+`;
+}
+
+function govoCleanPublicHeaderV5(isAdmin, nav) {
+  if (isAdmin) {
+    return `<header class="topbar"><div class="brand-row"><div class="brand"><div class="logo"></div><div><h2>GOVO</h2><p>Meherpur Super App</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>`;
+  }
+  return `<header class="topbar govo-clean-topbar">
+    <div class="brand-row govo-clean-row">
+      <a class="govo-clean-logo" href="https://app.govoexpress.com/app">GOVO<span>.</span></a>
+      <button type="button" class="govo-clean-menu-btn" onclick="document.body.classList.toggle('govo-clean-menu-open')" aria-label="Open GOVO menu"><i></i><i></i><i></i></button>
+    </div>
+    <nav class="govo-clean-menu-panel">
+      <button type="button" onclick="window.govoToggleTheme ? window.govoToggleTheme() : document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light')">☀️ / 🌙 Theme</button>
+      <a href="https://app.govoexpress.com/app">🏠 App</a>
+      <a href="https://app.govoexpress.com/shops">🏪 Shops</a>
+      <a href="https://app.govoexpress.com/services">🛠️ Services</a>
+      <a href="https://app.govoexpress.com/track">🔎 Track</a>
+      <a href="https://app.govoexpress.com/support">☎️ Support</a>
+      <a href="https://merchant.govoexpress.com/merchant/dashboard">🏬 Merchant Login</a>
+      <a href="https://merchant.govoexpress.com/merchant">➕ Merchant Join</a>
+      <a href="https://rider.govoexpress.com/rider">🏍️ Rider</a>
+    </nav>
+  </header>`;
+}
+
+function govoCleanPublicRuntimeV5() {
+  return `<script id="govo-clean-public-runtime-v5">
+(function(){
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('.govo-clean-menu-btn');
+    var panel = e.target.closest && e.target.closest('.govo-clean-menu-panel');
+    if(!btn && !panel) document.body.classList.remove('govo-clean-menu-open');
+  });
+})();
+</script>`;
+}
+
 function page(title, body, active = '') {
   const publicNav = [
     ['app', '/app', 'App'],
@@ -1014,7 +1349,7 @@ function page(title, body, active = '') {
     }
   }
 </style>
-</head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app"><header class="topbar"><div class="brand-row"><div class="brand"><div class="logo">G</div><div><h2>GOVO</h2><p>Meherpur Super App</p></div></div><div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div></div>${nav}</header>${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${isAdmin ? '' : homeStylePublicChromeV2()}</body></html>`;
+</head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app">${govoCleanPublicHeaderV5(isAdmin, nav)}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${isAdmin ? '' : homeStylePublicChromeV2()}</body></html>`;
 }
 
 function badge(status) {
