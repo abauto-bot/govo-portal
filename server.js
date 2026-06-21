@@ -400,6 +400,162 @@ function page(title, body, active = '') {
   const showBottom = !['admin', 'merchant', 'rider'].includes(active);
   const bottom = showBottom ? `<nav class="bottom-nav"><a class="${active === 'app' ? 'active' : ''}" href="https://app.govoexpress.com/app">Home</a><a class="${active === 'shops' ? 'active' : ''}" href="https://app.govoexpress.com/shops">Shops</a><a class="${active === 'services' ? 'active' : ''}" href="https://app.govoexpress.com/services">Services</a><a class="${active === 'track' ? 'active' : ''}" href="https://app.govoexpress.com/track">Track</a><a href="https://merchant.govoexpress.com/merchant">Join</a></nav>` : '';
   return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robots}${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}</style>
+<style id="govo-home-style-app-header-v1">
+  .topbar{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(34,197,94,.18), transparent 34%),
+      linear-gradient(180deg, rgba(7,19,15,.96), rgba(7,19,15,.82)) !important;
+    border:1px solid rgba(34,197,94,.20) !important;
+    border-radius:0 0 28px 28px !important;
+    box-shadow:0 18px 60px rgba(0,0,0,.30) !important;
+    backdrop-filter:blur(18px) !important;
+    padding:18px 18px 14px !important;
+  }
+
+  .brand-row{
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:14px !important;
+  }
+
+  .home-style-brand{
+    display:flex !important;
+    align-items:center !important;
+    gap:14px !important;
+    min-width:0 !important;
+  }
+
+  .home-style-wordmark{
+    text-decoration:none !important;
+    color:#f8fff8 !important;
+    font-weight:950 !important;
+    letter-spacing:-.09em !important;
+    font-size:clamp(42px, 9vw, 76px) !important;
+    line-height:.82 !important;
+    white-space:nowrap !important;
+    text-shadow:0 15px 45px rgba(0,0,0,.34) !important;
+  }
+
+  .home-style-wordmark span{
+    color:#22c55e !important;
+    text-shadow:0 0 18px rgba(34,197,94,.8) !important;
+    margin-left:.02em !important;
+  }
+
+  .home-style-copy h2{
+    margin:0 !important;
+    color:#f5fff7 !important;
+    font-size:18px !important;
+    line-height:1.05 !important;
+    letter-spacing:-.035em !important;
+  }
+
+  .home-style-copy p{
+    margin:4px 0 0 !important;
+    color:rgba(245,255,247,.68) !important;
+    font-size:13px !important;
+    line-height:1.2 !important;
+  }
+
+  .header-actions{
+    gap:8px !important;
+    align-items:center !important;
+  }
+
+  .header-actions .pill{
+    display:none !important;
+  }
+
+  .theme-toggle{
+    border-radius:999px !important;
+    min-height:44px !important;
+    padding:0 16px !important;
+    font-weight:900 !important;
+    background:rgba(15,23,42,.86) !important;
+    border:1px solid rgba(255,255,255,.12) !important;
+  }
+
+  .nav{
+    margin-top:16px !important;
+    padding:8px !important;
+    border-radius:999px !important;
+    background:rgba(255,255,255,.055) !important;
+    border:1px solid rgba(255,255,255,.10) !important;
+    overflow-x:auto !important;
+    flex-wrap:nowrap !important;
+    justify-content:flex-start !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+
+  .nav a{
+    flex-shrink:0 !important;
+    border-radius:999px !important;
+    padding:11px 18px !important;
+    font-weight:900 !important;
+    color:#b9ffd0 !important;
+  }
+
+  .nav a.active{
+    background:rgba(34,197,94,.13) !important;
+    border-color:#22c55e !important;
+    color:#f5fff7 !important;
+  }
+
+  .app-hero,
+  .card{
+    background:
+      radial-gradient(circle at 12% 0%, rgba(34,197,94,.12), transparent 35%),
+      rgba(255,255,255,.062) !important;
+    border:1px solid rgba(255,255,255,.12) !important;
+    box-shadow:0 18px 55px rgba(0,0,0,.22) !important;
+  }
+
+  .btn, button, input[type="submit"]{
+    border-radius:999px !important;
+    font-weight:900 !important;
+  }
+
+  @media(max-width:720px){
+    .topbar{
+      padding:14px 16px 12px !important;
+      border-radius:0 0 24px 24px !important;
+    }
+
+    .home-style-wordmark{
+      font-size:clamp(48px, 14vw, 72px) !important;
+      max-width:68vw !important;
+    }
+
+    .home-style-copy{
+      display:none !important;
+    }
+
+    .theme-toggle{
+      min-width:78px !important;
+      height:46px !important;
+      font-size:13px !important;
+      padding:0 12px !important;
+    }
+
+    .nav{
+      margin-top:14px !important;
+      gap:8px !important;
+      padding:8px !important;
+    }
+
+    .nav a{
+      min-width:max-content !important;
+      padding:10px 16px !important;
+      font-size:14px !important;
+    }
+
+    .app{
+      padding-top:10px !important;
+      padding-bottom:104px !important;
+    }
+  }
+</style>
+
 <style id="govo-app-brand-polish-v1">
   .topbar{
     background:
