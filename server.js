@@ -13,6 +13,45 @@ loadEnv();
 
 const app = express();
 
+/* GOVO_TRUE_MERGE_V3 */
+require("./govo_unified_v3").mount(app);
+/* GOVO_TRUE_MERGE_V3_END */
+
+
+
+
+// ===== ABU OS V6.4 GOVO SCANNER SHIELD =====
+// Purpose: block common internet scanner paths before they reach app routes/DB parsing.
+// This prevents noise like "/.env" becoming route params and causing PostgreSQL integer parse errors.
+const ABU_SCANNER_BLOCK_PATTERNS = [
+  /(^|\/)\.env($|[/?#])/i,
+  /(^|\/)\.env\./i,
+  /(^|\/)\.git($|[/?#])/i,
+  /(^|\/)jolokia($|\/|\?)/i,
+  /(^|\/)api\/jolokia($|\/|\?)/i,
+  /(^|\/)wp-admin($|\/|\?)/i,
+  /(^|\/)wp-login\.php($|[/?#])/i,
+  /(^|\/)phpmyadmin($|\/|\?)/i,
+  /(^|\/)pma($|\/|\?)/i,
+  /(^|\/)boaform($|\/|\?)/i,
+  /(^|\/)cgi-bin($|\/|\?)/i,
+  /(^|\/)vendor\/phpunit($|\/|\?)/i,
+  /(^|\/)config\.json($|[/?#])/i
+];
+
+function abuScannerShield(req, res, next) {
+  const url = String(req.originalUrl || req.url || "");
+  if (ABU_SCANNER_BLOCK_PATTERNS.some((pattern) => pattern.test(url))) {
+    return res.status(404).type("text/plain").send("Not found");
+  }
+  return next();
+}
+
+app.use(abuScannerShield);
+// ===== END ABU OS V6.4 GOVO SCANNER SHIELD =====
+
+
+
 /* GOVO PRODUCT UPLOAD FIX START */
 const govoUploadsDir = path.join(__dirname, "uploads");
 
@@ -1421,7 +1460,12 @@ function statCards(c) {
 }
 
 async function ensureSchema() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_leads (id SERIAL PRIMARY KEY, shop_name TEXT, owner_name TEXT, phone TEXT, location TEXT, category TEXT, delivery_needed TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
+  
+  if (process.env.GOVO_SKIP_DB === '1') {
+    console.log('⚠️ GOVO_SKIP_DB=1 set: ensureSchema skipped for UI/test mode');
+    return;
+  }
+await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_leads (id SERIAL PRIMARY KEY, shop_name TEXT, owner_name TEXT, phone TEXT, location TEXT, category TEXT, delivery_needed TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_rider_leads (id SERIAL PRIMARY KEY, rider_name TEXT, phone TEXT, location TEXT, vehicle_type TEXT, experience TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_orders (id SERIAL PRIMARY KEY, shop_name TEXT, merchant_phone TEXT, customer_name TEXT, customer_phone TEXT, pickup_location TEXT, drop_location TEXT, item_details TEXT, note TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_order_events (id SERIAL PRIMARY KEY, order_id INTEGER, event_type TEXT, status TEXT, note TEXT, actor_type TEXT DEFAULT 'admin', actor_name TEXT, created_at TIMESTAMP DEFAULT NOW())`);
@@ -1545,8 +1589,371 @@ app.get('/', (req, res) => {
 });
 app.get('/health', (req, res) => res.json({ ok: true, service: 'govo-portal', version: 'v1.0-clean-phase1' }));
 
+
+
+/* GOVO DIRECT PREMIUM PUBLIC BODY FIX - generated safe helper */
+function govoDirectSafe(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[m]));
+}
+
+function govoDirectPublicCss() {
+  return `
+  <style>
+    .govo-public-page{
+      width:min(1160px, calc(100% - 28px));
+      margin:0 auto;
+      padding:22px 0 96px;
+      color:#ecfff6;
+    }
+    .govo-premium-hero,
+    .govo-premium-panel{
+      position:relative;
+      overflow:hidden;
+      border:1px solid rgba(167,255,206,.14);
+      background:
+        radial-gradient(circle at 18% 0%, rgba(58,255,173,.18), transparent 34%),
+        radial-gradient(circle at 100% 10%, rgba(255,218,121,.11), transparent 28%),
+        linear-gradient(135deg, rgba(6,38,31,.92), rgba(5,15,24,.95));
+      box-shadow:0 24px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06);
+      border-radius:28px;
+    }
+    .govo-premium-hero{
+      padding:28px;
+      min-height:220px;
+    }
+    .govo-premium-hero:before,
+    .govo-premium-panel:before{
+      content:"";
+      position:absolute;
+      inset:0;
+      opacity:.28;
+      background-image:
+        linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
+      background-size:34px 34px;
+      pointer-events:none;
+    }
+    .govo-premium-hero > *,
+    .govo-premium-panel > *{
+      position:relative;
+      z-index:1;
+    }
+    .govo-kicker{
+      display:inline-flex;
+      align-items:center;
+      gap:9px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(167,255,206,.18);
+      background:rgba(255,255,255,.06);
+      color:#a7ffce;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      font-size:12px;
+    }
+    .govo-display{
+      margin:15px 0 10px;
+      font-size:clamp(34px, 6vw, 66px);
+      line-height:.95;
+      letter-spacing:-.06em;
+      font-weight:950;
+      color:#f3fff9;
+    }
+    .govo-display .dot,
+    .govo-brand-inline .dot{
+      color:#74ffaf;
+    }
+    .govo-lead{
+      max-width:760px;
+      color:rgba(236,255,246,.72);
+      font-size:16px;
+      line-height:1.7;
+      margin:0;
+    }
+    .govo-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      margin-top:20px;
+    }
+    .govo-btn,
+    .govo-public-page .btn,
+    .govo-public-page button{
+      appearance:none;
+      border:0;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:48px;
+      padding:0 18px;
+      border-radius:16px;
+      font-weight:900;
+      color:#052018;
+      background:linear-gradient(135deg, #79ffb2, #d6ff8f);
+      box-shadow:0 16px 34px rgba(70,255,154,.18);
+      cursor:pointer;
+    }
+    .govo-btn.secondary,
+    .govo-public-page .btn.secondary{
+      color:#ecfff6;
+      background:rgba(255,255,255,.07);
+      border:1px solid rgba(167,255,206,.16);
+      box-shadow:none;
+    }
+    .govo-grid{
+      display:grid;
+      grid-template-columns:repeat(12, 1fr);
+      gap:16px;
+      margin-top:16px;
+    }
+    .govo-premium-panel{
+      grid-column:span 12;
+      padding:22px;
+    }
+    .govo-premium-panel h2{
+      margin:0 0 12px;
+      font-size:24px;
+      letter-spacing:-.03em;
+      color:#f3fff9;
+    }
+    .govo-section-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .govo-public-page .pill,
+    .govo-public-page .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      padding:8px 11px;
+      border-radius:999px;
+      border:1px solid rgba(167,255,206,.15);
+      background:rgba(255,255,255,.06);
+      color:#a7ffce;
+      font-weight:800;
+      text-decoration:none;
+    }
+    .govo-chip-list,
+    .chips{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .govo-result-grid,
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+      gap:14px;
+    }
+    .govo-result-grid > *,
+    .cards > *,
+    .govo-public-page .card{
+      border:1px solid rgba(167,255,206,.13);
+      background:rgba(255,255,255,.06);
+      border-radius:22px;
+      padding:16px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .govo-form-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:14px;
+    }
+    .govo-form-grid .full{
+      grid-column:1 / -1;
+    }
+    .govo-public-page label{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      color:rgba(236,255,246,.78);
+      font-weight:800;
+    }
+    .govo-public-page input,
+    .govo-public-page select,
+    .govo-public-page textarea{
+      width:100%;
+      min-height:48px;
+      border-radius:16px;
+      border:1px solid rgba(167,255,206,.15);
+      background:rgba(1,15,13,.58);
+      color:#f3fff9;
+      padding:0 14px;
+      outline:none;
+    }
+    .govo-public-page textarea{
+      padding-top:12px;
+      min-height:110px;
+    }
+    .govo-public-page input::placeholder{
+      color:rgba(236,255,246,.42);
+    }
+    .govo-form-note,
+    .form-mute{
+      color:rgba(236,255,246,.62);
+      line-height:1.6;
+      margin:0 0 16px;
+    }
+    @media(max-width:720px){
+      .govo-public-page{
+        width:min(100% - 18px, 1160px);
+        padding-top:12px;
+      }
+      .govo-premium-hero,
+      .govo-premium-panel{
+        border-radius:22px;
+        padding:18px;
+      }
+      .govo-form-grid{
+        grid-template-columns:1fr;
+      }
+      .govo-actions .govo-btn,
+      .govo-actions .btn{
+        width:100%;
+      }
+    }
+  </style>`;
+}
+
+function govoDirectRiderPage(phoneValue = '') {
+  const phone = govoDirectSafe(phoneValue);
+  return page('GOVO Rider', `
+    ${govoDirectPublicCss()}
+    <main class="govo-public-page">
+      <section class="govo-premium-hero">
+        <span class="govo-kicker">Rider Network</span>
+        <h1 class="govo-display">Earn with GOVO<span class="dot">.</span></h1>
+        <p class="govo-lead">Join GOVO rider network and take local delivery requests with a clean, trusted operating system.</p>
+        <div class="govo-actions">
+          <a class="govo-btn" href="https://rider.govoexpress.com/rider">Rider Portal</a>
+          <a class="govo-btn secondary" href="https://app.govoexpress.com/support">Need Help?</a>
+        </div>
+      </section>
+
+      <section class="govo-grid">
+        <div class="govo-premium-panel">
+          <div class="govo-section-head">
+            <h2>Rider Login</h2>
+            <span class="pill">Fast access</span>
+          </div>
+          <form method="POST" action="/rider/login" class="govo-form-grid">
+            <label class="full">Phone
+              <input name="phone" value="${phone}" required placeholder="01XXXXXXXXX">
+            </label>
+            <div class="govo-actions full">
+              <button type="submit">Login Rider</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="govo-premium-panel">
+          <div class="govo-section-head">
+            <h2>Join as Rider</h2>
+            <span class="pill">Apply</span>
+          </div>
+          <p class="govo-form-note">Submit basic info. GOVO team will approve active riders.</p>
+          <form method="POST" action="/rider/register" class="govo-form-grid">
+            <label>Name
+              <input name="name" required placeholder="Your name">
+            </label>
+            <label>Phone
+              <input name="phone" value="${phone}" required placeholder="01XXXXXXXXX">
+            </label>
+            <label>Area
+              <input name="area" required placeholder="Meherpur / Gangni">
+            </label>
+            <label>Vehicle
+              <select name="vehicle">
+                <option>Bike</option>
+                <option>Cycle</option>
+                <option>Auto</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <div class="govo-actions full">
+              <button type="submit">Submit Rider Info</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+  `, 'rider');
+}
+
+
 app.get('/merchant', (req, res) => {
-  res.send(page('Merchant Registration', `<section class="card"><h1>GOVO Merchant Registration</h1><p class="form-hint">Shop info din. GOVO admin approve korle customer app-e show korbe.</p><form method="POST" action="/merchant"><label>Shop Name</label><input name="shop_name" required><label>Owner Name</label><input name="owner_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Category</label><select name="category"><option>Restaurant</option><option>Grocery</option><option>Pharmacy</option><option>Fashion</option><option>Electronics</option><option>Service Provider</option><option>Other</option></select><label>Delivery Needed?</label><select name="delivery_needed"><option>Yes</option><option>No</option><option>Later</option></select><button>Submit Merchant Info</button></form></section>`, 'merchant'));
+  res.send(page('GOVO Merchant Registration', `
+    ${govoDirectPublicCss()}
+    <main class="govo-public-page">
+      <section class="govo-premium-hero">
+        <span class="govo-kicker">Merchant Network</span>
+        <h1 class="govo-display">Grow with GOVO<span class="dot">.</span></h1>
+        <p class="govo-lead">Register your shop. GOVO admin approve korle customer app-e show korbe.</p>
+        <div class="govo-actions">
+          <a class="govo-btn" href="https://merchant.govoexpress.com/merchant/dashboard">Merchant Login</a>
+          <a class="govo-btn secondary" href="https://app.govoexpress.com/shops">View Shops</a>
+        </div>
+      </section>
+
+      <section class="govo-grid">
+        <div class="govo-premium-panel">
+          <div class="govo-section-head">
+            <h2>GOVO Merchant Registration</h2>
+            <span class="pill">Apply</span>
+          </div>
+          <p class="govo-form-note">Shop info din. Approval er por app-e customer order korte parbe.</p>
+
+          <form method="POST" action="/merchant" class="govo-form-grid">
+            <label>Shop Name
+              <input name="shop_name" required placeholder="Shop name">
+            </label>
+            <label>Owner Name
+              <input name="owner_name" required placeholder="Owner name">
+            </label>
+            <label>Phone
+              <input name="phone" required placeholder="01XXXXXXXXX">
+            </label>
+            <label>Location
+              <input name="location" required placeholder="Meherpur / Gangni">
+            </label>
+            <label>Category
+              <select name="category">
+                <option>Restaurant</option>
+                <option>Grocery</option>
+                <option>Pharmacy</option>
+                <option>Fashion</option>
+                <option>Electronics</option>
+                <option>Service Provider</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <label>Delivery Needed?
+              <select name="delivery_needed">
+                <option>Yes</option>
+                <option>No</option>
+                <option>Later</option>
+              </select>
+            </label>
+            <div class="govo-actions full">
+              <button type="submit">Submit Merchant Info</button>
+              <a class="govo-btn secondary" href="https://merchant.govoexpress.com/merchant/dashboard">Already registered?</a>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+  `, 'merchant'));
 });
 
 app.post('/merchant', async (req, res, next) => {
@@ -1560,7 +1967,7 @@ app.post('/merchant', async (req, res, next) => {
 
 app.get('/rider', (req, res) => {
   if (readPortalSession(req, 'rider')) return res.redirect('/rider/dashboard');
-  res.send(riderLoginPage(String(req.query.phone || '').trim()));
+  res.send(govoDirectRiderPage(String(req.query.phone || '').trim()));
 });
 
 app.get('/rider/register', (req, res) => {
@@ -3483,14 +3890,48 @@ app.get('/services', async (req, res, next) => {
     const q = String(req.query.q || '').trim().toLowerCase();
     const all = await approvedProviders();
     const uniqueRows = uniqueByIdentity(all.rows, 'provider');
-    let rows = q ? uniqueRows.filter((x) => providerSearchText(x).includes(q) || (q === 'emergency' && boolish(x.emergency_available))) : uniqueRows.slice(0, 30);
+    const rows = q ? uniqueRows.filter((x) => providerSearchText(x).includes(q) || (q === 'emergency' && boolish(x.emergency_available))) : uniqueRows.slice(0, 30);
+
     const chips = serviceCategories.map((cat) => chip(`${cat.icon} ${cat.title}`, `/services?q=${encodeURIComponent(cat.title)}`)).join('');
     const cards = rows.map(providerCard).join('');
+
     res.send(page('GOVO Services', `
-      <section class="card app-hero"><span class="pill">GOVO Services</span><h1>Book trusted local service providers</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Find approved providers for repair, health, agriculture, transport, rent and home support.</p><form method="GET" action="/services"><input name="q" value="${esc(q)}" placeholder="Search service, area, name, phone"><button>Search Services</button></form><div class="toolbar"><a class="btn secondary" href="https://app.govoexpress.com/app">Home</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://merchant.govoexpress.com/provider">Become Provider</a></div></section>
-      <section class="card"><div class="section-head"><h2>Service Categories</h2><span class="pill">${serviceCategories.length}</span></div><div class="chips">${chips}</div></section>
-      <section class="card"><div class="section-head"><h2>${q ? 'Service Search Results' : 'Featured Trusted Providers'}</h2><span class="pill">${rows.length} showing</span></div></section>
-      <section class="cards">${cards || pilotPartnerEmpty('provider')}</section>
+      ${govoDirectPublicCss()}
+      <main class="govo-public-page">
+        <section class="govo-premium-hero">
+          <span class="govo-kicker">GOVO Services</span>
+          <h1 class="govo-display">Trusted local service providers<span class="dot">.</span></h1>
+          <p class="govo-lead">Find approved providers for repair, health, agriculture, transport, rent and home support.</p>
+
+          <form method="GET" action="/services" class="govo-actions">
+            <input name="q" value="${govoDirectSafe(q)}" placeholder="Search service, area, name, phone">
+            <button type="submit">Search Services</button>
+          </form>
+
+          <div class="govo-actions">
+            <a class="govo-btn secondary" href="https://app.govoexpress.com/shops">Browse Shops</a>
+            <a class="govo-btn secondary" href="https://merchant.govoexpress.com/provider">Become Provider</a>
+          </div>
+        </section>
+
+        <section class="govo-grid">
+          <div class="govo-premium-panel">
+            <div class="govo-section-head">
+              <h2>Service Categories</h2>
+              <span class="pill">${serviceCategories.length}</span>
+            </div>
+            <div class="govo-chip-list">${chips}</div>
+          </div>
+
+          <div class="govo-premium-panel">
+            <div class="govo-section-head">
+              <h2>${q ? 'Service Search Results' : 'Featured Trusted Providers'}</h2>
+              <span class="pill">${rows.length} showing</span>
+            </div>
+            <div class="govo-result-grid">${cards || pilotPartnerEmpty('provider')}</div>
+          </div>
+        </section>
+      </main>
     `, 'services'));
   } catch (e) { next(e); }
 });

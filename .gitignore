@@ -24,3 +24,11 @@ server.js.after-*
 .aider*
 .govo-ai/
 *.env
+
+# GOVO AI/test artifacts
+.govo-ai/
+server.js.before-*
+*.before-*
+*.bak
+*.backup
+backups/
