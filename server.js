@@ -583,6 +583,479 @@ function govoPremiumFlowShellInject(html) {
   return out;
 }
 
+// GOVO_PREMIUM_PAGE_FLOW_V1
+// Premium inner page flow layer for public GOVO routes.
+// Safety: GET HTML UI only. No DB/auth/schema/secret behavior changes.
+const GOVO_PREMIUM_PAGE_FLOW_V1_CSS = `
+<style id="govo-premium-page-flow-v1">
+  :root{
+    --govo9-bg:#061512;
+    --govo9-green:#073f32;
+    --govo9-green2:#0b5a46;
+    --govo9-gold:#d8b46a;
+    --govo9-ivory:#fffaf0;
+    --govo9-soft:#f4efe3;
+    --govo9-ink:#10231d;
+    --govo9-muted:#66756e;
+    --govo9-shadow:0 18px 55px rgba(0,0,0,.22);
+  }
+
+  .govo-page-flow-wrap{
+    max-width:1120px;
+    margin:0 auto 18px;
+    padding:0 14px;
+    box-sizing:border-box;
+    font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;
+  }
+
+  .govo-page-flow-hero{
+    position:relative;
+    overflow:hidden;
+    border-radius:30px;
+    padding:22px;
+    margin:0 auto 14px;
+    color:var(--govo9-ivory);
+    background:
+      radial-gradient(circle at 20% 0%,rgba(216,180,106,.24),transparent 34%),
+      linear-gradient(135deg,#073f32,#0b5a46);
+    border:1px solid rgba(216,180,106,.42);
+    box-shadow:var(--govo9-shadow);
+  }
+
+  .govo-page-flow-kicker{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:7px 10px;
+    border-radius:999px;
+    background:rgba(255,250,240,.12);
+    border:1px solid rgba(216,180,106,.38);
+    color:#ead7a2;
+    font-size:12px;
+    font-weight:900;
+    margin-bottom:12px;
+  }
+
+  .govo-page-flow-hero h1{
+    margin:0;
+    font-size:clamp(30px,7vw,58px);
+    line-height:1.02;
+    letter-spacing:-.055em;
+  }
+
+  .govo-page-flow-hero p{
+    margin:10px 0 0;
+    color:#e7efe9;
+    max-width:720px;
+    line-height:1.55;
+  }
+
+  .govo-page-flow-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+  }
+
+  .govo-page-flow-actions a{
+    min-height:45px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:11px 14px;
+    border-radius:16px;
+    text-decoration:none;
+    font-weight:1000;
+    color:#073f32!important;
+    background:#fffaf0;
+    box-shadow:0 10px 28px rgba(0,0,0,.18);
+  }
+
+  .govo-page-flow-actions a.primary{
+    background:#d8b46a;
+    color:#10231d!important;
+  }
+
+  .govo-page-flow-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .govo-page-flow-card{
+    background:rgba(255,250,240,.96);
+    color:var(--govo9-ink);
+    border-radius:24px;
+    padding:15px;
+    border:1px solid rgba(216,180,106,.42);
+    box-shadow:0 14px 35px rgba(0,0,0,.14);
+  }
+
+  .govo-page-flow-card b{
+    display:block;
+    color:var(--govo9-green);
+    font-size:15px;
+    margin-bottom:5px;
+  }
+
+  .govo-page-flow-card span{
+    color:var(--govo9-muted);
+    font-size:13px;
+    line-height:1.42;
+  }
+
+  .govo-page-flow-mini{
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .govo-page-flow-mini span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 10px;
+    border-radius:999px;
+    background:rgba(255,250,240,.13);
+    border:1px solid rgba(216,180,106,.32);
+    color:#fffaf0;
+    font-size:12px;
+    font-weight:850;
+  }
+
+  .govo-premium-flow-v2 main,
+  .govo-premium-flow-v2 .wrap,
+  .govo-premium-flow-v2 [class*="container"]{
+    margin-top:14px;
+  }
+
+  .govo-premium-flow-v2 table{
+    border-radius:18px;
+    overflow:hidden;
+  }
+
+  .govo-premium-flow-v2 input,
+  .govo-premium-flow-v2 textarea,
+  .govo-premium-flow-v2 select{
+    border:1px solid rgba(7,63,50,.16)!important;
+    box-shadow:0 8px 22px rgba(0,0,0,.06);
+  }
+
+  .govo-premium-flow-v2 form button,
+  .govo-premium-flow-v2 form a,
+  .govo-premium-flow-v2 button[type="submit"]{
+    border-radius:16px!important;
+    min-height:46px;
+    font-weight:1000!important;
+  }
+
+  @media(max-width:760px){
+    .govo-page-flow-wrap{
+      padding:0 10px;
+      margin-bottom:12px;
+    }
+
+    .govo-page-flow-hero{
+      border-radius:26px;
+      padding:18px;
+    }
+
+    .govo-page-flow-grid{
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+
+    .govo-page-flow-actions a{
+      flex:1 1 145px;
+    }
+  }
+</style>
+`;
+
+function govoPremiumPageFlowConfig(pathname) {
+  const path = String(pathname || '/');
+
+  if (path === '/' || path === '') {
+    return {
+      kicker:'GOVO Express · Premium Local OS',
+      title:'Meherpur-er smart service control.',
+      desc:'Delivery, local service, shop support, rider/merchant flow — shob ek premium GOVO experience-er moddhe.',
+      actions:[
+        ['/app','Open Super App','primary'],
+        ['/service-request','Request Service',''],
+        ['/track','Track','']
+      ],
+      cards:[
+        ['Fast Request','Phone-first service request flow.'],
+        ['Local Trust','Merchant, rider, customer — clear operation.'],
+        ['Premium Control','Admin/dispatch/reporting ready.']
+      ],
+      mini:['Live GOVO UI OS','Premium flow','Local service network']
+    };
+  }
+
+  if (path.startsWith('/app')) {
+    return {
+      kicker:'Super App Hub',
+      title:'এক জায়গা থেকে সব GOVO service.',
+      desc:'Delivery, shops, technician, support, tracking — customer-er jonno clean premium shortcut.',
+      actions:[
+        ['/service-request','Start Request','primary'],
+        ['/shops','Browse Shops',''],
+        ['/services','Find Services',''],
+        ['/track','Track Request','']
+      ],
+      cards:[
+        ['Delivery','Local pickup/drop flow.'],
+        ['Services','Technician, helper, local need.'],
+        ['Tracking','Request status customer-safe view.']
+      ],
+      mini:['Customer-first','Bangla-friendly','Mobile-ready']
+    };
+  }
+
+  if (path.startsWith('/service-request')) {
+    return {
+      kicker:'Service Request',
+      title:'আপনার দরকারটা সহজে লিখুন.',
+      desc:'Name, mobile, area, address, need — clear dile GOVO operator quickly confirm korte parbe.',
+      actions:[
+        ['#','Fill the form below','primary'],
+        ['/support','Need Help?',''],
+        ['/track','Already requested? Track','']
+      ],
+      cards:[
+        ['1. Details দিন','Area, address, service need clear লিখুন.'],
+        ['2. Phone Confirm','GOVO operator request confirm করবে.'],
+        ['3. Track Update','Tracking page-e status update দেখবেন.']
+      ],
+      mini:['No confusion','Operator-ready','Fast follow-up']
+    };
+  }
+
+  if (path.startsWith('/track')) {
+    return {
+      kicker:'Tracking',
+      title:'আপনার request কোথায় আছে দেখুন.',
+      desc:'Request code দিয়ে current status, assigned person, support flow customer-safe ভাবে দেখুন.',
+      actions:[
+        ['/service-request','New Request',''],
+        ['/support','Support','primary']
+      ],
+      cards:[
+        ['Status','Phone confirming, assigned, working, completed.'],
+        ['Assigned Info','Customer-safe rider/worker update.'],
+        ['Support','Problem hole support route ready.']
+      ],
+      mini:['Safe tracking','No private notes','Live status']
+    };
+  }
+
+  if (path.startsWith('/support')) {
+    return {
+      kicker:'Support Desk',
+      title:'Problem hole GOVO পাশে আছে.',
+      desc:'Customer, merchant, rider — যেকোনো issue support flow দিয়ে handle করা হবে.',
+      actions:[
+        ['/service-request','Request Service','primary'],
+        ['/track','Track Request',''],
+        ['/app','Back to App','']
+      ],
+      cards:[
+        ['Customer Help','Request, delivery, tracking issue.'],
+        ['Merchant Help','Shop/order/fulfillment support.'],
+        ['Rider Help','Job/status/area support.']
+      ],
+      mini:['Friendly support','Local trust','Fast response']
+    };
+  }
+
+  if (path.startsWith('/shops')) {
+    return {
+      kicker:'Local Shops',
+      title:'Premium local shop discovery.',
+      desc:'GOVO shops flow local merchant, order, delivery fulfillment-er foundation.',
+      actions:[
+        ['/service-request','Order Help','primary'],
+        ['/merchant','Merchant Join',''],
+        ['/app','Super App','']
+      ],
+      cards:[
+        ['Shop List','Local product/service discovery.'],
+        ['Merchant Flow','Fulfillment preview ready.'],
+        ['Delivery Link','Order to dispatch pipeline.']
+      ],
+      mini:['Local commerce','Merchant-ready','Delivery-connected']
+    };
+  }
+
+  if (path.startsWith('/services')) {
+    return {
+      kicker:'Local Services',
+      title:'Technician, helper, daily-life service.',
+      desc:'GOVO services page customer-ke local trusted help-er sathe connect korar premium flow.',
+      actions:[
+        ['/service-request','Request Service','primary'],
+        ['/rider','Worker/Rider Join',''],
+        ['/support','Support','']
+      ],
+      cards:[
+        ['Daily Need','Electric, plumber, helper, local request.'],
+        ['Verified Flow','Operator-confirmed service assignment.'],
+        ['Trackable','Request status track kora যাবে.']
+      ],
+      mini:['Service OS','Local worker network','Customer-safe']
+    };
+  }
+
+  if (path.startsWith('/merchant')) {
+    return {
+      kicker:'Merchant Partner',
+      title:'GOVO merchant network-e join korun.',
+      desc:'Local shop/order/service fulfillment premium system-er sathe merchant onboarding.',
+      actions:[
+        ['/service-request','Customer Request',''],
+        ['/shops','Shops',''],
+        ['/support','Merchant Support','primary']
+      ],
+      cards:[
+        ['Visibility','Local customer reach.'],
+        ['Fulfillment','Admin preview + dispatch support.'],
+        ['Trust','Premium local brand positioning.']
+      ],
+      mini:['Merchant-ready','Shop growth','Local premium']
+    };
+  }
+
+  if (path.startsWith('/rider')) {
+    return {
+      kicker:'Rider / Worker Partner',
+      title:'GOVO rider-worker operation flow.',
+      desc:'Delivery, service assignment, local job update — rider/worker flow premium foundation.',
+      actions:[
+        ['/service-request','Customer Request',''],
+        ['/services','Services',''],
+        ['/support','Rider Support','primary']
+      ],
+      cards:[
+        ['Job Flow','Assigned, start, working, completed.'],
+        ['Local Area','Meherpur-centered operation.'],
+        ['Trust Layer','Admin/operator confirmed assignment.']
+      ],
+      mini:['Rider-ready','Worker-ready','Operation control']
+    };
+  }
+
+  if (path.startsWith('/admin/login')) {
+    return {
+      kicker:'Secure Admin',
+      title:'GOVO operator control access.',
+      desc:'Admin area protected. Dispatch, reports, checklist, operation flow login-er por.',
+      actions:[
+        ['/app','Back to App',''],
+        ['/support','Support','']
+      ],
+      cards:[
+        ['Protected','Unauth admin pages redirect.'],
+        ['Operator OS','Dispatch/report/checklist ready.'],
+        ['Safe Access','No public admin control.']
+      ],
+      mini:['Admin protected','Noindex','Private ops']
+    };
+  }
+
+  return null;
+}
+
+function govoPremiumPageFlowEscape(value) {
+  return String(value ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function govoPremiumPageFlowRender(pathname) {
+  const cfg = govoPremiumPageFlowConfig(pathname);
+  if (!cfg) return '';
+
+  const actions = (cfg.actions || []).map(function(item){
+    const href = govoPremiumPageFlowEscape(item[0]);
+    const label = govoPremiumPageFlowEscape(item[1]);
+    const cls = item[2] === 'primary' ? 'primary' : '';
+    return '<a class="' + cls + '" href="' + href + '">' + label + '</a>';
+  }).join('');
+
+  const cards = (cfg.cards || []).map(function(item){
+    return '<article class="govo-page-flow-card"><b>' + govoPremiumPageFlowEscape(item[0]) + '</b><span>' + govoPremiumPageFlowEscape(item[1]) + '</span></article>';
+  }).join('');
+
+  const mini = (cfg.mini || []).map(function(x){
+    return '<span>✦ ' + govoPremiumPageFlowEscape(x) + '</span>';
+  }).join('');
+
+  return GOVO_PREMIUM_PAGE_FLOW_V1_CSS +
+    '<section class="govo-page-flow-wrap" id="govo-premium-page-flow-v1">' +
+      '<div class="govo-page-flow-hero">' +
+        '<div class="govo-page-flow-kicker">' + govoPremiumPageFlowEscape(cfg.kicker) + '</div>' +
+        '<h1>' + govoPremiumPageFlowEscape(cfg.title) + '</h1>' +
+        '<p>' + govoPremiumPageFlowEscape(cfg.desc) + '</p>' +
+        '<div class="govo-page-flow-actions">' + actions + '</div>' +
+        '<div class="govo-page-flow-mini">' + mini + '</div>' +
+      '</div>' +
+      '<div class="govo-page-flow-grid">' + cards + '</div>' +
+    '</section>';
+}
+
+function govoPremiumPageFlowInject(html, pathname) {
+  if (typeof html !== 'string') return html;
+  if (html.includes('govo-premium-page-flow-v1')) return html;
+  if (!/<body[^>]*>/i.test(html)) return html;
+
+  const insert = govoPremiumPageFlowRender(pathname);
+  if (!insert) return html;
+
+  return html.replace(/<body([^>]*)>/i, '<body$1>' + insert);
+}
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+
+  const path = String(req.path || '');
+  if (path.startsWith('/api/')) return next();
+  if (path.startsWith('/admin') && path !== '/admin/login') return next();
+
+  const originalSend = res.send.bind(res);
+
+  res.send = function govoPremiumPageFlowSend(body) {
+    try {
+      const contentType = String(res.getHeader('content-type') || '').toLowerCase();
+
+      if (Buffer.isBuffer(body)) {
+        const text = body.toString('utf8');
+        if (text.includes('<body') || contentType.includes('text/html')) {
+          return originalSend(Buffer.from(govoPremiumPageFlowInject(text, path), 'utf8'));
+        }
+      }
+
+      if (typeof body === 'string' && (body.includes('<body') || contentType.includes('text/html'))) {
+        return originalSend(govoPremiumPageFlowInject(body, path));
+      }
+    } catch (err) {}
+
+    return originalSend(body);
+  };
+
+  next();
+});
+
+
+
+
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
 
