@@ -3301,15 +3301,68 @@ async function govoTrackPublicFindByCode(code) {
   const cleanCode = String(code || '').trim();
   if (!cleanCode) return null;
 
-  let items = [];
-  if (typeof govoDispatchReadOnlyRequests === 'function') {
-    items = await govoDispatchReadOnlyRequests();
+  let item = null;
+
+  // 1) Existing read-only source first
+  try {
+    let items = [];
+    if (typeof govoDispatchReadOnlyRequests === 'function') {
+      items = await govoDispatchReadOnlyRequests();
+    }
+
+    item = (items || []).find((row, index) => {
+      const itemCode = String(govoTrackPublicCode(row, index) || '').trim();
+      return itemCode && itemCode === cleanCode;
+    }) || null;
+  } catch (err) {
+    item = null;
   }
 
-  return (items || []).find((item, index) => {
-    const itemCode = String(govoTrackPublicCode(item, index) || '').trim();
-    return itemCode && itemCode === cleanCode;
-  }) || null;
+  // 2) Real PostgreSQL fallback by request_code/id.
+  // This fixes real DB mode where dispatch list source may not include the newly created request.
+  if (!item) {
+    try {
+      let pg = null;
+      if (typeof pool !== 'undefined' && pool && typeof pool.query === 'function') pg = pool;
+      else if (typeof db !== 'undefined' && db && typeof db.query === 'function') pg = db;
+      else if (typeof pgPool !== 'undefined' && pgPool && typeof pgPool.query === 'function') pg = pgPool;
+
+      if (pg) {
+        const result = await pg.query(
+          'SELECT * FROM service_requests WHERE request_code = $1 OR id::text = $1 ORDER BY id DESC LIMIT 1',
+          [cleanCode]
+        );
+        item = result && result.rows && result.rows[0] ? result.rows[0] : null;
+      }
+    } catch (err) {
+      item = null;
+    }
+  }
+
+  // 3) Merge customer-safe assignment shadow if available.
+  const shadow = typeof govoTrackAssignMemoryGet === 'function'
+    ? govoTrackAssignMemoryGet(cleanCode)
+    : null;
+
+  if (item && shadow) {
+    return Object.assign({}, item, {
+      assigned_name: shadow.assignedName,
+      assigned_phone: shadow.assignedPhone,
+      provider_name: shadow.assignedName,
+      provider_phone: shadow.assignedPhone
+    });
+  }
+
+  if (!item && shadow) {
+    return {
+      request_code: cleanCode,
+      status: 'Assigned',
+      assigned_name: shadow.assignedName,
+      assigned_phone: shadow.assignedPhone
+    };
+  }
+
+  return item;
 }
 
 function govoTrackPublicPayload(item, index = 0) {
@@ -6059,6 +6112,29 @@ app.get('/admin/launch-checklist', async (req, res, next) => {
     next(err);
   }
 });
+
+
+// GOVO_FIX_TRACK_SAFE_DB_FALLBACK
+// Safe in-process assignment shadow + DB fallback for customer tracking.
+// Safety: no secret exposure, no public request list, code-based lookup only.
+globalThis.govoTrackAssignmentShadow = globalThis.govoTrackAssignmentShadow || new Map();
+
+function govoTrackAssignMemoryPut(code, assignedName, assignedPhone) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return;
+  globalThis.govoTrackAssignmentShadow.set(cleanCode, {
+    assignedName: String(assignedName || '').trim().slice(0, 80),
+    assignedPhone: String(assignedPhone || '').trim().replace(/[^0-9+]/g, '').slice(0, 20),
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function govoTrackAssignMemoryGet(code) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return null;
+  return globalThis.govoTrackAssignmentShadow.get(cleanCode) || null;
+}
+
 
 // GOVO_FIX_ENSURE_DISPATCH_ASSIGN_ROUTE
 // Ensure assignment endpoint exists for admin dispatch + smoke tests.
