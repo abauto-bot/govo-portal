@@ -3388,6 +3388,45 @@ function govoTrackPublicPayload(item, index = 0) {
   };
 }
 
+
+
+// GOVO_FIX_SAFE_ASSIGNED_API_OVERRIDE_V3
+// This route is intentionally placed before the older safe-assigned-info handler.
+app.get('/api/track/safe-assigned-info', async (req, res, next) => {
+  try {
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+
+    const code = String(req.query.code || req.query.request_code || '').trim();
+    if (!code) {
+      return res.status(400).json({ ok: false, error: 'missing_code' });
+    }
+
+    const row = await govoSafeAssignedPgLookupV3(code);
+    const shadow = govoSafeAssignedGetV3(code);
+
+    if (!row && !shadow) {
+      return res.status(404).json({ ok: false, error: 'not_found' });
+    }
+
+    const payload = {
+      ok: true,
+      code,
+      status: String((row && (row.status || row.current_status)) || (shadow ? 'Assigned' : 'Phone Confirming')),
+      area: String((row && (row.customer_area || row.area || row.zone)) || ''),
+      address: String((row && (row.customer_address || row.address || row.location || row.delivery_address)) || ''),
+      need: String((row && (row.service_type || row.need || row.category || row.title)) || 'Service request'),
+      assignedName: String((shadow && shadow.assignedName) || ''),
+      assignedPhone: String((shadow && shadow.assignedPhone) || '')
+    };
+
+    return res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+
 app.get('/api/track/safe-assigned-info', async (req, res, next) => {
   try {
     res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
@@ -6139,6 +6178,80 @@ function govoTrackAssignMemoryGet(code) {
 // GOVO_FIX_ENSURE_DISPATCH_ASSIGN_ROUTE
 // Ensure assignment endpoint exists for admin dispatch + smoke tests.
 // Safety: admin protected, no public exposure, no schema migration.
+
+
+// GOVO_FIX_SAFE_ASSIGNED_ROUTE_OVERRIDE_V3
+// Simple safe fix: capture admin assignment POST into in-process shadow.
+// No route parsing, no schema change, no secret exposure.
+globalThis.govoSafeAssignedShadowV3 = globalThis.govoSafeAssignedShadowV3 || new Map();
+
+function govoSafeAssignedPutV3(code, assignedName, assignedPhone) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return;
+
+  globalThis.govoSafeAssignedShadowV3.set(cleanCode, {
+    assignedName: String(assignedName || '').trim().slice(0, 80),
+    assignedPhone: String(assignedPhone || '').trim().replace(/[^0-9+]/g, '').slice(0, 20),
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function govoSafeAssignedGetV3(code) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return null;
+  return globalThis.govoSafeAssignedShadowV3.get(cleanCode) || null;
+}
+
+async function govoSafeAssignedPgLookupV3(code) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return null;
+
+  try {
+    if (!globalThis.govoSafeAssignedPgPoolV3) {
+      const { Pool } = require('pg');
+
+      if (process.env.DATABASE_URL) {
+        globalThis.govoSafeAssignedPgPoolV3 = new Pool({
+          connectionString: process.env.DATABASE_URL,
+          ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined
+        });
+      } else {
+        globalThis.govoSafeAssignedPgPoolV3 = new Pool({
+          host: process.env.PGHOST || '127.0.0.1',
+          port: Number(process.env.PGPORT || 5432),
+          user: process.env.PGUSER || process.env.POSTGRES_USER || 'postgres',
+          database: process.env.PGDATABASE || process.env.POSTGRES_DB || 'postgres',
+          password: String(process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || '')
+        });
+      }
+    }
+
+    const result = await globalThis.govoSafeAssignedPgPoolV3.query(
+      'SELECT * FROM service_requests WHERE request_code = $1 OR id::text = $1 ORDER BY id DESC LIMIT 1',
+      [cleanCode]
+    );
+
+    return result && result.rows && result.rows[0] ? result.rows[0] : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Capture assignment request before the existing assignment route handles redirect.
+app.use('/admin/dispatch/assign', express.urlencoded({ extended: false, limit: '10kb' }), express.json({ limit: '10kb' }), (req, res, next) => {
+  try {
+    if (req.method === 'POST') {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const code = String(body.code || body.request_code || body.requestId || body.id || '').trim();
+      const assignedName = String(body.assigned_name || body.assignedName || '').trim();
+      const assignedPhone = String(body.assigned_phone || body.assignedPhone || '').trim();
+      govoSafeAssignedPutV3(code, assignedName, assignedPhone);
+    }
+  } catch (err) {}
+  next();
+});
+
+
 app.post('/admin/dispatch/assign', express.urlencoded({ extended: false, limit: '10kb' }), express.json({ limit: '10kb' }), async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
