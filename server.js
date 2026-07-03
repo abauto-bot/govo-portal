@@ -583,6 +583,539 @@ function govoPremiumFlowShellInject(html) {
   return out;
 }
 
+// GOVO_PHASE9C_RESTORE_BUTTON_FLOW
+// Restores shop/service/category button flow without hiding original page content.
+// Safety: public GET HTML only. No DB/auth/schema/env/notification changes.
+const GOVO_PHASE9C_RESTORE_BUTTON_FLOW_CSS = `
+<style id="govo-phase9c-restore-button-flow">
+  :root{
+    --g9c-green:#073f32;
+    --g9c-green2:#0b5a46;
+    --g9c-gold:#d8b46a;
+    --g9c-ivory:#fffaf0;
+    --g9c-soft:#f4efe3;
+    --g9c-ink:#10231d;
+    --g9c-muted:#68766f;
+    --g9c-line:rgba(7,63,50,.13);
+    --g9c-shadow:0 14px 38px rgba(0,0,0,.13);
+  }
+
+  .govo9c-wrap{
+    max-width:1120px;
+    margin:0 auto 14px;
+    padding:0 14px;
+    box-sizing:border-box;
+    font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;
+  }
+
+  .govo9c-board{
+    background:rgba(255,250,240,.96);
+    color:var(--g9c-ink);
+    border:1px solid rgba(216,180,106,.40);
+    border-radius:26px;
+    padding:15px;
+    box-shadow:var(--g9c-shadow);
+  }
+
+  .govo9c-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+  }
+
+  .govo9c-kicker{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:7px 10px;
+    border-radius:999px;
+    background:#eef8f3;
+    border:1px solid rgba(7,63,50,.10);
+    color:var(--g9c-green);
+    font-size:12px;
+    font-weight:950;
+  }
+
+  .govo9c-title{
+    margin:8px 0 0;
+    font-size:clamp(23px,5.8vw,38px);
+    line-height:1.08;
+    letter-spacing:-.045em;
+    color:#101713;
+  }
+
+  .govo9c-sub{
+    margin:8px 0 0;
+    color:var(--g9c-muted);
+    line-height:1.48;
+    max-width:760px;
+    font-size:14px;
+  }
+
+  .govo9c-primary-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:9px;
+    margin:13px 0 8px;
+  }
+
+  .govo9c-primary-actions a{
+    text-decoration:none;
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    border-radius:16px;
+    padding:10px 13px;
+    font-weight:1000;
+    color:#fffaf0!important;
+    background:linear-gradient(135deg,var(--g9c-green),var(--g9c-green2));
+    box-shadow:0 12px 28px rgba(7,63,50,.20);
+  }
+
+  .govo9c-primary-actions a.alt{
+    background:#fffaf0;
+    color:var(--g9c-green)!important;
+    border:1px solid rgba(7,63,50,.13);
+    box-shadow:0 10px 24px rgba(0,0,0,.08);
+  }
+
+  .govo9c-section-title{
+    margin:14px 0 9px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    color:#101713;
+    font-size:18px;
+    font-weight:1000;
+    letter-spacing:-.02em;
+  }
+
+  .govo9c-section-title small{
+    color:var(--g9c-green);
+    font-size:12px;
+    font-weight:950;
+    background:#eef8f3;
+    border:1px solid rgba(7,63,50,.10);
+    border-radius:999px;
+    padding:6px 9px;
+    white-space:nowrap;
+  }
+
+  .govo9c-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:10px;
+  }
+
+  .govo9c-card,
+  .govo9c-select{
+    text-decoration:none;
+    border:1px solid var(--g9c-line);
+    background:#fffdf7;
+    color:var(--g9c-ink)!important;
+    border-radius:20px;
+    padding:13px;
+    min-height:106px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    box-shadow:0 10px 24px rgba(0,0,0,.06);
+    box-sizing:border-box;
+    cursor:pointer;
+    text-align:left;
+  }
+
+  button.govo9c-select{
+    width:100%;
+    font:inherit;
+  }
+
+  .govo9c-card:hover,
+  .govo9c-select:hover{
+    border-color:rgba(216,180,106,.75);
+    transform:translateY(-1px);
+  }
+
+  .govo9c-icon{
+    width:34px;
+    height:34px;
+    border-radius:13px;
+    display:grid;
+    place-items:center;
+    background:#eef8f3;
+    color:var(--g9c-green);
+    font-size:18px;
+    margin-bottom:10px;
+  }
+
+  .govo9c-name{
+    font-weight:1000;
+    font-size:15px;
+    line-height:1.18;
+    color:#10231d;
+  }
+
+  .govo9c-en{
+    margin-top:4px;
+    color:var(--g9c-muted);
+    font-size:12px;
+    line-height:1.25;
+  }
+
+  .govo9c-pillrow{
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-top:12px;
+  }
+
+  .govo9c-pillrow span{
+    border-radius:999px;
+    padding:7px 9px;
+    background:#eef8f3;
+    color:var(--g9c-green);
+    font-size:12px;
+    font-weight:900;
+    border:1px solid rgba(7,63,50,.09);
+  }
+
+  .govo9c-selected-note{
+    display:none;
+    margin:10px 0 0;
+    border-radius:16px;
+    background:#073f32;
+    color:#fffaf0;
+    padding:10px 12px;
+    font-size:13px;
+    font-weight:900;
+  }
+
+  .govo9c-selected-note.show{
+    display:block;
+  }
+
+  @media(max-width:900px){
+    .govo9c-grid{
+      grid-template-columns:repeat(3,minmax(0,1fr));
+    }
+  }
+
+  @media(max-width:640px){
+    .govo9c-wrap{
+      padding:0 10px;
+      margin-bottom:12px;
+    }
+
+    .govo9c-board{
+      border-radius:23px;
+      padding:13px;
+    }
+
+    .govo9c-head{
+      display:block;
+    }
+
+    .govo9c-grid{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:9px;
+    }
+
+    .govo9c-card,
+    .govo9c-select{
+      min-height:116px;
+      border-radius:19px;
+      padding:12px;
+    }
+
+    .govo9c-primary-actions a{
+      flex:1 1 135px;
+    }
+  }
+</style>
+`;
+
+const GOVO_PHASE9C_SHOP_BUTTONS = [
+  ['📦','পার্সেল ডেলিভারি','Parcel Delivery','/service-request?type=parcel'],
+  ['🛒','বাজার-সদাই','Groceries / Market','/service-request?type=grocery'],
+  ['🍚','খাবার/রেস্টুরেন্ট','Food / Restaurant','/service-request?type=food'],
+  ['💊','ঔষধ/ফার্মেসি','Medicine / Pharmacy','/service-request?type=medicine'],
+  ['📱','মোবাইল/ইলেকট্রনিক্স','Mobile / Electronics','/service-request?type=electronics'],
+  ['👕','ফ্যাশন/কাপড়','Fashion / Clothing','/service-request?type=fashion'],
+  ['🏠','হার্ডওয়্যার/হোম','Hardware / Home','/service-request?type=hardware'],
+  ['🌾','কৃষি/মাঠের জিনিস','Agri / Field Items','/service-request?type=agri']
+];
+
+const GOVO_PHASE9C_SERVICE_BUTTONS = [
+  ['🧹','বাসায় কাজ লাগবে','Home Work','/service-request?type=home-work'],
+  ['🩺','ডাক্তারের support','Doctor Support','/service-request?type=doctor'],
+  ['💊','ঔষধ লাগবে','Need Medicine','/service-request?type=medicine'],
+  ['🏡','ঘরের/পরিবারের কাজ','Family Work','/service-request?type=family-work'],
+  ['🌾','কৃষি/মাঠের কাজ','Field Work','/service-request?type=field-work'],
+  ['🚨','জরুরি সাহায্য','Emergency Help','/service-request?type=emergency'],
+  ['🔌','ইলেকট্রিক কাজ','Electrician','/service-request?type=electrician'],
+  ['🚰','প্লাম্বার কাজ','Plumber','/service-request?type=plumber']
+];
+
+const GOVO_PHASE9C_QUICK_BUTTONS = [
+  ['📦','ডেলিভারি বুক','Book Delivery','/service-request?type=parcel'],
+  ['🏪','দোকান দেখুন','Browse Shops','/shops'],
+  ['🛠️','সার্ভিস দেখুন','Browse Services','/services'],
+  ['◎','অর্ডার ট্র্যাক','Track','/track'],
+  ['☎️','সাপোর্ট','Support','/support'],
+  ['🏍️','রাইডার/ওয়ার্কার','Rider / Worker','/rider'],
+  ['🤝','মার্চেন্ট','Merchant','/merchant'],
+  ['📍','এরিয়া','Meherpur Area','/service-request?type=area']
+];
+
+function govoPhase9CEscape(value){
+  return String(value ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function govoPhase9CCards(items, mode){
+  return items.map(function(item){
+    const icon = govoPhase9CEscape(item[0]);
+    const bn = govoPhase9CEscape(item[1]);
+    const en = govoPhase9CEscape(item[2]);
+    const href = govoPhase9CEscape(item[3]);
+    const type = govoPhase9CEscape((item[3].split('type=')[1] || item[1]).replace(/[-+]/g,' '));
+
+    if(mode === 'select'){
+      return '<button type="button" class="govo9c-select" data-govo9c-type="' + type + '" data-govo9c-bn="' + bn + '">' +
+        '<span class="govo9c-icon">' + icon + '</span>' +
+        '<span><span class="govo9c-name">' + bn + '</span><span class="govo9c-en">' + en + '</span></span>' +
+      '</button>';
+    }
+
+    return '<a class="govo9c-card" href="' + href + '">' +
+      '<span class="govo9c-icon">' + icon + '</span>' +
+      '<span><span class="govo9c-name">' + bn + '</span><span class="govo9c-en">' + en + '</span></span>' +
+    '</a>';
+  }).join('');
+}
+
+function govoPhase9CConfig(pathname){
+  const path = String(pathname || '/');
+
+  if(path === '/' || path.startsWith('/app')){
+    return {
+      kicker:'GOVO menu restored',
+      title:'দোকান, সার্ভিস, ডেলিভারি — সব button flow.',
+      desc:'আগের useful দোকান/service/category flow ফিরিয়ে আনা হয়েছে। এখান থেকে customer directly কাজ শুরু করতে পারবে.',
+      actions:[
+        ['/service-request','📦 ডেলিভারি বুক করুন',''],
+        ['/shops','🏪 দোকান দেখুন','alt'],
+        ['/services','🛠️ সার্ভিস দেখুন','alt']
+      ],
+      sections:[
+        ['Quick Menu','সব কাজের shortcut',GOVO_PHASE9C_QUICK_BUTTONS,'link'],
+        ['দোকান / Shop Categories','button type menu',GOVO_PHASE9C_SHOP_BUTTONS,'link'],
+        ['সার্ভিস / Service Categories','customer need menu',GOVO_PHASE9C_SERVICE_BUTTONS,'link']
+      ],
+      pills:['Meherpur first','Dokan + Service','No lost flow','Button menu']
+    };
+  }
+
+  if(path.startsWith('/shops')){
+    return {
+      kicker:'Shop Menu',
+      title:'দোকানগুলো category button আকারে.',
+      desc:'Customer দোকান/category বেছে request দিতে পারবে। Existing shop content নিচে থাকবে, hide করা হয়নি.',
+      actions:[
+        ['/service-request?type=parcel','📦 পার্সেল দিন',''],
+        ['/service-request?type=grocery','🛒 বাজার লাগবে','alt'],
+        ['/app','✦ App Home','alt']
+      ],
+      sections:[
+        ['Shop Categories','local commerce buttons',GOVO_PHASE9C_SHOP_BUTTONS,'link'],
+        ['Related Services','shop-order support',GOVO_PHASE9C_SERVICE_BUTTONS.slice(0,4),'link']
+      ],
+      pills:['Local shop flow','Merchant ready','Delivery connected']
+    };
+  }
+
+  if(path.startsWith('/services')){
+    return {
+      kicker:'Service Menu',
+      title:'সার্ভিসগুলো button আকারে.',
+      desc:'Home work, doctor support, medicine, emergency — customer সহজে category select করবে.',
+      actions:[
+        ['/service-request','＋ Request দিন',''],
+        ['/track','◎ Track করুন','alt'],
+        ['/support','☎ Support','alt']
+      ],
+      sections:[
+        ['Service Categories','daily-life service buttons',GOVO_PHASE9C_SERVICE_BUTTONS,'link'],
+        ['Shop Support','needed items / delivery',GOVO_PHASE9C_SHOP_BUTTONS.slice(0,4),'link']
+      ],
+      pills:['Home service','Emergency help','Worker/Rider flow']
+    };
+  }
+
+  if(path.startsWith('/service-request')){
+    return {
+      kicker:'Request Category',
+      title:'আগে category চাপুন, তারপর form পূরণ করুন.',
+      desc:'Category button চাপলে request type note/form-এর সাথে match করতে সুবিধা হবে.',
+      actions:[
+        ['/shops','🏪 Shops','alt'],
+        ['/services','🛠️ Services','alt'],
+        ['/track','◎ Track','alt']
+      ],
+      sections:[
+        ['ক্যাটাগরি বাছুন','tap kore select korun',GOVO_PHASE9C_SHOP_BUTTONS.concat(GOVO_PHASE9C_SERVICE_BUTTONS),'select']
+      ],
+      pills:['Tap category','Fill form','Operator confirm']
+    };
+  }
+
+  if(path.startsWith('/track')){
+    return {
+      kicker:'Tracking Menu',
+      title:'Track korar sathe request option ready.',
+      desc:'Code thakle track করুন, না থাকলে নতুন request দিন.',
+      actions:[
+        ['/service-request','＋ New Request',''],
+        ['/support','☎ Support','alt'],
+        ['/app','✦ App','alt']
+      ],
+      sections:[
+        ['Need something else?','quick buttons',GOVO_PHASE9C_QUICK_BUTTONS.slice(0,5),'link']
+      ],
+      pills:['Track','Support','New request']
+    };
+  }
+
+  if(path.startsWith('/support')){
+    return {
+      kicker:'Support Menu',
+      title:'Support-er sathe direct action buttons.',
+      desc:'Customer, merchant, rider — support থেকে next action clear button আকারে.',
+      actions:[
+        ['/service-request','＋ Request লিখুন',''],
+        ['/track','◎ Track status','alt'],
+        ['/app','✦ App Home','alt']
+      ],
+      sections:[
+        ['Support Shortcuts','problem type buttons',[
+          ['☎️','Customer support','Customer Help','/service-request?type=customer-support'],
+          ['🏪','Merchant support','Merchant Help','/merchant'],
+          ['🏍️','Rider support','Rider Help','/rider'],
+          ['🚨','জরুরি সাহায্য','Emergency Help','/service-request?type=emergency']
+        ],'link']
+      ],
+      pills:['Customer support','Merchant support','Rider support']
+    };
+  }
+
+  if(path.startsWith('/merchant') || path.startsWith('/rider')){
+    return {
+      kicker:path.startsWith('/merchant') ? 'Merchant Menu' : 'Rider / Worker Menu',
+      title:path.startsWith('/merchant') ? 'Merchant flow clear buttons.' : 'Rider-worker flow clear buttons.',
+      desc:'Partner onboarding-er sathe customer request/shop/service flow connected thakbe.',
+      actions:[
+        ['/service-request','＋ Customer Request',''],
+        ['/shops','🏪 Shops','alt'],
+        ['/services','🛠️ Services','alt'],
+        ['/support','☎ Support','alt']
+      ],
+      sections:[
+        ['Connected GOVO Flow','partner shortcuts',GOVO_PHASE9C_QUICK_BUTTONS,'link']
+      ],
+      pills:['Partner flow','Admin connected','Local operation']
+    };
+  }
+
+  return null;
+}
+
+function govoPhase9CRender(pathname){
+  const cfg = govoPhase9CConfig(pathname);
+  if(!cfg) return '';
+
+  const actions = (cfg.actions || []).map(function(a){
+    return '<a class="' + govoPhase9CEscape(a[2] || '') + '" href="' + govoPhase9CEscape(a[0]) + '">' + govoPhase9CEscape(a[1]) + '</a>';
+  }).join('');
+
+  const sections = (cfg.sections || []).map(function(sec){
+    return '<div class="govo9c-section-title">' + govoPhase9CEscape(sec[0]) + '<small>' + govoPhase9CEscape(sec[1]) + '</small></div>' +
+      '<div class="govo9c-grid">' + govoPhase9CCards(sec[2] || [], sec[3]) + '</div>';
+  }).join('');
+
+  const pills = (cfg.pills || []).map(function(x){
+    return '<span>✓ ' + govoPhase9CEscape(x) + '</span>';
+  }).join('');
+
+  return GOVO_PHASE9C_RESTORE_BUTTON_FLOW_CSS +
+    '<section class="govo9c-wrap" id="govo-phase9c-restore-button-flow">' +
+      '<div class="govo9c-board">' +
+        '<div class="govo9c-head"><div>' +
+          '<div class="govo9c-kicker">' + govoPhase9CEscape(cfg.kicker) + '</div>' +
+          '<h1 class="govo9c-title">' + govoPhase9CEscape(cfg.title) + '</h1>' +
+          '<p class="govo9c-sub">' + govoPhase9CEscape(cfg.desc) + '</p>' +
+        '</div></div>' +
+        '<div class="govo9c-primary-actions">' + actions + '</div>' +
+        '<div class="govo9c-pillrow">' + pills + '</div>' +
+        sections +
+        '<div class="govo9c-selected-note" id="govo9cSelectedNote"></div>' +
+      '</div>' +
+    '</section>' +
+    '<script>(function(){try{var params=new URLSearchParams(location.search);var t=params.get("type");function setNeed(v){var note=document.getElementById("govo9cSelectedNote");if(note){note.textContent="Selected: "+v+" — নিচের form পূরণ করুন";note.classList.add("show");}var fields=document.querySelectorAll("textarea,input");for(var i=0;i<fields.length;i++){var f=fields[i];var n=(f.name||f.placeholder||"").toLowerCase();if(n.indexOf("need")>=0||n.indexOf("problem")>=0||n.indexOf("note")>=0||f.tagName==="TEXTAREA"){if(!f.value)f.value=v;break;}}}if(t)setNeed(t);document.querySelectorAll(".govo9c-select").forEach(function(b){b.addEventListener("click",function(){setNeed(b.getAttribute("data-govo9c-bn")||b.getAttribute("data-govo9c-type")||"service");});});}catch(e){}})();</script>';
+}
+
+function govoPhase9CInject(html, pathname){
+  if(typeof html !== 'string') return html;
+  if(html.includes('govo-phase9c-restore-button-flow')) return html;
+  if(!/<body[^>]*>/i.test(html)) return html;
+
+  const insert = govoPhase9CRender(pathname);
+  if(!insert) return html;
+
+  return html.replace(/<body([^>]*)>/i, '<body$1>' + insert);
+}
+
+app.use((req, res, next) => {
+  if(req.method !== 'GET') return next();
+
+  const path = String(req.path || '');
+  if(path.startsWith('/api/')) return next();
+  if(path.startsWith('/admin') && path !== '/admin/login') return next();
+
+  const originalSend = res.send.bind(res);
+  res.send = function govoPhase9CSend(body){
+    try{
+      const contentType = String(res.getHeader('content-type') || '').toLowerCase();
+
+      if(Buffer.isBuffer(body)){
+        const text = body.toString('utf8');
+        if(text.includes('<body') || contentType.includes('text/html')){
+          return originalSend(Buffer.from(govoPhase9CInject(text, path), 'utf8'));
+        }
+      }
+
+      if(typeof body === 'string' && (body.includes('<body') || contentType.includes('text/html'))){
+        return originalSend(govoPhase9CInject(body, path));
+      }
+    }catch(e){}
+
+    return originalSend(body);
+  };
+
+  next();
+});
+
+
+
+
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
 
