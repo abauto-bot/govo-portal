@@ -1,55 +1,40 @@
 
-# GOVO local/runtime
-*.log
-.DS_Store
-.env
-node_modules
-npm-debug.log
-portal.log
-server.js.STABLE-*
-server.js.bak.*
-server.js.before-*
-server.js.current-working-*
-server.js.fix-before-*
-
+!.env.example
+# GOVO AI/test artifacts
+# GOVO local secret / temporary files
 # GOVO local secrets / runtime files
+# GOVO local/runtime
+# Local backups / temporary files
+# Secrets and local env
+*.backup
+*.bak
+*.before-*
+*.env
+*.key
+*.log
+*.pem
+*.secret
+*PASSWORD*
+*TOKEN*
+*password*
+*token*
+.DS_Store
+.aider*
 .env
 .env.*
 .env.clean
 .env.clean.*
-uploads/
-*.before-*
-server.js.before-*
+.govo-ai/
+GOVO_AI_HANDOFF.md
+backups/
+node_modules
+npm-debug.log
+portal.log
+server.js.STABLE-*
 server.js.after-*
-.aider*
-.govo-ai/
-*.env
-
-# GOVO AI/test artifacts
-.govo-ai/
-server.js.before-*
-*.before-*
-*.bak
-*.backup
-backups/
-
-# Secrets and local env
-.env
-.env.*
-*.env
-*.key
-*.pem
-*.secret
-*token*
-*TOKEN*
-*password*
-*PASSWORD*
-
-# Local backups / temporary files
-*.bak
-*.backup
-*.before-*
 server.js.bak*
+server.js.bak.*
 server.js.before-*
-backups/
-.govo-ai/
+server.js.current-working-*
+server.js.fix-before-*
+uploads/
