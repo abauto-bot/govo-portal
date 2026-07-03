@@ -4742,6 +4742,109 @@ function govoDispatchPriorityLabel(value) {
   return raw || 'normal';
 }
 
+
+// GOVO_PHASE4B_STATUS_ACTION
+// Protected dispatch status update actions.
+// Safety: no assignment writes, no DB schema changes.
+const GOVO_DISPATCH_STATUS_OPTIONS = [
+  'Phone Confirming',
+  'Confirmed',
+  'Assigned',
+  'On the way',
+  'Working',
+  'Completed',
+  'Paid',
+  'Feedback',
+  'Cancelled'
+];
+
+function govoDispatchNormalizeStatus(value) {
+  const raw = String(value || '').trim();
+  const found = GOVO_DISPATCH_STATUS_OPTIONS.find(s => s.toLowerCase() === raw.toLowerCase());
+  return found || 'Phone Confirming';
+}
+
+function govoDispatchStatusButtons(code, currentStatus) {
+  const safeCode = govoDispatchEsc(code || '');
+  const current = govoDispatchNormalizeStatus(currentStatus);
+  const buttons = GOVO_DISPATCH_STATUS_OPTIONS.map((status) => {
+    const active = status.toLowerCase() === current.toLowerCase();
+    return `<button class="${active ? 'active' : ''}" type="submit" name="status" value="${govoDispatchEsc(status)}">${govoDispatchEsc(status)}</button>`;
+  }).join('');
+
+  return `
+    <form class="govo-status-form" method="post" action="/admin/dispatch/status">
+      <input type="hidden" name="code" value="${safeCode}">
+      <div class="govo-status-title">Status update</div>
+      <div class="govo-status-buttons">${buttons}</div>
+    </form>
+  `;
+}
+
+function govoDispatchFindMemoryItem(code) {
+  const target = String(code || '').trim();
+  if (!target) return null;
+
+  const items = govoDispatchMemoryRequests();
+  for (const item of items) {
+    if (String(govoDispatchCode(item) || '').trim() === target) return item;
+    if (String(item?.code || '').trim() === target) return item;
+    if (String(item?.request_code || '').trim() === target) return item;
+    if (String(item?.requestId || '').trim() === target) return item;
+    if (String(item?.request_id || '').trim() === target) return item;
+    if (String(item?.id || '').trim() === target) return item;
+  }
+  return null;
+}
+
+async function govoDispatchParseBody(req) {
+  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length) return req.body;
+
+  return await new Promise((resolve) => {
+    let raw = '';
+    req.on('data', chunk => { raw += chunk.toString(); });
+    req.on('end', () => {
+      const params = new URLSearchParams(raw);
+      const out = {};
+      for (const [k, v] of params.entries()) out[k] = v;
+      resolve(out);
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+async function govoDispatchUpdateStatusOnly(code, status) {
+  const normalized = govoDispatchNormalizeStatus(status);
+  const note = `Dispatch status updated to ${normalized}`;
+
+  // Test mode / memory mode
+  const mem = govoDispatchFindMemoryItem(code);
+  if (mem) {
+    mem.status = normalized;
+    mem.current_status = normalized;
+    mem.updated_at = new Date().toISOString();
+    mem.status_note = note;
+    if (Array.isArray(mem.events)) {
+      mem.events.push({ type: 'status', status: normalized, note, at: new Date().toISOString() });
+    }
+    return { ok: true, mode: 'memory', status: normalized };
+  }
+
+  // Real DB mode: reuse existing Phase 3B status update logic if available.
+  if (typeof updateServiceRequestStatusByCode === 'function') {
+    const result = await updateServiceRequestStatusByCode(String(code || ''), normalized, note);
+    return { ok: Boolean(result), mode: 'existing-function', status: normalized };
+  }
+
+  if (typeof updateRequestStatusByCode === 'function') {
+    const result = await updateRequestStatusByCode(String(code || ''), normalized, note);
+    return { ok: Boolean(result), mode: 'existing-function', status: normalized };
+  }
+
+  return { ok: false, mode: 'not-found', status: normalized };
+}
+
+
 function govoDispatchRender(items) {
   const cards = (items || []).map((item, index) => {
     const code = govoDispatchCode(item, index);
@@ -4781,6 +4884,7 @@ function govoDispatchRender(items) {
           ${govoDispatchTel(mobile) ? `<a href="tel:${govoDispatchEsc(govoDispatchTel(mobile))}">Customer Call</a>` : ''}
         </div>
 
+        ${govoDispatchStatusButtons(code, status)}
         ${created ? `<small>Created: ${govoDispatchEsc(created)}</small>` : ''}
       </article>
     `;
@@ -4809,6 +4913,11 @@ function govoDispatchRender(items) {
   .govo-grid p,.govo-note{background:#f4efe3;border-radius:14px;padding:10px;margin:8px 0}
   .govo-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
   .govo-actions a{background:var(--green);color:white;text-decoration:none;padding:12px 14px;border-radius:14px;font-weight:800}
+  .govo-status-form{margin-top:14px;background:#edf6f1;border:1px solid rgba(7,63,50,.15);border-radius:16px;padding:12px}
+  .govo-status-title{font-weight:900;color:var(--green);margin-bottom:8px}
+  .govo-status-buttons{display:flex;gap:8px;flex-wrap:wrap}
+  .govo-status-buttons button{border:0;border-radius:999px;padding:10px 12px;font-weight:800;background:#ffffff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .govo-status-buttons button.active{background:var(--gold);color:#1d261f}
   .empty{background:rgba(255,255,255,.08);border:1px dashed rgba(216,180,106,.45);padding:22px;border-radius:20px;margin-top:18px}
 </style>
 </head>
@@ -4823,6 +4932,32 @@ function govoDispatchRender(items) {
 </body>
 </html>`;
 }
+
+
+app.post('/admin/dispatch/status', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const body = await govoDispatchParseBody(req);
+    const code = String(body.code || body.request_code || body.requestId || body.id || '').trim();
+    const status = govoDispatchNormalizeStatus(body.status);
+
+    if (!code) {
+      return res.redirect('/admin/dispatch?status_error=missing_code');
+    }
+
+    const result = await govoDispatchUpdateStatusOnly(code, status);
+
+    if (!result.ok) {
+      return res.redirect('/admin/dispatch?status_error=not_found');
+    }
+
+    return res.redirect('/admin/dispatch?status_updated=' + encodeURIComponent(code));
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 app.get('/admin/dispatch', async (req, res, next) => {
   try {
