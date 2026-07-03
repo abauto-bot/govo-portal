@@ -35,6 +35,10 @@ echo "===== CREATE SAFE TEMP ENV ====="
 # Remove local/test flags and notification/API keys so DB can be tested without sending real messages.
 grep -Ev '^(GOVO_SKIP_DB|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|SMS_API_KEY|OPENROUTER_API_KEY)=' "$ENV_FILE" > "$TMP_ENV" || true
 {
+  # Force container app to listen on internal Docker port 3000.
+  # Real .env may contain PORT=8090/other, which causes host curl 000 in smoke tests.
+  echo "PORT=3000"
+  echo "HOST=0.0.0.0"
   echo "GOVO_NOTIFY_DISABLED=1"
   echo "GOVO_SKIP_NOTIFY=1"
   echo "DISABLE_NOTIFICATIONS=1"
@@ -79,6 +83,23 @@ docker run -d \
   "$IMAGE_TAG" >/tmp/govo-real-db-container-id.txt
 
 sleep 7
+
+echo "===== CONTAINER STATUS ====="
+docker ps -a --filter "name=$CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | tee /tmp/govo-real-db-container-status.txt
+docker logs --tail=80 "$CONTAINER" > /tmp/govo-real-db-container-logs.txt 2>&1 || true
+
+{
+  echo "## Container Status"
+  echo '```'
+  cat /tmp/govo-real-db-container-status.txt
+  echo '```'
+  echo
+  echo "## Container Logs Tail"
+  echo '```'
+  cat /tmp/govo-real-db-container-logs.txt
+  echo '```'
+  echo
+} >> "$REPORT"
 
 echo "===== ROUTE STATUS ====="
 ROUTES=(
