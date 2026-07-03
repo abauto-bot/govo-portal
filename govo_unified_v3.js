@@ -31,6 +31,165 @@ function categoryGrid(page, isStatic = false) {
   return `<section class="govo-grid">${categories(page, isStatic).map(UI.categoryCard).join("")}</section>`;
 }
 
+
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function customerCategories(selected = "") {
+  const items = [
+    ["market", "Need Groceries", "বাজার লাগবে", "🛒"],
+    ["parcel", "Send Products", "পণ্য পাঠাতে চাই", "📦"],
+    ["home-help", "Home Work", "বাসায় কাজ লাগবে", "🧹"],
+    ["doctor", "Doctor Support", "ডাক্তারের support", "🩺"],
+    ["medicine", "Need Medicine", "ঔষধ লাগবে", "💊"],
+    ["family", "Family Work", "ঘরের/পরিবারের কাজ", "🏠"],
+    ["agriculture", "Field Work", "কৃষি/মাঠের কাজ", "🌾"],
+    ["emergency", "Emergency Help", "জরুরি সাহায্য", "🚨"]
+  ];
+  return items.map(([slug, title, banglaTitle, emoji]) => ({
+    title,
+    banglaTitle,
+    emoji,
+    href: `/service-request?service_type=${encodeURIComponent(banglaTitle)}&category=${encodeURIComponent(slug)}`,
+    isActive: selected === slug || selected === banglaTitle || selected === title
+  }));
+}
+
+function customerCategoryGrid(selected = "") {
+  return `<section class="govo-grid">${customerCategories(selected).map(UI.categoryCard).join("")}</section>`;
+}
+
+function actionCard({ href, tone = "", emoji, title, sub }) {
+  return `<a class="govo-action-card ${esc(tone)}" href="${esc(href)}">
+    <span class="emoji" aria-hidden="true">${esc(emoji)}</span>
+    <span><b>${esc(title)}</b><span>${esc(sub)}</span></span>
+  </a>`;
+}
+
+function voiceRecorderShell(compact = false) {
+  return `<section class="govo-card govo-voice-card" id="voice-request">
+    <button class="govo-record-circle" type="button" aria-label="ভয়েস রেকর্ড করুন">🎙️</button>
+    <div><h2 class="govo-section-title">ভয়েসে বলুন</h2><p class="govo-copy">আপনি কী চান সহজ করে বলুন। ভয়েস না হলে নিচের note field-এ লিখুন।</p></div>
+    <div class="govo-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    ${compact ? "" : `<div class="govo-mini-actions">
+      ${UI.ctaButton({ variant: "secondary", label: "শুনুন", href: "#voice-request" })}
+      ${UI.ctaButton({ variant: "secondary", label: "মুছুন", href: "#voice-request" })}
+      ${UI.ctaButton({ variant: "gold", label: "নিশ্চিত করুন", href: "/service-request#request-form" })}
+    </div>`}
+  </section>`;
+}
+
+function customerHome() {
+  return `
+<section class="govo-hero">
+  <div class="govo-trust-row">${UI.trustBadge("secure")}${UI.trustBadge("verified")}</div>
+  <div class="govo-kicker">GOVO Customer App</div>
+  <h1 class="govo-title">কি লাগবে আপনার?</h1>
+  <p class="govo-copy">ভয়েস, লেখা বা সরাসরি operator call দিয়ে রিকোয়েস্ট শুরু করুন।</p>
+</section>
+<section class="govo-action-stack" aria-label="Customer quick actions">
+  ${actionCard({ href: "/service-request?mode=voice#voice-request", tone: "gold", emoji: "🎙️", title: "ভয়েসে বলুন", sub: "Speak your request" })}
+  ${actionCard({ href: "/service-request#request-form", tone: "primary", emoji: "✍️", title: "লিখে request দিন", sub: "Write your request" })}
+  ${actionCard({ href: "/support", emoji: "📞", title: "Operator-কে call করুন", sub: "Call our Operator" })}
+</section>
+<div class="govo-section-head"><h2 class="govo-section-title">ক্যাটাগরি বাছাই করুন</h2>${UI.trustBadge("fast")}</div>
+${customerCategoryGrid()}
+${voiceRecorderShell(true)}
+${UI.requestCard({ id: "#GV-MOCK", title: "রিকোয়েস্ট tracking preview", date: "Received → Assigned → Completed", status: "processing", href: "/track/mock-id-123", actionLabel: "Track দেখুন" })}`;
+}
+
+function requestPage(query = {}) {
+  const category = String(query.category || "");
+  const serviceType = String(query.service_type || "");
+  const mode = String(query.mode || "");
+  return `
+<section class="govo-hero">
+  <div class="govo-trust-row">${UI.trustBadge("secure")}${UI.statusChip("pending")}</div>
+  <div class="govo-kicker">Request Entry</div>
+  <h1 class="govo-title">রিকোয়েস্ট দিন</h1>
+  <p class="govo-copy">নাম, মোবাইল, এলাকা আর কী দরকার লিখুন। দরকার হলে ভয়েস note যোগ করুন।</p>
+</section>
+${mode === "voice" ? voiceRecorderShell(false) : ""}
+<div class="govo-section-head"><h2 class="govo-section-title">ক্যাটাগরি</h2><a class="govo-trust-badge gold" href="/app">হোম</a></div>
+${customerCategoryGrid(category || serviceType)}
+<section class="govo-card govo-request-card" id="request-form">
+  <form class="govo-form" method="POST" action="/service-request">
+    <input type="hidden" name="service_type" value="${esc(serviceType || "GOVO Customer Request")}">
+    <div class="govo-field"><label for="customer_name">নাম</label><input id="customer_name" name="customer_name" autocomplete="name" required placeholder="আপনার নাম"></div>
+    <div class="govo-field"><label for="customer_phone">মোবাইল</label><input id="customer_phone" name="customer_phone" type="tel" inputmode="numeric" pattern="01[0-9]{9}" autocomplete="tel" required placeholder="01XXXXXXXXX"></div>
+    <div class="govo-field"><label for="customer_area">এলাকা</label><input id="customer_area" name="customer_area" required placeholder="যেমন: মেহেরপুর সদর"></div>
+    <div class="govo-field"><label for="problem_details">কী দরকার</label><textarea id="problem_details" name="problem_details" required placeholder="আপনার দরকারটা লিখুন">${esc(serviceType)}</textarea></div>
+    ${voiceRecorderShell(true)}
+    <div class="govo-field"><label for="note">voice/note</label><textarea id="note" name="note" placeholder="ভয়েস থাকলে সংক্ষেপে note লিখুন"></textarea></div>
+    <div class="govo-field"><label for="customer_address">address/location</label><textarea id="customer_address" name="customer_address" required placeholder="বাসা/দোকান/লোকেশন লিখুন"></textarea></div>
+    <div class="govo-field"><label>urgent/normal</label><div class="govo-toggle-row">
+      <label class="govo-radio-pill"><input type="radio" name="priority" value="urgent"> জরুরি</label>
+      <label class="govo-radio-pill"><input type="radio" name="priority" value="normal" checked> স্বাভাবিক</label>
+    </div></div>
+    ${UI.ctaButton({ variant: "primary", size: "lg", leftIcon: "✓", label: "রিকোয়েস্ট পাঠান" }).replace('type="button"', 'type="submit"')}
+  </form>
+</section>`;
+}
+
+const TRACKING_STEPS = [
+  ["Received", "গৃহীত হয়েছে"],
+  ["Phone Confirming", "ফোনে নিশ্চিত করা হচ্ছে"],
+  ["Confirmed", "নিশ্চিত করা হয়েছে"],
+  ["Assigned", "কর্মী নিয়োজিত করা হয়েছে"],
+  ["On the way", "কর্মী রওনা দিয়েছে"],
+  ["Working", "কাজ চলছে"],
+  ["Completed", "কাজ সম্পন্ন"],
+  ["Paid", "পেমেন্ট সম্পন্ন"],
+  ["Feedback", "মতামত দিন"]
+];
+
+function statusStepper(activeIndex = 3) {
+  return `<div class="govo-timeline">${TRACKING_STEPS.map(([en, bn], index) => {
+    const state = index < activeIndex ? "done" : (index === activeIndex ? "active" : "");
+    const mark = index < activeIndex ? "✓" : (index + 1);
+    return `<div class="govo-step ${state}"><span class="govo-step-node">${esc(mark)}</span><span><b>${esc(bn)}</b><span>${esc(en)}</span></span></div>`;
+  }).join("")}</div>`;
+}
+
+function trackCustomer(id = "mock-id-123") {
+  return `
+<section class="govo-hero">
+  <div class="govo-trust-row">${UI.trustBadge("secure")}${UI.statusChip("processing")}</div>
+  <div class="govo-kicker">Tracking</div>
+  <h1 class="govo-title">রিকোয়েস্ট status</h1>
+  <p class="govo-copy">Request ID: ${esc(id || "mock-id-123")}</p>
+</section>
+${UI.requestCard({ id: `#${id || "GV-MOCK"}`, title: "আপনার রিকোয়েস্ট confirm করা হচ্ছে", date: "শেষ আপডেট: আজ", status: "processing", href: "/support", actionLabel: "Support" })}
+<section class="govo-card govo-request-card">
+  <div class="govo-section-head"><h2 class="govo-section-title">Status timeline</h2>${UI.trustBadge("fast")}</div>
+  ${statusStepper(3)}
+</section>
+<div class="govo-sticky-help">${UI.ctaButton({ variant: "primary", size: "lg", leftIcon: "📞", label: "কোনো সমস্যা? অপারেটরকে কল দিন", href: "/support" })}</div>`;
+}
+
+function supportPage() {
+  return `
+<section class="govo-hero">
+  <div class="govo-trust-row">${UI.trustBadge("verified")}${UI.trustBadge("secure")}</div>
+  <div class="govo-kicker">Customer Support</div>
+  <h1 class="govo-title">Operator support</h1>
+  <p class="govo-copy">আপনার সেবা নিশ্চিত করতে আমাদের অপারেটর আপনাকে ২ মিনিটের মধ্যে call করবেন।</p>
+</section>
+<section class="govo-card govo-support-card">
+  <div class="govo-operator-avatar" aria-hidden="true">👨‍💼</div>
+  <div><h2 class="govo-section-title">রহমান ভাই</h2><p class="govo-copy">সিনিয়র অপারেটর · GOVO Express</p></div>
+  ${UI.ctaButton({ variant: "primary", size: "lg", leftIcon: "📞", label: "সরাসরি কল করুন", href: "tel:01900000000" })}
+  ${UI.ctaButton({ variant: "gold", size: "lg", leftIcon: "✍️", label: "Request লিখুন", href: "/service-request" })}
+</section>
+${UI.emptyState({ title: "অপারেটর flow", description: "এটি customer-facing support screen. Admin/operator hidden route publicly expose করা হয়নি।", emoji: "🛡️", actionLabel: "Track status", href: "/track/mock-id-123" })}`;
+}
+
 function home(isStatic = false) {
   const L = links(isStatic);
   return `
@@ -101,16 +260,7 @@ ${UI.requestCard({ id: "#RIDER-QUEUE", title: "Rider task preview", date: "Admin
 }
 
 function track() {
-  return `
-<section class="govo-hero">
-  <div class="govo-trust-row">${UI.trustBadge("secure")}${UI.statusChip("processing")}</div>
-  <div class="govo-kicker">Track Order</div>
-  <h1 class="govo-title">অর্ডারের অবস্থান সহজে দেখুন</h1>
-  <p class="govo-copy">Customer SMS, rider assignment এবং delivery status flow classic tracking system-এ connected থাকবে।</p>
-  ${UI.ctaButton({ variant: "primary", size: "lg", leftIcon: "📍", label: "Classic track খুলুন", href: "/track?classic=1" })}
-</section>
-${UI.requestCard({ id: "#GV-9082", title: "Pickup → Delivery চলমান", date: "শেষ আপডেট: আজ", status: "processing", price: "৳৮০", href: "/track?classic=1" })}
-${UI.errorState({ message: "লাইভ tracking data না থাকলে classic tracking form ব্যবহার করুন।", href: "/track?classic=1" })}`;
+  return trackCustomer("mock-id-123");
 }
 
 function admin() {
@@ -125,19 +275,25 @@ function admin() {
 ${UI.emptyState({ title: "Operator UI foundation", description: "Role-based nav supports operator tabs, but hidden admin access is not exposed publicly.", emoji: "⚙", actionLabel: "Notify Center", href: "/notify" })}`;
 }
 
-function body(page, isStatic = false) {
+function body(page, opts = {}) {
+  const isStatic = !!(opts && opts.isStatic);
+  const query = (opts && opts.query) || {};
   if (page === "shops") return shops(isStatic);
   if (page === "services") return services(isStatic);
   if (page === "merchant") return merchant();
   if (page === "rider") return rider();
   if (page === "track") return track();
+  if (page === "request") return requestPage(query);
+  if (page === "support") return supportPage();
+  if (page === "customerApp") return customerHome();
   if (page === "admin") return admin();
   return home(isStatic);
 }
 
 function activeTab(page) {
   if (page === "track") return "orders";
-  if (page === "merchant" || page === "rider") return "profile";
+  if (page === "request") return "voice";
+  if (page === "support" || page === "merchant" || page === "rider") return "profile";
   return "home";
 }
 
@@ -146,11 +302,11 @@ function renderPage(page = "home", opts = {}) {
   const role = page === "admin" ? "operator" : "user";
   return UI.mobileShell({
     title: "GOVO Express",
-    description: "GOVO Express Local Premium Trust OS shared UI foundation.",
-    body: body(page, isStatic),
+    description: "GOVO Express Local Premium Trust OS customer app UI.",
+    body: body(page, opts),
     role,
     activeTab: role === "operator" ? "queue" : activeTab(page),
-    voice: role === "operator" ? false : { isRecording: false }
+    voice: role === "operator" || page === "request" || page === "track" || page === "support" ? false : { isRecording: false }
   });
 }
 
@@ -162,6 +318,11 @@ function mount(app) {
 
   const routes = {
     "/": "home",
+    "/app": "customerApp",
+    "/app/request": "request",
+    "/service-request": "request",
+    "/support": "support",
+    "/app/support": "support",
     "/shops": "shops",
     "/services": "services",
     "/merchant": "merchant",
@@ -174,8 +335,21 @@ function mount(app) {
     app.get(route, (req, res, next) => {
       if (req.query && req.query.classic === "1") return next();
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(renderPage(page, { isStatic: false }));
+      res.send(renderPage(page, { isStatic: false, query: req.query || {} }));
     });
+  });
+
+  app.get(["/track/:id", "/app/track/:id"], (req, res, next) => {
+    if (req.query && req.query.classic === "1") return next();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(UI.mobileShell({
+      title: "GOVO Track",
+      description: "GOVO Express customer tracking status UI.",
+      body: trackCustomer(req.params.id),
+      role: "user",
+      activeTab: "orders",
+      voice: false
+    }));
   });
 
   console.log("✅ GOVO Local Premium Trust OS Phase 1 UI foundation mounted");

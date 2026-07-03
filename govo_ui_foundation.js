@@ -247,6 +247,89 @@ button,a{touch-action:manipulation}
 .govo-btn-secondary{background:var(--govo-emerald-50);color:var(--govo-emerald-800);border:1px solid var(--govo-emerald-100)}
 .govo-btn-gold{background:linear-gradient(135deg,var(--govo-gold-500),#efd989);color:#2a210e}
 .govo-btn-loading{opacity:.78;pointer-events:none}
+
+.govo-action-stack{display:grid;gap:10px}
+.govo-action-card{
+  min-height:74px;
+  padding:14px;
+  border-radius:22px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  border:1px solid var(--govo-ivory-200);
+  background:#fffef8;
+  box-shadow:var(--govo-shadow-md);
+  text-align:left;
+  font-weight:900;
+}
+.govo-action-card.primary{background:linear-gradient(135deg,var(--govo-emerald-800),var(--govo-emerald-600));color:#fffef8;border-color:transparent}
+.govo-action-card.gold{background:linear-gradient(135deg,var(--govo-gold-100),#fffef8);border-color:rgba(212,175,55,.52);color:#2a210e}
+.govo-action-card .emoji{width:46px;height:46px;border-radius:18px;display:grid;place-items:center;background:rgba(255,255,255,.58);font-size:24px;flex:0 0 auto}
+.govo-action-card.primary .emoji{background:rgba(255,255,255,.13)}
+.govo-action-card b{display:block;font-size:17px;line-height:1.15}
+.govo-action-card span:last-child{display:block;margin-top:3px;font-size:12px;font-weight:700;opacity:.75}
+.govo-form{display:grid;gap:12px}
+.govo-field{display:grid;gap:6px}
+.govo-field label{font-size:14px;font-weight:900;color:var(--govo-charcoal-900)}
+.govo-field input,.govo-field select,.govo-field textarea{
+  width:100%;
+  min-height:52px;
+  border:1px solid var(--govo-ivory-200);
+  border-radius:18px;
+  background:#fffef8;
+  color:var(--govo-charcoal-900);
+  padding:13px 14px;
+  font-size:16px;
+  outline:none;
+  box-shadow:var(--govo-shadow-sm);
+}
+.govo-field textarea{min-height:108px;resize:vertical;line-height:1.45}
+.govo-toggle-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.govo-radio-pill{min-height:52px;border-radius:999px;border:1px solid var(--govo-ivory-200);background:#fffef8;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:900;color:var(--govo-charcoal-800)}
+.govo-radio-pill input{accent-color:var(--govo-emerald-700)}
+.govo-voice-card{padding:16px;display:grid;gap:12px;text-align:center}
+.govo-record-circle{
+  width:94px;
+  height:94px;
+  margin:0 auto;
+  border:0;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  font-size:38px;
+  background:linear-gradient(135deg,var(--govo-gold-500),#f1d987);
+  color:#2a210e;
+  box-shadow:0 0 0 10px rgba(212,175,55,.12),0 18px 36px rgba(9,79,57,.13);
+  animation:govo-pulse 1.25s ease-in-out infinite;
+}
+.govo-wave{height:42px;display:flex;align-items:center;justify-content:center;gap:5px}
+.govo-wave i{display:block;width:6px;border-radius:99px;background:var(--govo-emerald-700);animation:govo-wave 1s ease-in-out infinite}
+.govo-wave i:nth-child(1){height:16px}.govo-wave i:nth-child(2){height:28px;animation-delay:.08s}.govo-wave i:nth-child(3){height:38px;animation-delay:.16s}.govo-wave i:nth-child(4){height:24px;animation-delay:.24s}.govo-wave i:nth-child(5){height:32px;animation-delay:.32s}
+@keyframes govo-wave{50%{transform:scaleY(.45);opacity:.62}}
+.govo-mini-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.govo-mini-actions .govo-btn{min-height:44px;padding:9px 10px;font-size:13px}
+.govo-timeline{display:grid;gap:0;margin-top:4px}
+.govo-step{display:grid;grid-template-columns:36px 1fr;gap:10px;position:relative;padding:0 0 18px}
+.govo-step:before{content:"";position:absolute;left:17px;top:36px;bottom:0;width:2px;background:var(--govo-ivory-200)}
+.govo-step:last-child{padding-bottom:0}.govo-step:last-child:before{display:none}
+.govo-step-node{width:36px;height:36px;border-radius:999px;display:grid;place-items:center;border:2px solid var(--govo-ivory-200);background:#fffef8;color:#7a857f;font-weight:900}
+.govo-step.done .govo-step-node{background:var(--govo-emerald-700);border-color:var(--govo-emerald-700);color:#fffef8}
+.govo-step.active .govo-step-node{background:var(--govo-gold-500);border-color:var(--govo-gold-500);color:#2a210e;animation:govo-pulse 1.2s ease-in-out infinite}
+.govo-step b{display:block;color:var(--govo-charcoal-900);font-size:15px;line-height:1.2}
+.govo-step span{display:block;color:#6b7771;font-size:12px;margin-top:3px}
+.govo-support-card{padding:18px;text-align:center;display:grid;gap:14px;justify-items:center}
+.govo-operator-avatar{width:96px;height:96px;border-radius:32px;display:grid;place-items:center;background:linear-gradient(135deg,var(--govo-emerald-800),var(--govo-emerald-600));color:#fffef8;font-size:42px;box-shadow:var(--govo-shadow-lg)}
+.govo-sticky-help{
+  position:sticky;
+  bottom:88px;
+  z-index:12;
+  padding:10px;
+  border-radius:24px;
+  background:rgba(253,253,249,.92);
+  border:1px solid var(--govo-ivory-200);
+  box-shadow:var(--govo-shadow-lg);
+  backdrop-filter:blur(14px);
+}
 .govo-spinner{
   width:18px;
   height:18px;
@@ -347,6 +430,8 @@ button,a{touch-action:manipulation}
   .govo-title{font-size:30px}
   .govo-grid{gap:8px}
   .govo-category-card{padding:12px;min-height:108px}
+  .govo-action-card{padding:12px}
+  .govo-mini-actions{grid-template-columns:1fr}
   .govo-bottom-nav{width:calc(100vw - 18px)}
   .govo-voice-shell{width:calc(100vw - 18px)}
 }
