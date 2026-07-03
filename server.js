@@ -47,6 +47,243 @@ function abuScannerShield(req, res, next) {
   return next();
 }
 
+// GOVO_FINAL_UI_POLISH_V1
+// Global premium UI polish layer.
+// Safety: CSS/HTML polish only. No DB, no auth, no route behavior change.
+const GOVO_FINAL_UI_POLISH_V1_CSS = `
+<style id="govo-final-ui-polish-v1">
+  :root{
+    --govo-emerald:#073f32;
+    --govo-emerald-2:#0b5a46;
+    --govo-ink:#10231d;
+    --govo-ivory:#fffaf0;
+    --govo-gold:#d8b46a;
+    --govo-soft:#f4efe3;
+    --govo-muted:#66756e;
+    --govo-shadow:0 18px 55px rgba(0,0,0,.18);
+    --govo-radius:22px;
+  }
+
+  html{
+    scroll-behavior:smooth;
+    -webkit-text-size-adjust:100%;
+  }
+
+  body{
+    text-rendering:optimizeLegibility;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  body::selection{
+    background:rgba(216,180,106,.45);
+  }
+
+  a,button,input,textarea,select{
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  button,a,input,textarea,select{
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease, opacity .16s ease;
+  }
+
+  button:active,
+  a:active{
+    transform:translateY(1px) scale(.99);
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible{
+    outline:3px solid rgba(216,180,106,.72)!important;
+    outline-offset:3px!important;
+  }
+
+  input,textarea,select{
+    min-height:44px;
+    border-radius:14px!important;
+  }
+
+  textarea{
+    line-height:1.45;
+  }
+
+  img,svg,video,canvas{
+    max-width:100%;
+  }
+
+  main,section,article,header,footer,nav{
+    box-sizing:border-box;
+  }
+
+  [class*="hero"],
+  [class*="card"],
+  [class*="panel"],
+  [class*="box"],
+  [class*="sheet"]{
+    box-shadow:var(--govo-shadow);
+  }
+
+  [class*="card"],
+  [class*="panel"],
+  [class*="box"]{
+    border-radius:var(--govo-radius);
+  }
+
+  [class*="btn"],
+  button,
+  a[href*="/service-request"],
+  a[href*="/track"],
+  a[href*="/support"]{
+    min-height:42px;
+  }
+
+  .govo-final-polish-badge{
+    position:fixed;
+    right:12px;
+    bottom:12px;
+    z-index:2147483000;
+    pointer-events:none;
+    opacity:.82;
+    font:700 11px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;
+    color:#fffaf0;
+    background:linear-gradient(135deg,rgba(7,63,50,.92),rgba(11,90,70,.92));
+    border:1px solid rgba(216,180,106,.42);
+    border-radius:999px;
+    padding:7px 10px;
+    box-shadow:0 10px 28px rgba(0,0,0,.25);
+  }
+
+  @media (max-width:640px){
+    body{
+      font-size:15px;
+    }
+
+    main,
+    .wrap,
+    [class*="wrap"],
+    [class*="container"]{
+      width:100%!important;
+      max-width:100%!important;
+      padding-left:14px!important;
+      padding-right:14px!important;
+      box-sizing:border-box;
+    }
+
+    h1{
+      font-size:clamp(26px,8vw,42px)!important;
+      line-height:1.05!important;
+      letter-spacing:-.04em;
+    }
+
+    h2{
+      font-size:clamp(20px,6vw,28px)!important;
+      line-height:1.15!important;
+    }
+
+    p,li,label,input,textarea,select,button,a{
+      font-size:15px;
+    }
+
+    button,
+    a[class*="btn"],
+    .btn,
+    [role="button"]{
+      width:auto;
+      min-height:46px;
+      border-radius:16px!important;
+    }
+
+    form{
+      gap:12px;
+    }
+
+    input,textarea,select{
+      width:100%;
+      box-sizing:border-box;
+      font-size:16px!important;
+    }
+
+    [class*="grid"]{
+      grid-template-columns:1fr!important;
+    }
+
+    [class*="actions"],
+    [class*="buttons"]{
+      gap:10px!important;
+    }
+
+    .govo-final-polish-badge{
+      display:none;
+    }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{
+      transition:none!important;
+      animation:none!important;
+      scroll-behavior:auto!important;
+    }
+  }
+</style>
+`;
+
+function govoFinalUiPolishInject(html) {
+  if (typeof html !== 'string') return html;
+  if (html.includes('govo-final-ui-polish-v1')) return html;
+
+  let out = html;
+
+  if (/<\/head>/i.test(out)) {
+    out = out.replace(/<\/head>/i, GOVO_FINAL_UI_POLISH_V1_CSS + '\n</head>');
+  } else if (/<body[^>]*>/i.test(out)) {
+    out = out.replace(/<body([^>]*)>/i, '<body$1>' + GOVO_FINAL_UI_POLISH_V1_CSS);
+  } else {
+    return html;
+  }
+
+  // Small non-interactive release badge for internal confidence; hidden on small mobile screens.
+  if (/<\/body>/i.test(out) && !out.includes('govo-final-polish-badge')) {
+    out = out.replace(/<\/body>/i, '<div class="govo-final-polish-badge">GOVO UI OS v1</div>\n</body>');
+  }
+
+  return out;
+}
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+
+  const originalSend = res.send.bind(res);
+
+  res.send = function govoFinalUiPolishSend(body) {
+    try {
+      const contentType = String(res.getHeader('content-type') || '').toLowerCase();
+
+      if (Buffer.isBuffer(body)) {
+        const text = body.toString('utf8');
+        if (text.includes('<html') || contentType.includes('text/html')) {
+          return originalSend(Buffer.from(govoFinalUiPolishInject(text), 'utf8'));
+        }
+      }
+
+      if (typeof body === 'string' && (body.includes('<html') || body.includes('</body>') || contentType.includes('text/html'))) {
+        return originalSend(govoFinalUiPolishInject(body));
+      }
+    } catch (err) {
+      // UI polish must never break a route.
+    }
+
+    return originalSend(body);
+  };
+
+  next();
+});
+
+
+
+
 app.use(abuScannerShield);
 // ===== END ABU OS V6.4 GOVO SCANNER SHIELD =====
 
