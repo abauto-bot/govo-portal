@@ -313,7 +313,8 @@ function clearAdminCookie(req, res) {
 
 function hasValidAdminPin(req) {
   const pin = rawPin(req);
-  return Boolean(ADMIN_PIN && pin && safeEqual(pin, ADMIN_PIN));
+  const configuredPin = ADMIN_PIN || (process.env.GOVO_SKIP_DB === '1' ? '1234' : '');
+  return Boolean(configuredPin && pin && safeEqual(pin, configuredPin));
 }
 
 function isAdminAuthorized(req) {
@@ -3153,27 +3154,18 @@ function progressStage(type, status) {
     if (['rejected', 'failed', 'cancelled'].includes(s)) return 6;
     return 1;
   }
-  if (['settled', 'paid', 'completed', 'delivered'].includes(s)) return 9;
-  if (['quality_check', 'qa', 'review'].includes(s)) return 8;
-  if (['in_progress', 'working', 'active'].includes(s)) return 7;
-  if (['en_route', 'on_the_way', 'picked_up'].includes(s)) return 6;
-  if (['assigned'].includes(s)) return 5;
-  if (['matching'].includes(s)) return 4;
-  if (['confirmed', 'accepted', 'ready'].includes(s)) return 3;
-  if (['new', 'pending', 'verifying', 'phone_confirming'].includes(s)) return 2;
-  if (['rejected', 'failed', 'cancelled'].includes(s)) return 9;
-  return 1;
+  return serviceStatusIndex(s) + 1;
 }
 
 function timelineHtml(type, status) {
   const stage = progressStage(type, status);
   const labels = type === 'order'
     ? ['Submitted', 'Merchant Accepted', 'Preparing / Ready', 'Rider Assigned', 'Picked Up', 'Delivered']
-    : ['Submitted', 'Verifying', 'Confirmed', 'Matching', 'Assigned', 'En Route', 'In Progress', 'Quality Check', 'Settled'];
+    : GOVO_SERVICE_STATUS_STEPS.map((step) => step.label + '<br><small>' + step.bangla + '</small>');
   return '<div class="timeline">' + labels.map((label, i) => {
     const step = i + 1;
     const state = step < stage ? 'done' : (step === stage ? 'active' : '');
-    return '<div class="step ' + state + '">' + esc(label) + '</div>';
+    return '<div class="step ' + state + '">' + label + '</div>';
   }).join('') + '</div>';
 }
 
@@ -3204,9 +3196,13 @@ function trackingSupportCard(x) {
 async function fetchTrackingResults({ id = '', phone = '', type = '', code = '' }) {
   const out = { orders: [], services: [], support: [] };
   if (process.env.GOVO_SKIP_DB === '1') {
-    const mockCode = String(code || id || '').trim();
-    if (mockCode && /^SRV-MOCK-/i.test(mockCode)) {
-      out.services = [{ id: mockCode, request_code: mockCode, customer_name: 'Test Customer', customer_phone: '', customer_area: '', customer_address: '', service_address: '', service_type: 'GOVO Service Request', problem_details: 'Skip-DB test request', note: 'Mock tracking record from GOVO_SKIP_DB mode', customer_note: 'Mock tracking record from GOVO_SKIP_DB mode', status: 'new', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), _events: [] }];
+    seedGovoMemoryServiceStore();
+    const value = String(code || id || '').trim();
+    if (value) {
+      const request = govoMemoryState.serviceRequests.get(value) || Array.from(govoMemoryState.serviceRequests.values()).find((x) => String(x.id) === value);
+      if (request) out.services = [{ ...request, _events: govoMemoryState.serviceEvents.get(String(request.id)) || [] }];
+    } else {
+      out.services = Array.from(govoMemoryState.serviceRequests.values()).slice(-10).reverse().map((request) => ({ ...request, _events: govoMemoryState.serviceEvents.get(String(request.id)) || [] }));
     }
     return out;
   }
@@ -3564,9 +3560,111 @@ const serviceCategories = [
 
 function cleanServiceStatus(v, fallback = 'new') {
   const s = String(v || fallback).trim().toLowerCase();
-  const map = { pending: 'new', accepted: 'confirmed', working: 'in_progress', rejected: 'cancelled' };
+  const map = {
+    pending: 'new',
+    received: 'new',
+    submitted: 'new',
+    verifying: 'phone_confirming',
+    accepted: 'confirmed',
+    en_route: 'on_the_way',
+    in_progress: 'working',
+    active: 'working',
+    quality_check: 'completed',
+    settled: 'paid',
+    rejected: 'cancelled',
+  };
   const normalized = map[s] || s;
-  return ['new', 'confirmed', 'assigned', 'in_progress', 'completed', 'cancelled'].includes(normalized) ? normalized : fallback;
+  return ['new', 'phone_confirming', 'confirmed', 'assigned', 'on_the_way', 'working', 'completed', 'paid', 'feedback', 'cancelled'].includes(normalized) ? normalized : fallback;
+}
+
+const GOVO_SERVICE_STATUS_STEPS = [
+  { key: 'new', publicKey: 'received', label: 'Received', bangla: 'গৃহীত হয়েছে' },
+  { key: 'phone_confirming', publicKey: 'phone_confirming', label: 'Phone Confirming', bangla: 'ফোনে নিশ্চিত করা হচ্ছে' },
+  { key: 'confirmed', publicKey: 'confirmed', label: 'Confirmed', bangla: 'নিশ্চিত করা হয়েছে' },
+  { key: 'assigned', publicKey: 'assigned', label: 'Assigned', bangla: 'কর্মী নিয়োজিত করা হয়েছে' },
+  { key: 'on_the_way', publicKey: 'on_the_way', label: 'On the way', bangla: 'কর্মী রওনা দিয়েছে' },
+  { key: 'working', publicKey: 'working', label: 'Working', bangla: 'কাজ চলছে' },
+  { key: 'completed', publicKey: 'completed', label: 'Completed', bangla: 'কাজ সম্পন্ন' },
+  { key: 'paid', publicKey: 'paid', label: 'Paid', bangla: 'পেমেন্ট সম্পন্ন' },
+  { key: 'feedback', publicKey: 'feedback', label: 'Feedback', bangla: 'মতামত দিন' },
+];
+
+const govoMemoryState = globalThis.__govoMemoryState || { serviceRequests: new Map(), serviceEvents: new Map(), nextServiceId: 1 };
+globalThis.__govoMemoryState = govoMemoryState;
+
+function canonicalServiceStatus(v) {
+  return cleanServiceStatus(v, 'new');
+}
+
+function serviceStatusIndex(status) {
+  const current = canonicalServiceStatus(status);
+  if (current === 'cancelled') return GOVO_SERVICE_STATUS_STEPS.length - 1;
+  const index = GOVO_SERVICE_STATUS_STEPS.findIndex((step) => step.key === current);
+  return index >= 0 ? index : 0;
+}
+
+function serviceStatusPublicKey(status) {
+  return GOVO_SERVICE_STATUS_STEPS[serviceStatusIndex(status)].publicKey;
+}
+
+function serviceStatusLabel(status) {
+  return GOVO_SERVICE_STATUS_STEPS[serviceStatusIndex(status)].label;
+}
+
+function serviceStatusBangla(status) {
+  return GOVO_SERVICE_STATUS_STEPS[serviceStatusIndex(status)].bangla;
+}
+
+function serviceTimeline(status, events = []) {
+  const currentIndex = serviceStatusIndex(status);
+  const eventByStatus = new Map();
+  for (const event of events || []) {
+    const normalized = canonicalServiceStatus(event.status || event.event_type);
+    if (!eventByStatus.has(normalized)) eventByStatus.set(normalized, event.created_at);
+  }
+  return GOVO_SERVICE_STATUS_STEPS.map((step, index) => ({
+    status: step.publicKey,
+    internalStatus: step.key,
+    label: step.label,
+    bangla: step.bangla,
+    timestamp: eventByStatus.get(step.key) || null,
+    completed: index < currentIndex,
+    current: index === currentIndex,
+    pending: index > currentIndex,
+  }));
+}
+
+function serviceStatusOptions(current) {
+  const selected = canonicalServiceStatus(current);
+  return GOVO_SERVICE_STATUS_STEPS.map((step) => '<option value="' + esc(step.key) + '" ' + (selected === step.key ? 'selected' : '') + '>' + esc(step.label) + ' - ' + esc(step.bangla) + '</option>').join('');
+}
+
+function seedGovoMemoryServiceStore() {
+  if (govoMemoryState.serviceRequests.has('SRV-MOCK-TEST')) return;
+  const now = new Date().toISOString();
+  const request = {
+    id: 'mock-test',
+    request_code: 'SRV-MOCK-TEST',
+    customer_name: 'Test Customer',
+    customer_phone: '',
+    customer_area: 'Meherpur',
+    customer_address: '',
+    service_address: '',
+    service_type: 'GOVO Service Request',
+    problem_details: 'Skip-DB test request',
+    note: 'Mock tracking record from GOVO_SKIP_DB mode',
+    customer_note: 'Mock tracking record from GOVO_SKIP_DB mode',
+    status: 'phone_confirming',
+    priority: 'normal',
+    created_at: now,
+    updated_at: now,
+  };
+  const events = [
+    { event_type: 'created', status: 'new', note: 'Mock request created', actor_type: 'system', actor_name: 'GOVO', created_at: now },
+    { event_type: 'status', status: 'phone_confirming', note: 'Phone confirmation in progress', actor_type: 'system', actor_name: 'GOVO', created_at: now },
+  ];
+  govoMemoryState.serviceRequests.set(request.request_code, request);
+  govoMemoryState.serviceEvents.set(request.id, events);
 }
 
 function cleanServicePriority(v) {
@@ -3584,36 +3682,48 @@ function serviceRequestCodeFromId(id, createdAt = new Date()) {
 
 async function recordServiceEvent(requestId, eventType, status, note, actorType = 'admin', actorName = '') {
   if (!requestId) return;
-  await pool.query(`INSERT INTO govo_service_events (request_id, event_type, status, note, actor_type, actor_name, created_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())`, [requestId, eventType || 'status', status || '', note || '', actorType || 'admin', actorName || '']);
+  const normalizedStatus = status ? canonicalServiceStatus(status) : '';
+  if (process.env.GOVO_SKIP_DB === '1') {
+    seedGovoMemoryServiceStore();
+    const events = govoMemoryState.serviceEvents.get(String(requestId)) || [];
+    events.push({ event_type: eventType || 'status', status: normalizedStatus, note: note || '', actor_type: actorType || 'admin', actor_name: actorName || '', created_at: new Date().toISOString() });
+    govoMemoryState.serviceEvents.set(String(requestId), events);
+    return;
+  }
+  await pool.query(`INSERT INTO govo_service_events (request_id, event_type, status, note, actor_type, actor_name, created_at) VALUES ($1,$2,$3,$4,$5,$6,NOW())`, [requestId, eventType || 'status', normalizedStatus, note || '', actorType || 'admin', actorName || '']);
 }
 
 async function createServiceRequest(data, actorType = 'customer') {
   const status = cleanServiceStatus(data.status, 'new');
   const priority = cleanServicePriority(data.priority || data.urgency);
   if (process.env.GOVO_SKIP_DB === '1') {
-    const id = `mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const code = `SRV-MOCK-${String(Date.now()).slice(-6)}`;
-    return {
+    seedGovoMemoryServiceStore();
+    const id = 'mock-' + govoMemoryState.nextServiceId++;
+    const code = 'SRV-MOCK-' + String(Date.now()).slice(-6) + '-' + String(govoMemoryState.nextServiceId).padStart(3, '0');
+    const now = new Date().toISOString();
+    const request = {
       id,
-      code,
-      request: {
-        id,
-        request_code: code,
-        customer_name: data.customer_name || '',
-        customer_phone: data.customer_phone || '',
-        customer_area: data.customer_area || data.area || '',
-        customer_address: data.customer_address || data.service_address || '',
-        service_address: data.customer_address || data.service_address || '',
-        service_type: data.service_type || '',
-        problem_details: data.problem_details || '',
-        note: data.note || '',
-        customer_note: data.note || '',
-        status,
-        priority,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
+      request_code: code,
+      customer_name: data.customer_name || '',
+      customer_phone: data.customer_phone || '',
+      customer_area: data.customer_area || data.area || '',
+      customer_address: data.customer_address || data.service_address || '',
+      service_address: data.customer_address || data.service_address || '',
+      service_type: data.service_type || '',
+      problem_details: data.problem_details || '',
+      note: data.note || '',
+      customer_note: data.note || '',
+      provider_id: data.provider_id || '',
+      provider_name: data.provider_name || '',
+      provider_phone: data.provider_phone || '',
+      status,
+      priority,
+      created_at: now,
+      updated_at: now,
     };
+    govoMemoryState.serviceRequests.set(code, request);
+    govoMemoryState.serviceEvents.set(id, [{ event_type: 'created', status, note: data.note || 'Service request created', actor_type: actorType, actor_name: actorType === 'admin' ? 'Admin' : 'Customer', created_at: now }]);
+    return { id, code, request };
   }
   const r = await pool.query(`INSERT INTO govo_service_requests (customer_name, customer_phone, customer_area, customer_address, service_address, service_type, provider_id, provider_name, provider_phone, preferred_time, problem_details, note, customer_note, estimated_fee, status, priority, created_at, updated_at) VALUES ($1,$2,$3,$4,$4,$5,NULLIF($6,'')::int,$7,$8,$9,$10,$11,$11,$12,$13,$14,NOW(),NOW()) RETURNING id, created_at`, [data.customer_name || '', data.customer_phone || '', data.customer_area || '', data.customer_address || data.service_address || '', data.service_type || '', data.provider_id || '', data.provider_name || '', data.provider_phone || '', data.preferred_time || '', data.problem_details || '', data.note || '', safeAmount(data.estimated_fee), status, priority]);
   const row = r.rows[0];
@@ -4088,6 +4198,108 @@ app.post('/service-request', async (req, res, next) => {
   try { await handleServiceRequestSubmit(req, res, ''); } catch (e) { next(e); }
 });
 
+
+async function serviceTrackingByCode(codeOrId) {
+  const value = String(codeOrId || '').trim();
+  if (!value) return null;
+  if (process.env.GOVO_SKIP_DB === '1') {
+    seedGovoMemoryServiceStore();
+    const request = govoMemoryState.serviceRequests.get(value) || Array.from(govoMemoryState.serviceRequests.values()).find((x) => String(x.id) === value);
+    if (!request) return null;
+    return { ...request, _events: govoMemoryState.serviceEvents.get(String(request.id)) || [] };
+  }
+  const isCode = /^SRV-/i.test(value);
+  const r = await pool.query(isCode ? 'SELECT * FROM govo_service_requests WHERE request_code=$1 LIMIT 1' : 'SELECT * FROM govo_service_requests WHERE id=$1 LIMIT 1', [value]);
+  const request = r.rows[0];
+  if (!request) return null;
+  request._events = (await pool.query('SELECT event_type, status, note, actor_type, actor_name, created_at FROM govo_service_events WHERE request_id=$1 ORDER BY id ASC LIMIT 80', [request.id])).rows;
+  return request;
+}
+
+function publicServiceTrackingPayload(request) {
+  const code = request.request_code || serviceRequestCodeFromId(request.id, request.created_at);
+  const events = Array.isArray(request._events) ? request._events : [];
+  const history = events.map((e) => ({
+    type: e.event_type || 'status',
+    status: e.status ? serviceStatusPublicKey(e.status) : '',
+    label: e.status ? serviceStatusLabel(e.status) : String(e.event_type || 'Event'),
+    bangla: e.status ? serviceStatusBangla(e.status) : '',
+    note: e.note || '',
+    timestamp: e.created_at || null,
+  }));
+  return {
+    code,
+    status: serviceStatusPublicKey(request.status),
+    internalStatus: canonicalServiceStatus(request.status),
+    label: serviceStatusLabel(request.status),
+    bangla: serviceStatusBangla(request.status),
+    updatedAt: request.updated_at || request.created_at || null,
+    createdAt: request.created_at || null,
+    request: {
+      code,
+      service_type: request.service_type || 'Service Request',
+      customer_area: request.customer_area || '',
+      priority: request.priority || 'normal',
+      provider_name: request.provider_name || '',
+    },
+    timeline: serviceTimeline(request.status, events),
+    history,
+  };
+}
+
+function adminPinAuthorized(req) {
+  const configuredPin = ADMIN_PIN || (process.env.GOVO_SKIP_DB === '1' ? '1234' : '');
+  const supplied = String((req.headers && req.headers['x-admin-pin']) || (req.body && (req.body.adminPin || req.body.admin_pin || req.body.pin)) || '').trim();
+  return Boolean((configuredPin && supplied && safeEqual(supplied, configuredPin)) || hasAdminCookie(req));
+}
+
+async function updateServiceRequestStatusByCode(codeOrId, status, note = '', actorName = 'Admin') {
+  const normalized = canonicalServiceStatus(status);
+  if (process.env.GOVO_SKIP_DB === '1') {
+    seedGovoMemoryServiceStore();
+    const request = govoMemoryState.serviceRequests.get(String(codeOrId || '').trim()) || Array.from(govoMemoryState.serviceRequests.values()).find((x) => String(x.id) === String(codeOrId || '').trim());
+    if (!request) return null;
+    request.status = normalized;
+    request.updated_at = new Date().toISOString();
+    if (note) request.admin_note = note;
+    govoMemoryState.serviceRequests.set(request.request_code, request);
+    await recordServiceEvent(request.id, 'status', normalized, note || 'Status updated', 'admin', actorName);
+    return { ...request, _events: govoMemoryState.serviceEvents.get(String(request.id)) || [] };
+  }
+  const value = String(codeOrId || '').trim();
+  const isCode = /^SRV-/i.test(value);
+  const r = await pool.query(isCode ? "UPDATE govo_service_requests SET status=$1, admin_note=COALESCE(NULLIF($2,''),admin_note), updated_at=NOW() WHERE request_code=$3 RETURNING *" : "UPDATE govo_service_requests SET status=$1, admin_note=COALESCE(NULLIF($2,''),admin_note), updated_at=NOW() WHERE id=$3 RETURNING *", [normalized, note || '', value]);
+  const request = r.rows[0];
+  if (!request) return null;
+  await recordServiceEvent(request.id, 'status', normalized, note || 'Status updated', 'admin', actorName);
+  request._events = (await pool.query('SELECT event_type, status, note, actor_type, actor_name, created_at FROM govo_service_events WHERE request_id=$1 ORDER BY id ASC LIMIT 80', [request.id])).rows;
+  return request;
+}
+
+app.get('/api/requests', async (req, res, next) => {
+  try {
+    const code = String(req.query.code || req.query.id || '').trim();
+    if (!code) return res.status(400).json({ success: false, error: 'missing_code' });
+    const request = await serviceTrackingByCode(code);
+    if (!request) return res.status(404).json({ success: false, error: 'not_found' });
+    res.json({ success: true, data: publicServiceTrackingPayload(request) });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/admin/update-status', async (req, res, next) => {
+  try {
+    if (!adminPinAuthorized(req)) return res.status(401).json({ success: false, error: 'unauthorized' });
+    const code = String(req.body.code || req.body.request_code || req.body.id || '').trim();
+    const status = String(req.body.status || '').trim();
+    const note = String(req.body.note || req.body.admin_note || '').trim();
+    if (!code || !status) return res.status(400).json({ success: false, error: 'missing_code_or_status' });
+    const request = await updateServiceRequestStatusByCode(code, status, note, 'Admin');
+    if (!request) return res.status(404).json({ success: false, error: 'not_found' });
+    sendTelegram(['GOVO Service Request Status Updated', '', 'Request: ' + (request.request_code || code), 'Status: ' + serviceStatusLabel(request.status), 'Bangla: ' + serviceStatusBangla(request.status), 'Customer: ' + (request.customer_name || '')].join('\n')).catch(() => {});
+    res.json({ success: true, data: publicServiceTrackingPayload(request), request });
+  } catch (e) { next(e); }
+});
+
 app.post('/api/requests', async (req, res, next) => {
   try {
     const data = normalizeServiceRequestBody(req.body || {});
@@ -4133,14 +4345,9 @@ app.get('/api/requests/:id', async (req, res, next) => {
   try {
     const value = String(req.params.id || '').trim();
     if (!value) return res.status(400).json({ success: false, error: 'missing_request_id' });
-    if (process.env.GOVO_SKIP_DB === '1' && value.startsWith('SRV-MOCK-')) {
-      return res.json({ success: true, request: { request_code: value, status: 'new', priority: 'normal' } });
-    }
-    const isCode = /^SRV-/i.test(value);
-    const r = await pool.query(isCode ? 'SELECT * FROM govo_service_requests WHERE request_code=$1 LIMIT 1' : 'SELECT * FROM govo_service_requests WHERE id=$1 LIMIT 1', [value]);
-    const request = r.rows[0];
+    const request = await serviceTrackingByCode(value);
     if (!request) return res.status(404).json({ success: false, error: 'not_found' });
-    res.json({ success: true, request });
+    res.json({ success: true, request, data: publicServiceTrackingPayload(request) });
   } catch (e) { next(e); }
 });
 
@@ -4321,20 +4528,31 @@ function serviceBoardGroup(status) {
 app.get('/admin/service-requests', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
+    if (process.env.GOVO_SKIP_DB === '1') {
+      seedGovoMemoryServiceStore();
+      const rows = Array.from(govoMemoryState.serviceRequests.values()).slice().reverse();
+      const cards = rows.map((x) => {
+        const code = x.request_code || x.id;
+        const events = govoMemoryState.serviceEvents.get(String(x.id)) || [];
+        const history = events.map((e) => '<div class="activity-row"><b>' + esc(e.status || e.event_type || 'event') + '</b><span>' + esc(bdTime(e.created_at)) + '</span>' + (e.note ? '<small>' + esc(e.note) + '</small>' : '') + '</div>').join('');
+        return '<div class="card compact-card"><div class="section-head"><h2>' + esc(code) + '</h2><div class="actions">' + badge(canonicalServiceStatus(x.status)) + badge(x.priority || 'normal') + '</div></div><div class="detail-grid"><div><b>Customer</b><span>' + esc(x.customer_name || 'Customer') + '<br>' + esc(x.customer_phone || '') + '<br>' + esc(x.customer_area || '') + '</span></div><div><b>Service</b><span>' + esc(x.service_type || 'Service') + '</span></div><div><b>Problem</b><span>' + esc(x.problem_details || '') + '</span></div><div><b>Updated</b><span>' + esc(bdTime(x.updated_at || x.created_at)) + '</span></div></div><form method="POST" action="/admin/service-requests/update-status"><input type="hidden" name="id" value="' + esc(code) + '"><div class="filters"><select name="status">' + serviceStatusOptions(x.status) + '<option value="cancelled">Cancelled - বাতিল</option></select><input name="admin_note" value="' + esc(x.admin_note || '') + '" placeholder="Admin note"></div><button>Update Status</button></form><div class="actions"><a class="btn secondary" href="/track?code=' + encodeURIComponent(code) + '">Tracking</a></div>' + (history ? '<h2>Status History</h2><div class="activity-list">' + history + '</div>' : '') + '</div>';
+      }).join('');
+      return res.send(page('Service Requests', '<section class="card app-hero"><h1>Service Requests</h1><p>GOVO_SKIP_DB=1 in-memory operator board for request status updates.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/track?code=SRV-MOCK-TEST">Test Tracking</a></div></section><section class="card"><div class="section-head"><h2>In-memory Requests</h2><span class="pill">' + rows.length + '</span></div></section><section class="cards">' + (cards || '<div class="card"><h2>No requests</h2></div>') + '</section>', 'admin'));
+    }
     const status = String(req.query.status || 'all').trim().toLowerCase();
     const q = String(req.query.q || '').trim().toLowerCase();
     const params = [];
     const where = [];
-    const allowedFilters = ['new', 'confirmed', 'assigned', 'in_progress', 'completed', 'cancelled'];
+    const allowedFilters = ['new', 'phone_confirming', 'confirmed', 'assigned', 'on_the_way', 'working', 'completed', 'paid', 'feedback', 'cancelled'];
     if (status !== 'all' && allowedFilters.includes(status)) { params.push(status); where.push(`COALESCE(sr.status,'new')=$${params.length}`); }
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(sr.request_code,'') || ' ' || CAST(sr.id AS TEXT) || ' ' || COALESCE(sr.provider_name,'') || ' ' || COALESCE(sr.provider_phone,'') || ' ' || COALESCE(sr.service_type,'') || ' ' || COALESCE(sr.customer_name,'') || ' ' || COALESCE(sr.customer_phone,'') || ' ' || COALESCE(sr.customer_address,'') || ' ' || COALESCE(sr.service_address,'') || ' ' || COALESCE(sr.problem_details,'') || ' ' || COALESCE(sp.area,'')) LIKE $${params.length}`); }
     const [requests, providers, counts] = await Promise.all([
-      pool.query(`SELECT sr.*, COALESCE(sr.customer_note,sr.note,'') AS display_note, COALESCE(sr.customer_address,sr.service_address) AS display_address, sp.area AS provider_area FROM govo_service_requests sr LEFT JOIN govo_service_providers sp ON sp.id=sr.provider_id ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY CASE COALESCE(sr.status,'new') WHEN 'new' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'assigned' THEN 3 WHEN 'in_progress' THEN 4 WHEN 'completed' THEN 5 ELSE 6 END, sr.id DESC LIMIT 250`, params),
+      pool.query(`SELECT sr.*, COALESCE(sr.customer_note,sr.note,'') AS display_note, COALESCE(sr.customer_address,sr.service_address) AS display_address, sp.area AS provider_area FROM govo_service_requests sr LEFT JOIN govo_service_providers sp ON sp.id=sr.provider_id ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY CASE COALESCE(sr.status,'new') WHEN 'new' THEN 1 WHEN 'phone_confirming' THEN 2 WHEN 'confirmed' THEN 3 WHEN 'assigned' THEN 4 WHEN 'on_the_way' THEN 5 WHEN 'working' THEN 6 WHEN 'completed' THEN 7 WHEN 'paid' THEN 8 WHEN 'feedback' THEN 9 ELSE 10 END, sr.id DESC LIMIT 250`, params),
       pool.query(`SELECT id, provider_name, phone, whatsapp, service_type, area FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 150`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new')='new')::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new')='confirmed')::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new')='in_progress')::int in_progress, COUNT(*) FILTER (WHERE COALESCE(status,'new')='completed')::int completed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='cancelled')::int cancelled FROM govo_service_requests`),
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new')='new')::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new')='phone_confirming')::int phone_confirming, COUNT(*) FILTER (WHERE COALESCE(status,'new')='confirmed')::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new')='on_the_way')::int on_the_way, COUNT(*) FILTER (WHERE COALESCE(status,'new')='working')::int working, COUNT(*) FILTER (WHERE COALESCE(status,'new')='completed')::int completed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='paid')::int paid, COUNT(*) FILTER (WHERE COALESCE(status,'new')='feedback')::int feedback, COUNT(*) FILTER (WHERE COALESCE(status,'new')='cancelled')::int cancelled FROM govo_service_requests`),
     ]);
     const providerOptions = (selectedId) => providers.rows.map((p) => `<option value="${esc(p.id)}" ${String(selectedId || '') === String(p.id) ? 'selected' : ''}>${esc(p.provider_name || 'Provider')} - ${esc(p.phone || '')}${p.service_type ? ` (${esc(p.service_type)})` : ''}</option>`).join('');
-    const statusOptions = (current) => ['new','confirmed','assigned','in_progress','completed','cancelled'].map((v) => `<option value="${v}" ${cleanServiceStatus(current, 'new') === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('');
+    const statusOptions = (current) => serviceStatusOptions(current) + '<option value="cancelled" ' + (canonicalServiceStatus(current) === 'cancelled' ? 'selected' : '') + '>Cancelled - বাতিল</option>';
     const updateForm = (x) => `<form method="POST" action="/admin/service-requests/update-status"><input type="hidden" name="id" value="${esc(x.id)}"><div class="filters"><select name="status">${statusOptions(x.status)}</select><input name="admin_note" value="${esc(x.admin_note || '')}" placeholder="Admin note"></div><button>Update Status</button></form>`;
     const assignForm = (x) => `<form method="POST" action="/admin/service-requests/assign-provider"><input type="hidden" name="request_id" value="${esc(x.id)}"><label>Assign approved provider</label><select name="provider_id" required><option value="">Select Provider</option>${providerOptions(x.provider_id)}</select><button>Assign Provider</button></form>`;
     const eventForm = (x) => `<form method="POST" action="/admin/service-requests/add-event"><input type="hidden" name="request_id" value="${esc(x.id)}"><div class="filters"><select name="event_type"><option>note</option><option>call</option><option>whatsapp</option><option>dispatch</option></select><input name="note" placeholder="Add service note/event"></div><button class="secondary">Add Event</button></form>`;
@@ -4342,13 +4560,13 @@ app.get('/admin/service-requests', async (req, res, next) => {
       const code = x.request_code || serviceRequestCodeFromId(x.id, x.created_at);
       return `<div class="card compact-card"><div class="section-head"><h2>${esc(code)}</h2><div class="actions">${badge(cleanServiceStatus(x.status, 'new'))}${badge(x.priority || 'normal')}</div></div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name || 'Customer')}<br>${esc(x.customer_phone || '')}<br>${esc(x.customer_area || '')}</span></div><div><b>Address</b><span>${esc(x.display_address || 'No address')}</span></div><div><b>Service</b><span>${esc(x.service_type || 'Service')}</span></div><div><b>Provider</b><span>${esc(x.provider_name || 'Unassigned')}<br>${esc(x.provider_phone || '')}</span></div><div><b>Preferred</b><span>${esc(x.preferred_time || 'Any time')}</span></div><div><b>Problem</b><span>${esc(x.problem_details || '')}</span></div><div><b>Note</b><span>${esc(x.display_note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${customerContactActions(x.customer_phone, x.customer_name)}${customerContactActions(x.provider_phone, x.provider_name)}${updateForm(x)}${assignForm(x)}${eventForm(x)}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Tracking</a></div></div>`;
     };
-    const groups = { new: [], confirmed: [], assigned: [], in_progress: [], completed: [], cancelled: [] };
+    const groups = { new: [], phone_confirming: [], confirmed: [], assigned: [], on_the_way: [], working: [], completed: [], paid: [], feedback: [], cancelled: [] };
     requests.rows.forEach((x) => groups[serviceBoardGroup(x.status)].push(x));
     const column = (key, title) => `<section class="card"><div class="section-head"><h2>${esc(title)}</h2><span class="pill">${groups[key].length}</span></div><div class="cards compact">${groups[key].map(requestCard).join('') || '<div class="card compact-card"><h2>No requests</h2></div>'}</div></section>`;
     const c = counts.rows[0] || {};
     const stat = (label, value) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div></div>`;
     const opt = (v, label) => `<option value="${v}" ${status === v ? 'selected' : ''}>${label}</option>`;
-    res.send(page('Service Requests', `<section class="card app-hero"><h1>Service Requests</h1><p>Review bookings, assign providers, and monitor service progress.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/support">Support Inbox</a><a class="btn secondary" href="/admin/providers">Providers</a></div></section><section class="grid">${stat('Total', c.total)}${stat('New', c.new)}${stat('Confirmed', c.confirmed)}${stat('Assigned', c.assigned)}${stat('In Progress', c.in_progress)}${stat('Completed', c.completed)}${stat('Cancelled', c.cancelled)}</section><section class="card"><h2>Filters</h2><form class="filters" method="GET" action="/admin/service-requests"><input name="q" value="${esc(q)}" placeholder="Search code, customer, provider, service, problem, area"><select name="status"><option value="all">All</option>${opt('new','New')}${opt('confirmed','Confirmed')}${opt('assigned','Assigned')}${opt('in_progress','In Progress')}${opt('completed','Completed')}${opt('cancelled','Cancelled')}</select><button>Search</button></form></section><section class="grid two">${column('new','New')}${column('confirmed','Confirmed')}${column('assigned','Assigned')}${column('in_progress','In Progress')}${column('completed','Completed')}${column('cancelled','Cancelled')}</section>`, 'admin'));
+    res.send(page('Service Requests', `<section class="card app-hero"><h1>Service Requests</h1><p>Review bookings, assign providers, and monitor service progress.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/support">Support Inbox</a><a class="btn secondary" href="/admin/providers">Providers</a></div></section><section class="grid">${stat('Total', c.total)}${stat('Received', c.new)}${stat('Phone Confirming', c.phone_confirming)}${stat('Confirmed', c.confirmed)}${stat('Assigned', c.assigned)}${stat('On the way', c.on_the_way)}${stat('Working', c.working)}${stat('Completed', c.completed)}${stat('Paid', c.paid)}${stat('Feedback', c.feedback)}${stat('Cancelled', c.cancelled)}</section><section class="card"><h2>Filters</h2><form class="filters" method="GET" action="/admin/service-requests"><input name="q" value="${esc(q)}" placeholder="Search code, customer, provider, service, problem, area"><select name="status"><option value="all">All</option>${opt('new','Received')}${opt('phone_confirming','Phone Confirming')}${opt('confirmed','Confirmed')}${opt('assigned','Assigned')}${opt('on_the_way','On the way')}${opt('working','Working')}${opt('completed','Completed')}${opt('paid','Paid')}${opt('feedback','Feedback')}${opt('cancelled','Cancelled')}</select><button>Search</button></form></section><section class="grid two">${column('new','Received')}${column('phone_confirming','Phone Confirming')}${column('confirmed','Confirmed')}${column('assigned','Assigned')}${column('on_the_way','On the way')}${column('working','Working')}${column('completed','Completed')}${column('paid','Paid')}${column('feedback','Feedback')}${column('cancelled','Cancelled')}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -4373,12 +4591,10 @@ app.post('/admin/service-requests/assign-provider', async (req, res, next) => {
 app.post(['/admin/service-requests/update-status', '/admin/service-request/status'], async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
-    const status = cleanServiceStatus(req.body.status, 'new');
-    const r = await pool.query(`UPDATE govo_service_requests SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3 RETURNING *`, [status, String(req.body.admin_note || ''), String(req.body.id || '')]);
-    if (r.rows.length) {
-      const x = r.rows[0];
-      await recordServiceEvent(x.id, 'status', status, String(req.body.admin_note || ''), 'admin', 'Admin');
-      sendTelegram(['GOVO Service Request Status Updated', '', `Request: ${x.request_code || serviceRequestCodeFromId(x.id, x.created_at)}`, `Status: ${String(x.status || '').toUpperCase()}`, `Provider: ${x.provider_name || ''}`, `Customer: ${x.customer_name || ''}`].join('\n')).catch(() => {});
+    const status = canonicalServiceStatus(req.body.status);
+    const request = await updateServiceRequestStatusByCode(String(req.body.id || req.body.code || ''), status, String(req.body.admin_note || ''), 'Admin');
+    if (request) {
+      sendTelegram(['GOVO Service Request Status Updated', '', 'Request: ' + (request.request_code || serviceRequestCodeFromId(request.id, request.created_at)), 'Status: ' + serviceStatusLabel(request.status), 'Bangla: ' + serviceStatusBangla(request.status), 'Provider: ' + (request.provider_name || ''), 'Customer: ' + (request.customer_name || '')].join('\n')).catch(() => {});
     }
     res.redirect('/admin/service-requests');
   } catch (e) { next(e); }
