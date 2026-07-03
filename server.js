@@ -4806,46 +4806,11 @@ function govoDispatchFindMemoryItem(code) {
 }
 
 async function govoDispatchParseBody(req) {
-  // If Express/body-parser already parsed body, use it immediately.
-  // Important: even an empty object means the stream may already be consumed.
+  // GOVO Phase 4C hardening:
+  // Request body parsing is handled by Express route middleware.
+  // Do not manually read req streams here; that can hang or conflict with body-parser.
   if (req.body && typeof req.body === 'object') return req.body;
-
-  const maxBytes = 10 * 1024;
-
-  return await new Promise((resolve) => {
-    let raw = '';
-    let done = false;
-
-    const finish = (value) => {
-      if (done) return;
-      done = true;
-      resolve(value || {});
-    };
-
-    const timer = setTimeout(() => finish({}), 1500);
-
-    req.on('data', chunk => {
-      raw += chunk.toString();
-      if (Buffer.byteLength(raw, 'utf8') > maxBytes) {
-        clearTimeout(timer);
-        finish({ __body_too_large: true });
-      }
-    });
-
-    req.on('end', () => {
-      clearTimeout(timer);
-      if (!raw) return finish({});
-      const params = new URLSearchParams(raw);
-      const out = {};
-      for (const [k, v] of params.entries()) out[k] = v;
-      finish(out);
-    });
-
-    req.on('error', () => {
-      clearTimeout(timer);
-      finish({});
-    });
-  });
+  return {};
 }
 
 async function govoDispatchUpdateStatusOnly(code, status) {
@@ -4969,7 +4934,7 @@ function govoDispatchRender(items) {
 }
 
 
-app.post('/admin/dispatch/status', async (req, res, next) => {
+app.post('/admin/dispatch/status', express.urlencoded({ extended: false, limit: '10kb' }), express.json({ limit: '10kb' }), async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
 
