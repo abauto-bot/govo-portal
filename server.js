@@ -4764,12 +4764,20 @@ function govoDispatchNormalizeStatus(value) {
   return found || 'Phone Confirming';
 }
 
+function govoDispatchIsValidStatus(value) {
+  const raw = String(value || '').trim();
+  return GOVO_DISPATCH_STATUS_OPTIONS.some(s => s.toLowerCase() === raw.toLowerCase());
+}
+
 function govoDispatchStatusButtons(code, currentStatus) {
   const safeCode = govoDispatchEsc(code || '');
   const current = govoDispatchNormalizeStatus(currentStatus);
   const buttons = GOVO_DISPATCH_STATUS_OPTIONS.map((status) => {
     const active = status.toLowerCase() === current.toLowerCase();
-    return `<button class="${active ? 'active' : ''}" type="submit" name="status" value="${govoDispatchEsc(status)}">${govoDispatchEsc(status)}</button>`;
+    const confirmAttr = ['Cancelled', 'Completed', 'Paid'].includes(status)
+      ? ` onclick="return confirm('Are you sure you want to mark this request as ${govoDispatchEsc(status)}?')"`
+      : '';
+    return `<button class="${active ? 'active' : ''}" type="submit" name="status" value="${govoDispatchEsc(status)}"${confirmAttr}>${govoDispatchEsc(status)}</button>`;
   }).join('');
 
   return `
@@ -4798,18 +4806,45 @@ function govoDispatchFindMemoryItem(code) {
 }
 
 async function govoDispatchParseBody(req) {
-  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length) return req.body;
+  // If Express/body-parser already parsed body, use it immediately.
+  // Important: even an empty object means the stream may already be consumed.
+  if (req.body && typeof req.body === 'object') return req.body;
+
+  const maxBytes = 10 * 1024;
 
   return await new Promise((resolve) => {
     let raw = '';
-    req.on('data', chunk => { raw += chunk.toString(); });
+    let done = false;
+
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      resolve(value || {});
+    };
+
+    const timer = setTimeout(() => finish({}), 1500);
+
+    req.on('data', chunk => {
+      raw += chunk.toString();
+      if (Buffer.byteLength(raw, 'utf8') > maxBytes) {
+        clearTimeout(timer);
+        finish({ __body_too_large: true });
+      }
+    });
+
     req.on('end', () => {
+      clearTimeout(timer);
+      if (!raw) return finish({});
       const params = new URLSearchParams(raw);
       const out = {};
       for (const [k, v] of params.entries()) out[k] = v;
-      resolve(out);
+      finish(out);
     });
-    req.on('error', () => resolve({}));
+
+    req.on('error', () => {
+      clearTimeout(timer);
+      finish({});
+    });
   });
 }
 
@@ -4939,20 +4974,29 @@ app.post('/admin/dispatch/status', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
 
     const body = await govoDispatchParseBody(req);
+    if (body.__body_too_large) {
+      return res.redirect('/admin/dispatch?status_error=body_too_large');
+    }
+
     const code = String(body.code || body.request_code || body.requestId || body.id || '').trim();
-    const status = govoDispatchNormalizeStatus(body.status);
+    const submittedStatus = String(body.status || '').trim();
 
     if (!code) {
       return res.redirect('/admin/dispatch?status_error=missing_code');
     }
 
+    if (!govoDispatchIsValidStatus(submittedStatus)) {
+      return res.redirect('/admin/dispatch?status_error=invalid_status');
+    }
+
+    const status = govoDispatchNormalizeStatus(submittedStatus);
     const result = await govoDispatchUpdateStatusOnly(code, status);
 
     if (!result.ok) {
       return res.redirect('/admin/dispatch?status_error=not_found');
     }
 
-    return res.redirect('/admin/dispatch?status_updated=' + encodeURIComponent(code));
+    return res.redirect('/admin/dispatch?status_updated=1');
   } catch (err) {
     next(err);
   }
