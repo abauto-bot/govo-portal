@@ -8,15 +8,12 @@ IMAGE_TAG="govo_portal:ui-os-v1-rc-${TS}"
 CONTAINER="govo_portal_ui_os_rc_${PORT}"
 REPORT="docs/GOVO_UI_OS_V1_RC_AUDIT_REPORT_${TS}.md"
 
-BACKUP_ROOT="${GOVO_RC_BACKUP_ROOT:-/opt/govo-backups}"
-if ! mkdir -p "$BACKUP_ROOT" >/dev/null 2>&1; then
-  BACKUP_ROOT="$HOME/govo-backups"
-  mkdir -p "$BACKUP_ROOT"
-fi
-
+# Use user-writable backup path. No sudo needed.
+BACKUP_ROOT="${GOVO_RC_BACKUP_ROOT:-$HOME/govo-backups}"
 BACKUP_DIR="$BACKUP_ROOT/ui-os-v1-rc-${TS}"
 
-mkdir -p "$(dirname "$REPORT")" "$BACKUP_DIR"
+mkdir -p "$(dirname "$REPORT")"
+mkdir -p "$BACKUP_DIR"
 
 echo "===== GOVO UI OS v1 RC AUDIT ====="
 echo "PORT=$PORT"
@@ -32,6 +29,7 @@ echo "BACKUP_DIR=$BACKUP_DIR"
   echo "- Git commit: $(git rev-parse --short HEAD)"
   echo "- Test port: $PORT"
   echo "- Image tag: $IMAGE_TAG"
+  echo "- Backup: $BACKUP_DIR"
   echo
 } > "$REPORT"
 
@@ -89,7 +87,7 @@ ROUTES=(
 : > /tmp/govo-rc-routes.txt
 for path in "${ROUTES[@]}"; do
   code="$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}${path}" || true)"
-  printf "%-38s %s\n" "$path" "$code" | tee -a /tmp/govo-rc-routes.txt
+  printf "%-42s %s\n" "$path" "$code" | tee -a /tmp/govo-rc-routes.txt
 done
 
 {
@@ -122,7 +120,7 @@ AUTH_ROUTES=(
 : > /tmp/govo-rc-auth-routes.txt
 for path in "${AUTH_ROUTES[@]}"; do
   code="$(curl -s -b "/tmp/govo-admin-cookie-${PORT}.txt" -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}${path}" || true)"
-  printf "%-38s %s\n" "$path" "$code" | tee -a /tmp/govo-rc-auth-routes.txt
+  printf "%-42s %s\n" "$path" "$code" | tee -a /tmp/govo-rc-auth-routes.txt
 done
 
 {
@@ -209,7 +207,6 @@ grep -RIl \
   echo
 } >> "$REPORT"
 
-echo "===== FINAL SUMMARY ====="
 {
   echo "## Live Deploy Blockers"
   echo
