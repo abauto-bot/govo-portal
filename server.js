@@ -4918,6 +4918,11 @@ function govoDispatchRender(items) {
   .govo-status-buttons{display:flex;gap:8px;flex-wrap:wrap}
   .govo-status-buttons button{border:0;border-radius:999px;padding:10px 12px;font-weight:800;background:#ffffff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08)}
   .govo-status-buttons button.active{background:var(--gold);color:#1d261f}
+  .rider-action-form{margin-top:14px;background:#edf6f1;border:1px solid rgba(7,63,50,.15);border-radius:16px;padding:12px}
+  .rider-action-title{font-weight:900;color:var(--green);margin-bottom:8px}
+  .rider-action-buttons{display:flex;gap:8px;flex-wrap:wrap}
+  .rider-action-buttons button{border:0;border-radius:999px;padding:10px 12px;font-weight:900;background:#ffffff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .rider-action-buttons button.active{background:var(--gold);color:#1d261f}
   .empty{background:rgba(255,255,255,.08);border:1px dashed rgba(216,180,106,.45);padding:22px;border-radius:20px;margin-top:18px}
 </style>
 </head>
@@ -5040,6 +5045,48 @@ function govoRoleOperatorNote(item) {
   return govoRolePick(item, ['operator_note', 'operatorNote', 'assignment_note', 'status_note'], '');
 }
 
+
+// GOVO_PHASE5B_RIDER_ACTIONS
+// Admin-only rider/worker preview actions.
+// Safety: protected route only, no public /rider changes, no DB schema changes.
+const GOVO_RIDER_ACTIONS = [
+  { action: 'accept', label: 'Accept', status: 'Assigned' },
+  { action: 'reject', label: 'Reject', status: 'Cancelled', confirm: true },
+  { action: 'start', label: 'Start', status: 'On the way' },
+  { action: 'reached', label: 'Reached', status: 'Working' },
+  { action: 'working', label: 'Working', status: 'Working' },
+  { action: 'completed', label: 'Completed', status: 'Completed', confirm: true }
+];
+
+function govoRiderStatusFromAction(action) {
+  const raw = String(action || '').trim().toLowerCase();
+  const found = GOVO_RIDER_ACTIONS.find(a => a.action === raw);
+  return found ? found.status : '';
+}
+
+function govoRiderActionButtons(code, currentStatus) {
+  const safeCode = govoRoleSafe(code || '');
+  const current = String(currentStatus || '').toLowerCase();
+
+  const buttons = GOVO_RIDER_ACTIONS.map((item) => {
+    const active = String(item.status || '').toLowerCase() === current;
+    const confirmAttr = item.confirm
+      ? ` onclick="return confirm('Confirm rider action: ${govoRoleSafe(item.label)}?')"`
+      : '';
+
+    return `<button class="${active ? 'active' : ''}" type="submit" name="action" value="${govoRoleSafe(item.action)}"${confirmAttr}>${govoRoleSafe(item.label)}</button>`;
+  }).join('');
+
+  return `
+    <form class="rider-action-form" method="post" action="/admin/rider-jobs-preview/action">
+      <input type="hidden" name="code" value="${safeCode}">
+      <div class="rider-action-title">Rider action — admin preview only</div>
+      <div class="rider-action-buttons">${buttons}</div>
+    </form>
+  `;
+}
+
+
 function govoRoleRenderJobs(role, items) {
   const isMerchant = role === 'merchant';
   const title = isMerchant ? 'GOVO Admin Preview: Merchant Jobs' : 'GOVO Admin Preview: Rider / Worker Jobs';
@@ -5085,6 +5132,7 @@ function govoRoleRenderJobs(role, items) {
           <a href="${track}">Tracking দেখুন</a>
           ${safeCall ? `<a href="tel:${govoRoleSafe(safeCall)}">Call</a>` : ''}
         </div>
+        ${!isMerchant ? govoRiderActionButtons(code, status) : ''}
       </article>
     `;
   }).join('');
@@ -5138,6 +5186,37 @@ app.get('/admin/merchant-jobs-preview', async (req, res, next) => {
     next(err);
   }
 });
+
+
+app.post('/admin/rider-jobs-preview/action', express.urlencoded({ extended: false, limit: '10kb' }), express.json({ limit: '10kb' }), async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const body = await govoDispatchParseBody(req);
+    const code = String(body.code || body.request_code || body.requestId || body.id || '').trim();
+    const action = String(body.action || '').trim();
+    const status = govoRiderStatusFromAction(action);
+
+    if (!code) {
+      return res.redirect('/admin/rider-jobs-preview?action_error=missing_code');
+    }
+
+    if (!status) {
+      return res.redirect('/admin/rider-jobs-preview?action_error=invalid_action');
+    }
+
+    const result = await govoDispatchUpdateStatusOnly(code, status);
+
+    if (!result.ok) {
+      return res.redirect('/admin/rider-jobs-preview?action_error=not_found');
+    }
+
+    return res.redirect('/admin/rider-jobs-preview?action_updated=1');
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 app.get('/admin/rider-jobs-preview', async (req, res, next) => {
   try {
