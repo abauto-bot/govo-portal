@@ -6060,6 +6060,46 @@ app.get('/admin/launch-checklist', async (req, res, next) => {
   }
 });
 
+// GOVO_FIX_ENSURE_DISPATCH_ASSIGN_ROUTE
+// Ensure assignment endpoint exists for admin dispatch + smoke tests.
+// Safety: admin protected, no public exposure, no schema migration.
+app.post('/admin/dispatch/assign', express.urlencoded({ extended: false, limit: '10kb' }), express.json({ limit: '10kb' }), async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const code = String(body.code || body.request_code || body.requestId || body.id || '').trim();
+    const assignedName = String(body.assigned_name || body.assignedName || '').trim();
+    const assignedPhone = String(body.assigned_phone || body.assignedPhone || '').trim();
+    const operatorNote = String(body.operator_note || body.operatorNote || '').trim();
+
+    if (!code) {
+      return res.redirect('/admin/dispatch?assign_error=missing_code');
+    }
+
+    if (typeof govoDispatchSaveAssignment === 'function') {
+      const result = await govoDispatchSaveAssignment(code, assignedName, assignedPhone, operatorNote);
+      if (result && result.ok) {
+        return res.redirect('/admin/dispatch?assignment_saved=1');
+      }
+    }
+
+    if (typeof govoDispatchUpdateStatusOnly === 'function') {
+      const result = await govoDispatchUpdateStatusOnly(code, 'Assigned');
+      if (result && result.ok) {
+        return res.redirect('/admin/dispatch?assignment_saved=1');
+      }
+    }
+
+    return res.redirect('/admin/dispatch?assign_error=not_found');
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
+
 
 
 
