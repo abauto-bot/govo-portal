@@ -5567,6 +5567,403 @@ app.get('/admin/rider-jobs-preview', async (req, res, next) => {
   }
 });
 
+// GOVO_PHASE6A_NOTIFY_REPORT_PREVIEW
+// Admin-only SMS/WhatsApp template preview + daily ops report.
+// Safety: read-only, no real send, no API key usage, no DB schema changes.
+function govoOpsSafe(value) {
+  if (typeof govoRoleSafe === 'function') return govoRoleSafe(value);
+  if (typeof govoTrackPublicSafe === 'function') return govoTrackPublicSafe(value);
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .trim();
+}
+
+function govoOpsPick(item, keys, fallback = '') {
+  if (typeof govoRolePick === 'function') return govoRolePick(item, keys, fallback);
+  for (const key of keys) {
+    if (item && item[key] !== undefined && item[key] !== null && String(item[key]).trim() !== '') return item[key];
+  }
+  return fallback;
+}
+
+function govoOpsCode(item, index = 0) {
+  if (typeof govoRoleCode === 'function') return govoRoleCode(item, index);
+  if (typeof govoDispatchCode === 'function') return govoDispatchCode(item, index);
+  return govoOpsPick(item, ['code', 'request_code', 'requestId', 'request_id', 'order_code', 'tracking_code', 'id'], `REQ-${index + 1}`);
+}
+
+async function govoOpsReadRequests() {
+  if (typeof govoDispatchReadOnlyRequests === 'function') {
+    return await govoDispatchReadOnlyRequests();
+  }
+  return [];
+}
+
+function govoOpsStatus(item) {
+  return String(govoOpsPick(item, ['status', 'current_status'], 'Phone Confirming') || 'Phone Confirming');
+}
+
+function govoOpsNeed(item) {
+  return String(govoOpsPick(item, ['need', 'service', 'service_type', 'order_type', 'category', 'title'], 'Service request') || 'Service request');
+}
+
+function govoOpsArea(item) {
+  return String(govoOpsPick(item, ['area', 'customer_area', 'zone'], '') || '');
+}
+
+function govoOpsAssignedName(item) {
+  if (typeof govoRoleAssignedName === 'function') return govoRoleAssignedName(item);
+  if (typeof govoDispatchAssignedName === 'function') return govoDispatchAssignedName(item);
+  return govoOpsPick(item, ['assigned_name', 'assignedName', 'provider_name', 'providerName', 'rider_name', 'worker_name', 'merchant_name'], '');
+}
+
+function govoOpsReportFromItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  const statusCounts = {};
+  const areaCounts = {};
+  let assigned = 0;
+  let urgent = 0;
+
+  list.forEach((item) => {
+    const status = govoOpsStatus(item);
+    const area = govoOpsArea(item) || 'Unknown';
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+    areaCounts[area] = (areaCounts[area] || 0) + 1;
+    if (govoOpsAssignedName(item)) assigned += 1;
+    const priority = String(govoOpsPick(item, ['priority', 'urgency'], '')).toLowerCase();
+    if (priority.includes('urgent') || priority.includes('high')) urgent += 1;
+  });
+
+  const latest = list.slice(-8).reverse().map((item, index) => ({
+    code: govoOpsCode(item, index),
+    need: govoOpsNeed(item),
+    area: govoOpsArea(item),
+    status: govoOpsStatus(item),
+    assignedName: govoOpsAssignedName(item)
+  }));
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    total: list.length,
+    assigned,
+    unassigned: Math.max(list.length - assigned, 0),
+    urgent,
+    statusCounts,
+    areaCounts,
+    latest
+  };
+}
+
+function govoOpsTemplateSet() {
+  return [
+    {
+      title: 'Customer request received',
+      channel: 'SMS / WhatsApp',
+      body: 'GOVO Express: আপনার request received হয়েছে। Tracking: {{tracking_link}} Support: {{support_link}}'
+    },
+    {
+      title: 'Customer assigned update',
+      channel: 'SMS / WhatsApp',
+      body: 'GOVO Express: আপনার request {{code}} assigned হয়েছে। Assigned: {{assigned_name}} {{assigned_phone}} Tracking: {{tracking_link}}'
+    },
+    {
+      title: 'Rider job alert',
+      channel: 'WhatsApp',
+      body: 'GOVO Rider Job: {{code}} | Area: {{area}} | Need: {{need}} | Address: {{address}} | Status: {{status}}'
+    },
+    {
+      title: 'Merchant fulfillment alert',
+      channel: 'WhatsApp',
+      body: 'GOVO Merchant Order: {{code}} | Need: {{need}} | Area: {{area}} | Status: {{status}} | Tracking: {{tracking_link}}'
+    },
+    {
+      title: 'Admin daily ops summary',
+      channel: 'Telegram / WhatsApp',
+      body: 'GOVO Daily: Total {{total}}, Assigned {{assigned}}, Unassigned {{unassigned}}, Urgent {{urgent}}. Check admin report.'
+    }
+  ];
+}
+
+function govoOpsShell(title, inner) {
+  return `<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${govoOpsSafe(title)}</title>
+<style>
+  :root{--green:#073f32;--green2:#0b5a46;--gold:#d8b46a;--ivory:#fffaf0;--ink:#10231d;--muted:#66756e}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;background:linear-gradient(135deg,#061512,#0b3d31);color:var(--ivory)}
+  .wrap{max-width:1100px;margin:auto;padding:22px}
+  .hero{border:1px solid rgba(216,180,106,.35);border-radius:24px;padding:22px;background:rgba(255,255,255,.06);box-shadow:0 18px 50px rgba(0,0,0,.25)}
+  .hero h1{margin:0 0 8px;font-size:28px}
+  .hero p{margin:0;color:#dce8df}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:18px}
+  .card{background:var(--ivory);color:var(--ink);border-radius:22px;padding:16px;border:1px solid rgba(216,180,106,.5)}
+  .card h2,.card h3{margin:0 0 8px;color:var(--green)}
+  .metric{font-size:32px;font-weight:1000;color:var(--green)}
+  .muted{color:var(--muted)}
+  pre{white-space:pre-wrap;background:#f4efe3;border-radius:14px;padding:12px;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  table{width:100%;border-collapse:collapse;margin-top:10px;background:var(--ivory);color:var(--ink);border-radius:18px;overflow:hidden}
+  th,td{padding:11px;border-bottom:1px solid #eadfca;text-align:left}
+  th{background:#f4efe3;color:var(--green)}
+  a.btn{display:inline-block;background:var(--green);color:white;text-decoration:none;padding:11px 14px;border-radius:14px;font-weight:900;margin-top:12px}
+</style>
+</head>
+<body><main class="wrap">${inner}</main></body></html>`;
+}
+
+function govoOpsRenderTemplates() {
+  const templates = govoOpsTemplateSet();
+  const cards = templates.map(t => `
+    <article class="card">
+      <h2>${govoOpsSafe(t.title)}</h2>
+      <p class="muted">${govoOpsSafe(t.channel)} · Preview only — no send</p>
+      <pre>${govoOpsSafe(t.body)}</pre>
+    </article>
+  `).join('');
+
+  return govoOpsShell('GOVO Notify Templates', `
+    <section class="hero">
+      <h1>GOVO Notify Templates</h1>
+      <p>Admin preview only. এখানে কোনো real SMS/WhatsApp send হচ্ছে না।</p>
+      <a class="btn" href="/admin/ops-daily-report">Daily Ops Report দেখুন</a>
+    </section>
+    <section class="grid">${cards}</section>
+  `);
+}
+
+function govoOpsRenderReport(report) {
+  const statusRows = Object.entries(report.statusCounts || {}).map(([k,v]) => `<tr><td>${govoOpsSafe(k)}</td><td>${v}</td></tr>`).join('');
+  const areaRows = Object.entries(report.areaCounts || {}).map(([k,v]) => `<tr><td>${govoOpsSafe(k)}</td><td>${v}</td></tr>`).join('');
+  const latestRows = (report.latest || []).map(item => `
+    <tr>
+      <td>${govoOpsSafe(item.code)}</td>
+      <td>${govoOpsSafe(item.need)}</td>
+      <td>${govoOpsSafe(item.area || '—')}</td>
+      <td>${govoOpsSafe(item.status)}</td>
+      <td>${govoOpsSafe(item.assignedName || '—')}</td>
+    </tr>
+  `).join('');
+
+  return govoOpsShell('GOVO Daily Ops Report', `
+    <section class="hero">
+      <h1>GOVO Daily Ops Report</h1>
+      <p>Admin preview only. Generated: ${govoOpsSafe(report.generatedAt)}</p>
+      <a class="btn" href="/admin/notify-templates">Notify Templates দেখুন</a>
+    </section>
+
+    <section class="grid">
+      <div class="card"><h2>Total Requests</h2><div class="metric">${report.total}</div></div>
+      <div class="card"><h2>Assigned</h2><div class="metric">${report.assigned}</div></div>
+      <div class="card"><h2>Unassigned</h2><div class="metric">${report.unassigned}</div></div>
+      <div class="card"><h2>Urgent</h2><div class="metric">${report.urgent}</div></div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Status Breakdown</h2>
+        <table><tr><th>Status</th><th>Count</th></tr>${statusRows || '<tr><td>None</td><td>0</td></tr>'}</table>
+      </div>
+      <div class="card">
+        <h2>Area Breakdown</h2>
+        <table><tr><th>Area</th><th>Count</th></tr>${areaRows || '<tr><td>None</td><td>0</td></tr>'}</table>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <h2>Latest Requests</h2>
+      <table><tr><th>Code</th><th>Need</th><th>Area</th><th>Status</th><th>Assigned</th></tr>${latestRows || '<tr><td colspan="5">No request yet</td></tr>'}</table>
+    </section>
+  `);
+}
+
+app.get('/api/admin/ops-daily-report', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+
+    const items = await govoOpsReadRequests();
+    return res.json(govoOpsReportFromItems(items));
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/admin/notify-templates', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+    res.send(govoOpsRenderTemplates());
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/admin/ops-daily-report', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+
+    const items = await govoOpsReadRequests();
+    const report = govoOpsReportFromItems(items);
+    res.send(govoOpsRenderReport(report));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GOVO_PHASE6B_OPS_SUMMARY_DRAFT
+// Admin-only copy/export draft for Telegram/WhatsApp ops summary.
+// Safety: no real send, no token/API usage, no private notes/phone exposure.
+function govoOpsSummaryLine(label, value) {
+  return `${label}: ${value}`;
+}
+
+function govoOpsTopEntries(obj, limit = 6) {
+  return Object.entries(obj || {})
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+    .slice(0, limit);
+}
+
+function govoOpsBuildSummaryDraft(report) {
+  const generated = report && report.generatedAt ? new Date(report.generatedAt) : new Date();
+
+  const statusLines = govoOpsTopEntries(report.statusCounts, 8)
+    .map(([name, count]) => `• ${name}: ${count}`)
+    .join('\n') || '• No status data yet';
+
+  const areaLines = govoOpsTopEntries(report.areaCounts, 8)
+    .map(([name, count]) => `• ${name}: ${count}`)
+    .join('\n') || '• No area data yet';
+
+  const latestLines = (report.latest || []).slice(0, 6).map((item) => {
+    const code = String(item.code || 'REQ');
+    const need = String(item.need || 'Service request');
+    const area = String(item.area || '—');
+    const status = String(item.status || 'Phone Confirming');
+    const assigned = item.assignedName ? ` | Assigned: ${String(item.assignedName)}` : '';
+    return `• ${code} — ${need} | ${area} | ${status}${assigned}`;
+  }).join('\n') || '• No latest request yet';
+
+  return [
+    '📊 GOVO Express Daily Ops Summary',
+    '',
+    govoOpsSummaryLine('Generated', generated.toLocaleString('en-GB', { hour12: true })),
+    '',
+    'Core numbers:',
+    `• Total requests: ${Number(report.total || 0)}`,
+    `• Assigned: ${Number(report.assigned || 0)}`,
+    `• Unassigned: ${Number(report.unassigned || 0)}`,
+    `• Urgent: ${Number(report.urgent || 0)}`,
+    '',
+    'Status breakdown:',
+    statusLines,
+    '',
+    'Area breakdown:',
+    areaLines,
+    '',
+    'Latest requests:',
+    latestLines,
+    '',
+    'Next actions:',
+    '• Unassigned requests assign করতে হবে',
+    '• Urgent requests আগে call/confirm করতে হবে',
+    '• Completed/Cancelled status clean রাখতে হবে',
+    '',
+    '— GOVO Admin Preview Draft'
+  ].join('\n');
+}
+
+async function govoOpsSummaryDraftPayload() {
+  const items = await govoOpsReadRequests();
+  const report = govoOpsReportFromItems(items);
+  const draft = govoOpsBuildSummaryDraft(report);
+
+  return {
+    ok: true,
+    generatedAt: report.generatedAt,
+    draft,
+    report
+  };
+}
+
+function govoOpsRenderSummaryDraft(payload) {
+  const text = payload.draft || '';
+
+  return govoOpsShell('GOVO Ops Summary Draft', `
+    <section class="hero">
+      <h1>GOVO Ops Summary Draft</h1>
+      <p>Admin-only copy/export. এখানে কোনো Telegram, SMS, WhatsApp send হচ্ছে না।</p>
+      <a class="btn" href="/admin/ops-daily-report">Daily Report</a>
+      <a class="btn" href="/admin/notify-templates">Notify Templates</a>
+      <a class="btn" href="/admin/ops-summary-draft.txt">Text Export</a>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <h2>Copy-ready summary</h2>
+      <p class="muted">এটা Telegram group / WhatsApp community / internal update-এ paste করা যাবে। Customer phone/private note নেই।</p>
+      <textarea id="opsSummaryText" readonly style="width:100%;min-height:430px;box-sizing:border-box;border:1px solid #eadfca;border-radius:16px;padding:14px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#f4efe3;color:#10231d">${govoOpsSafe(text)}</textarea>
+      <button onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('opsSummaryText').value).then(function(){document.getElementById('copyStatus').textContent='Copied ✅'}).catch(function(){document.getElementById('copyStatus').textContent='Select করে copy করুন';})" style="margin-top:12px;border:0;border-radius:14px;padding:12px 16px;background:#073f32;color:white;font-weight:900">Copy Summary</button>
+      <span id="copyStatus" class="muted" style="margin-left:10px"></span>
+    </section>
+  `);
+}
+
+app.get('/api/admin/ops-summary-draft', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+
+    const payload = await govoOpsSummaryDraftPayload();
+    return res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/admin/ops-summary-draft.txt', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+    res.type('text/plain; charset=utf-8');
+
+    const payload = await govoOpsSummaryDraftPayload();
+    return res.send(payload.draft);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/admin/ops-summary-draft', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+
+    const payload = await govoOpsSummaryDraftPayload();
+    return res.send(govoOpsRenderSummaryDraft(payload));
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
+
+
+
+
 
 
 
