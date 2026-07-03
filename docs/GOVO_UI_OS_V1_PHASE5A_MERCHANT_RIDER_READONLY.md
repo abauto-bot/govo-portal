@@ -1,423 +1,396 @@
-## 1. Data source plan
+## 1. Data source plan — Phase 5A only
 
 ### Goal
 
-Phase 5A should add **read-only assigned jobs views** for:
+Add **read-only assigned jobs preview pages** for merchant and rider:
+
+- `/merchant/jobs`
+- `/rider/jobs`
+
+These must be **protected preview routes**, not public onboarding pages, and must not replace existing:
 
 - `/merchant`
-- `/merchant/dashboard`
 - `/rider`
 
-No job actions yet. No accept/reject/start/completed buttons. No DB schema changes.
+No job actions yet.
+
+No DB schema changes.
+
+No secrets/env edits.
+
+No live deploy.
 
 ---
 
-### A. Create/extend one read-only jobs adapter
+### Access/protection plan
 
-Use one normalized server/helper layer so merchant and rider pages do not directly depend on DB/memory differences.
+Because proper merchant/rider auth does not exist yet, treat these as **protected internal preview pages**.
 
-Recommended shape:
+Recommended safe approach:
 
-```ts
-type FulfillmentJobCard = {
-  id: string;
-  code: string;
-  trackingUrl: string;
+1. Reuse the existing protected/admin/operator guard already used for dispatch, if available.
+2. If dispatch uses middleware/session/basic guard, apply the same guard to:
+   - `/merchant/jobs`
+   - `/rider/jobs`
+3. Do **not** expose these links in public/customer navigation.
+4. Optional internal-only link placement:
+   - Dispatch/admin internal dashboard only, if such nav exists.
+   - Otherwise no nav link; routes are manually accessible for testing.
 
-  area?: string;
-  address?: string;
-  need?: string;
-  category?: string;
-  status?: string;
-
-  assignedName?: string;
-  assignedPhone?: string;
-  operatorNote?: string;
-  customerPhone?: string;
-  operatorPhone?: string;
-
-  createdAt?: string;
-  updatedAt?: string;
-};
-```
-
-Create read-only functions such as:
-
-```ts
-getMerchantAssignedJobs()
-getRiderAssignedJobs()
-```
-
-or one shared function:
-
-```ts
-getAssignedFulfillmentJobs({ view: "merchant" | "rider" })
-```
-
-Important:
-
-- Only read existing request/order/status/assignment data.
-- Normalize missing values safely.
-- Sort newest first or status-priority first.
-- Do not mutate status.
-- Do not assign jobs.
-- Do not create records.
+Do not introduce merchant/rider login assumptions in Phase 5A.
 
 ---
 
-### B. `GOVO_SKIP_DB=1` behavior
+### Data reading plan
 
-When `GOVO_SKIP_DB=1`, read from the existing in-memory request store already used by customer/dispatch flow.
+Use existing request/status/assignment data only.
 
-Expected source:
+#### In `GOVO_SKIP_DB=1`
 
-- Existing request memory array/store.
-- Existing assignment fields.
-- Existing status fields.
-- Existing operator note fields.
+Read from the existing in-memory request store.
 
-Filtering:
+Expected data source:
 
-- Merchant view: show requests with merchant/vendor/shop assignment if such fields exist.
-- Rider view: show requests with rider/worker/runner assignment if such fields exist.
-- If the current data model only has generic assignment fields, still show assigned jobs read-only using available assignment data, but label conservatively.
+- Existing request memory store used by customer request/tracking/dispatch.
+- Filter for requests/orders that have assignment fields or status relevant to merchant/rider jobs.
 
-Example logic:
+Example filtering logic:
 
-```ts
-const requests = getMemoryRequests();
+##### Merchant jobs
 
-return requests
-  .filter(request => hasAnyAssignment(request))
-  .map(normalizeRequestToFulfillmentJob);
-```
+Show requests where one or more of these exist:
 
-If there is already role-specific assignment data:
+- `assignedName`
+- `assignedPhone`
+- `assignedTo`
+- `assignedMerchant`
+- `operatorNote`
+- status indicates assigned/processing/dispatched
 
-```ts
-merchantAssignedToName
-merchantAssignedToPhone
-riderAssignedToName
-riderAssignedToPhone
-```
+##### Rider jobs
 
-then use those separately.
+Show requests where one or more of these exist:
+
+- `assignedName`
+- `assignedPhone`
+- `assignedRider`
+- `riderName`
+- `riderPhone`
+- `operatorNote`
+- delivery/dispatch-related status
+
+Since Phase 4 has “safe assignment name/phone/operator note”, Phase 5A should reuse those fields instead of introducing new fields.
 
 ---
 
-### C. Real DB mode behavior
+#### In real DB mode
 
-When `GOVO_SKIP_DB` is not enabled:
+Use existing read-only request/order tables.
 
-- Use existing read-only request/order tables.
-- Use existing status/assignment fields or joins.
-- Do not run migrations.
-- Do not add columns.
-- Do not add new enum values.
-- Do not edit env/secrets.
+No schema change.
+
+No migrations.
+
+No writes.
 
 Recommended query behavior:
 
+- Fetch recent requests/orders.
+- Include existing assignment/status/operator note fields.
+- Sort newest first.
+- Limit results for preview safety, for example 50–100 rows.
+- Do not expose sensitive/internal-only fields.
+
+Possible read model:
+
 ```ts
-where: {
-  OR: [
-    { assignedName: { not: null } },
-    { assignedPhone: { not: null } },
-    { operatorNote: { not: null } }
-  ]
+{
+  id,
+  code,
+  customerArea,
+  customerAddress,
+  need,
+  category,
+  status,
+  assignedName,
+  assignedPhone,
+  operatorNote,
+  createdAt
 }
 ```
 
-If the schema has merchant/rider specific fields:
-
-```ts
-merchant view:
-where merchantAssignedId/name/phone exists
-
-rider view:
-where riderAssignedId/name/phone exists
-```
-
-If the DB uses an `orders` table instead of a `requests` table, keep the adapter flexible but read-only.
+If existing DB table names differ, adapt to current Phase 4 request/order repository layer instead of adding new DB access patterns.
 
 ---
 
-### D. Tracking link
+### Route behavior
 
-Use existing customer tracking route, for example:
+#### `/merchant/jobs`
 
-```ts
-/tracking/[code]
-```
+Protected read-only page.
 
-or whatever current tracking route exists.
+Bangla-first title examples:
 
-Card should render a clear CTA:
+- `মার্চেন্ট জবস`
+- `অ্যাসাইন করা কাজ`
+- Empty state: `এখনো কোনো অ্যাসাইন করা কাজ নেই`
 
-Bangla:
+Merchant card should show:
 
-```txt
-ট্র্যাকিং দেখুন
-```
+- Request code
+- Customer area
+- Need/category
+- Status
+- Assigned name/phone if relevant
+- Tracking link
+- Operator note
 
-The link must be public/customer-safe and should not expose internal IDs if request code is already the public tracking token.
+No buttons for:
 
----
+- Accept
+- Reject
+- Start
+- Complete
+- Cancel
+- Edit
 
-### E. Phone/call links
+Only safe links:
 
-For rider cards:
-
-- If customer/operator phone is available and already allowed in existing data, render a safe `tel:` link.
-- Sanitize phone before placing in `href`.
-- Prefer masking visible phone number while still offering a call button if the product already permits it.
-
-Example:
-
-```txt
-কল করুন
-```
-
-instead of displaying full number.
-
-Do not reveal secrets or internal operator credentials.
+- Tracking link
+- Optional phone display/call link only if already considered safe in existing Phase 4 assignment model
 
 ---
 
-### F. Empty/error states
+#### `/rider/jobs`
 
-Use Bangla-first empty states.
+Protected read-only page.
 
-Merchant empty:
+Bangla-first title examples:
+
+- `রাইডার জবস`
+- `ডেলিভারি/পিকআপ কাজ`
+- Empty state: `এখনো কোনো রাইডার কাজ নেই`
+
+Rider card should show:
+
+- Job/request code
+- Area/address
+- Need/category
+- Safe call link if available
+- Current status
+- Note
+- Tracking link
+
+No buttons for:
+
+- Accept
+- Reject
+- Start pickup
+- Start delivery
+- Complete
+- Failed
+- Call customer if unsafe/private number is not already approved for display
+
+---
+
+### UI plan
+
+Mobile-first, simple, readable.
+
+Suggested visual system:
+
+- Background: ivory/off-white
+- Cards: white or soft ivory
+- Primary text: charcoal
+- Accent: deep emerald
+- Minor highlight: subtle gold
+- Borders/shadows: soft, low contrast
+
+Card hierarchy:
+
+1. Code/status row
+2. Area/address
+3. Need/category
+4. Assigned person or phone if available
+5. Operator note
+6. Tracking link
+
+Example Bangla-first labels:
 
 ```txt
-এখন কোনো অ্যাসাইন করা কাজ নেই।
+রিকোয়েস্ট কোড
+এলাকা
+ঠিকানা
+প্রয়োজন
+ক্যাটাগরি
+বর্তমান অবস্থা
+অ্যাসাইন করা
+ফোন
+অপারেটর নোট
+ট্র্যাকিং
 ```
 
-Rider empty:
+Status display can reuse existing status labels from dispatch/customer tracking if available.
 
-```txt
-এখন কোনো ডেলিভারি/কাজ অ্যাসাইন নেই।
-```
+---
 
-Error fallback:
+### Public navigation rule
 
-```txt
-তথ্য লোড করা যায়নি। কিছুক্ষণ পর আবার চেষ্টা করুন।
-```
+Do not add `/merchant/jobs` or `/rider/jobs` to:
 
-Do not expose stack traces or DB details in UI.
+- Public homepage navigation
+- Customer request flow
+- Public merchant onboarding page
+- Public rider onboarding page
+- Header/footer used by unauthenticated visitors
+
+Keep `/merchant` and `/rider` unchanged as onboarding/public pages.
 
 ---
 
 ## 2. Files likely to change
 
-Exact filenames may vary, but likely changes should stay limited to these areas.
+Exact paths depend on the current app structure, but likely changes are below.
 
-### A. Merchant pages
+### If GOVO is using Next.js App Router
 
-Likely:
+Likely files:
+
+```txt
+app/merchant/jobs/page.tsx
+app/rider/jobs/page.tsx
+```
+
+Shared UI:
+
+```txt
+components/jobs/AssignedJobCard.tsx
+components/jobs/JobsEmptyState.tsx
+components/jobs/StatusBadge.tsx
+```
+
+Or existing component area:
+
+```txt
+components/merchant/MerchantJobsPreview.tsx
+components/rider/RiderJobsPreview.tsx
+```
+
+Data access layer:
+
+```txt
+lib/requests/readAssignedJobs.ts
+lib/requests/requestStore.ts
+lib/db/requests.ts
+```
+
+Protection/middleware:
+
+```txt
+middleware.ts
+lib/auth/requireProtectedPreview.ts
+lib/auth/requireDispatchAuth.ts
+```
+
+Only if existing protected route logic is centralized.
+
+Types:
+
+```txt
+types/request.ts
+types/jobs.ts
+```
+
+Only if needed. Avoid changing schema-level types in a way that implies new DB columns.
+
+---
+
+### If GOVO is using Next.js Pages Router
+
+Likely files:
+
+```txt
+pages/merchant/jobs.tsx
+pages/rider/jobs.tsx
+```
+
+Data/API:
+
+```txt
+lib/requests/readAssignedJobs.ts
+lib/requestStore.ts
+lib/db/requests.ts
+```
+
+Auth/protection:
+
+```txt
+lib/auth.ts
+middleware.ts
+```
+
+---
+
+### If there is already a dispatch data loader
+
+Prefer extending/read-wrapping existing read-only code:
+
+```txt
+lib/dispatch/getRequests.ts
+lib/dispatch/requestRepository.ts
+```
+
+Add a safe read-only selector rather than creating duplicate DB logic:
+
+```ts
+getAssignedJobsPreview({
+  role: "merchant" | "rider"
+})
+```
+
+This keeps Phase 5A close to Phase 4 and reduces risk.
+
+---
+
+### Files that should not change
+
+Avoid changing:
+
+```txt
+.env
+.env.local
+.env.production
+prisma/schema.prisma
+drizzle schema files
+database migration files
+public/customer nav files unless only verifying no change
+live deployment config
+```
+
+Also avoid replacing:
 
 ```txt
 app/merchant/page.tsx
-app/merchant/dashboard/page.tsx
-```
-
-or if using Pages Router:
-
-```txt
-pages/merchant/index.tsx
-pages/merchant/dashboard.tsx
-```
-
-Changes:
-
-- Replace placeholder/static dashboard content with read-only assigned jobs list.
-- Reuse the same card component/data loader.
-- Keep merchant UI simple and mobile-first.
-- Do not add workflow buttons.
-
-Merchant card fields:
-
-```txt
-রিকোয়েস্ট কোড
-এলাকা
-প্রয়োজন/ক্যাটাগরি
-স্ট্যাটাস
-অ্যাসাইনড নাম/ফোন, if relevant
-অপারেটর নোট
-ট্র্যাকিং লিংক
-```
-
----
-
-### B. Rider page
-
-Likely:
-
-```txt
 app/rider/page.tsx
-```
-
-or:
-
-```txt
+pages/merchant.tsx
 pages/rider.tsx
 ```
 
-Changes:
-
-- Show assigned rider/worker jobs read-only.
-- Use large mobile cards.
-- Add safe call link if allowed/available.
-- No start/completed/action buttons.
-
-Rider card fields:
-
-```txt
-জব কোড
-এলাকা/ঠিকানা
-প্রয়োজন/ক্যাটাগরি
-কাস্টমার/অপারেটর কল লিংক, if available
-বর্তমান স্ট্যাটাস
-নোট
-ট্র্যাকিং লিংক
-```
-
----
-
-### C. Shared data helper
-
-Likely new or extended:
-
-```txt
-lib/assigned-jobs.ts
-lib/requests.ts
-lib/dispatch.ts
-lib/data/assignedJobs.ts
-src/lib/assigned-jobs.ts
-```
-
-Purpose:
-
-- Hide memory-vs-DB differences.
-- Normalize request/order records into UI-friendly cards.
-- Keep reads server-side where possible.
-- Keep strict read-only semantics.
-
-Suggested functions:
-
-```ts
-export async function getMerchantAssignedJobs(): Promise<FulfillmentJobCard[]> {}
-
-export async function getRiderAssignedJobs(): Promise<FulfillmentJobCard[]> {}
-```
-
-or:
-
-```ts
-export async function getAssignedFulfillmentJobs(
-  view: "merchant" | "rider"
-): Promise<FulfillmentJobCard[]> {}
-```
-
----
-
-### D. Shared UI component
-
-Likely new:
-
-```txt
-components/AssignedJobCard.tsx
-components/fulfillment/AssignedJobCard.tsx
-components/merchant/MerchantAssignedJobs.tsx
-components/rider/RiderAssignedJobs.tsx
-```
-
-Recommended:
-
-- One generic `AssignedJobCard`.
-- Optional `variant="merchant" | "rider"`.
-- Avoid duplicating style logic.
-
-Visual style:
-
-- Deep emerald background or accents.
-- Charcoal text.
-- Ivory card background.
-- Subtle gold highlight for code/status.
-- Large touch-friendly spacing.
-- Bangla labels first.
-
-Example visual tokens if Tailwind is used:
-
-```txt
-bg-emerald-950
-text-stone-950
-bg-[#FFFDF5] / ivory
-border-amber-300/40
-text-amber-700
-rounded-2xl
-shadow-sm
-p-4
-```
-
----
-
-### E. Navigation/layout
-
-Likely:
-
-```txt
-components/Nav.tsx
-components/Header.tsx
-app/layout.tsx
-```
-
-Only change if necessary.
-
-Requirement:
-
-- Keep public/customer navigation clean.
-- Do not add merchant/rider links to primary customer nav unless they already exist as staff/internal links.
-- If there is an internal nav area, merchant/rider links can stay there.
-
----
-
-### F. Tests, if present
-
-Likely:
-
-```txt
-__tests__/assigned-jobs.test.ts
-tests/assigned-jobs.test.ts
-tests/merchant.spec.ts
-tests/rider.spec.ts
-```
-
-Recommended test coverage:
-
-- Memory mode returns assigned request cards.
-- Merchant page renders assigned job card.
-- Rider page renders assigned job card.
-- Empty state renders safely.
-- No action buttons are present.
-
-Avoid tests that require real secrets or live DB.
+Existing public onboarding pages should remain intact.
 
 ---
 
 ## 3. Test commands
 
-Use local/staged only. Do not deploy.
+Use local-only test flow. Do not deploy.
 
-### A. Install/check
+### Install/check
 
 ```bash
 npm install
 ```
 
-or if lockfile requires:
+or if already installed:
 
 ```bash
 npm ci
@@ -425,221 +398,269 @@ npm ci
 
 ---
 
-### B. Lint/type/build
-
-```bash
-npm run lint
-npm run build
-```
-
-If TypeScript check is separate:
+### Type check
 
 ```bash
 npm run typecheck
 ```
 
----
-
-### C. Unit tests
+If no typecheck script exists:
 
 ```bash
-npm test
-```
-
-or:
-
-```bash
-npm run test
+npx tsc --noEmit
 ```
 
 ---
 
-### D. Local memory mode manual test
+### Lint
 
-Run without DB:
+```bash
+npm run lint
+```
+
+---
+
+### Build check
+
+```bash
+npm run build
+```
+
+---
+
+### Local dev with memory store
 
 ```bash
 GOVO_SKIP_DB=1 npm run dev
 ```
 
-Then check:
+Then verify:
 
 ```txt
-http://localhost:3000/merchant
-http://localhost:3000/merchant/dashboard
-http://localhost:3000/rider
-```
-
-Verify:
-
-- Cards load from memory request store.
-- No DB connection required.
-- Empty states are Bangla and clean.
-- Tracking links work.
-- No accept/reject/start/completed buttons exist.
-
----
-
-### E. Optional curl checks
-
-```bash
-curl -I http://localhost:3000/merchant
-curl -I http://localhost:3000/merchant/dashboard
-curl -I http://localhost:3000/rider
+/merchant
+/rider
+/merchant/jobs
+/rider/jobs
 ```
 
 Expected:
 
-```txt
-HTTP 200
-```
-
-or expected auth redirect if these routes are protected.
+- `/merchant` remains public onboarding.
+- `/rider` remains public onboarding.
+- `/merchant/jobs` is protected.
+- `/rider/jobs` is protected.
+- No accept/reject/start/complete actions appear.
+- Cards render from memory request data.
+- Empty state works if no assigned jobs exist.
 
 ---
 
-### F. Real DB read-only local test
+### Local dev with real DB mode
 
-Only if local non-production DB is already configured.
+Without changing env/secrets:
 
 ```bash
 npm run dev
 ```
 
-Then verify the same pages.
+Verify:
 
-Important:
+```txt
+/merchant/jobs
+/rider/jobs
+```
 
-- Do not edit `.env`.
-- Do not use production DB.
-- Do not run migrations.
-- Do not deploy.
+Expected:
+
+- Uses existing request/order data.
+- Read-only only.
+- No schema migration required.
+- No DB writes generated by page load.
 
 ---
 
-### G. Regression checks
+### Optional route protection checks
 
-Search for forbidden action labels/buttons:
+If protected routes redirect unauthenticated users:
 
 ```bash
-grep -R "Accept\|Reject\|Start\|Complete\|Completed\|গ্রহণ\|বাতিল\|শুরু\|সম্পন্ন" app components pages src || true
+curl -I http://localhost:3000/merchant/jobs
+curl -I http://localhost:3000/rider/jobs
 ```
 
-Manual confirmation:
+Expected one of:
 
-- Merchant/rider cards are read-only.
-- Dispatch Phase 4 still works.
-- Customer request flow still works.
-- Customer tracking flow still works.
-- Public/customer nav remains uncluttered.
+```txt
+302 redirect to login/protected gate
+401 unauthorized
+403 forbidden
+```
+
+Authenticated/internal preview session should render `200`.
+
+---
+
+### Public nav regression check
+
+Manually verify:
+
+- Homepage does not advertise `/merchant/jobs` or `/rider/jobs`.
+- Customer tracking/request flow does not link to these preview pages.
+- Public merchant/rider onboarding routes still work.
+
+---
+
+### Suggested manual QA checklist
+
+#### Merchant jobs page
+
+- [ ] Bangla-first page title.
+- [ ] Mobile layout works at 360px width.
+- [ ] Large readable cards.
+- [ ] Request code visible.
+- [ ] Customer area visible.
+- [ ] Need/category visible.
+- [ ] Status visible.
+- [ ] Assigned name/phone visible only if present.
+- [ ] Tracking link works.
+- [ ] Operator note visible if present.
+- [ ] No action buttons.
+
+#### Rider jobs page
+
+- [ ] Bangla-first page title.
+- [ ] Mobile layout works at 360px width.
+- [ ] Job/request code visible.
+- [ ] Area/address visible.
+- [ ] Need/category visible.
+- [ ] Safe call link appears only when allowed data exists.
+- [ ] Current status visible.
+- [ ] Note visible if present.
+- [ ] Tracking link works.
+- [ ] No action buttons.
 
 ---
 
 ## 4. Risks
 
-### A. Data model ambiguity
+### 1. Accidental public exposure
 
-Risk:
-
-- Existing request/order schema may not clearly separate merchant assignment from rider assignment.
+Risk: `/merchant/jobs` and `/rider/jobs` could expose operational/customer data if not protected.
 
 Mitigation:
 
-- Use a normalization helper.
-- Prefer role-specific assignment fields if they exist.
-- If only generic assignment exists, show generic assigned fulfillment jobs read-only and keep labels neutral.
+- Reuse existing dispatch/admin protection.
+- Do not add public nav links.
+- Add middleware guard tests/manual checks.
+- Treat routes as internal preview until proper role auth exists.
 
 ---
 
-### B. Privacy exposure
+### 2. Confusing public onboarding routes
 
-Risk:
-
-- Rider card phone links could expose customer/operator numbers.
+Risk: Existing `/merchant` and `/rider` public onboarding pages may accidentally be replaced.
 
 Mitigation:
 
-- Only use phone fields already available and intended for fulfillment.
-- Sanitize `tel:` href.
-- Prefer button text like `কল করুন` instead of printing full phone.
-- Do not expose secrets, internal notes beyond allowed operator note, or admin-only metadata.
+- Only add nested `/merchant/jobs` and `/rider/jobs`.
+- Do not edit existing onboarding page unless absolutely necessary.
+- Regression test `/merchant` and `/rider`.
 
 ---
 
-### C. Accidentally adding workflow actions
+### 3. Data shape inconsistency between memory and DB modes
 
-Risk:
-
-- Users may expect accept/start/complete buttons.
+Risk: Memory store and DB records may use slightly different field names for assignment/status/note.
 
 Mitigation:
 
-- Phase 5A must be read-only.
-- No mutation endpoints.
-- No forms for status change.
-- No action buttons except tracking/call links.
-- Save accept/reject/start/completed for a later phase.
+- Create a small normalization function:
 
----
-
-### D. DB coupling
-
-Risk:
-
-- Pages could directly import DB logic and break memory mode.
-
-Mitigation:
-
-- Put all data access behind `getAssignedFulfillmentJobs`.
-- Ensure `GOVO_SKIP_DB=1` never imports or initializes DB client if current architecture requires that separation.
-
----
-
-### E. Public navigation clutter
-
-Risk:
-
-- Merchant/rider links added to customer-facing nav could confuse customers.
-
-Mitigation:
-
-- Do not add merchant/rider to public nav.
-- Keep these as direct/internal routes or in existing staff navigation only.
-
----
-
-### F. Empty states mistaken for errors
-
-Risk:
-
-- If no assigned jobs exist, merchant/rider may think system is broken.
-
-Mitigation:
-
-- Clear Bangla empty copy.
-- Optional helper text:
-
-```txt
-ডিসপ্যাচ থেকে কাজ অ্যাসাইন হলে এখানে দেখা যাবে।
+```ts
+normalizeAssignedJob(request): AssignedJobPreview
 ```
 
+- Use same normalized shape for both merchant and rider pages.
+- Fallback gracefully when optional fields are missing.
+
 ---
 
-### G. Live system safety
+### 4. Revealing unsafe phone/address data
 
-Risk:
-
-- Testing against live DB or deploying incomplete phase.
+Risk: Rider/merchant preview may show more customer data than intended.
 
 Mitigation:
 
-- Work on feature branch only, for example:
+- Only use existing Phase 4 safe assignment/request fields.
+- For call links, only show `tel:` when the existing phone field is already intended for operational display.
+- Avoid exposing hidden/internal/customer-private fields.
+- Prefer customer area over full address on merchant page unless full address is already shown in dispatch/tracking context.
+
+---
+
+### 5. Accidentally creating workflow actions
+
+Risk: UI may invite operations like accept/reject/complete too early.
+
+Mitigation:
+
+- No action buttons.
+- No mutation APIs.
+- No forms.
+- No status update calls from merchant/rider pages.
+- Tracking link only.
+
+---
+
+### 6. DB writes on page load
+
+Risk: Existing repository functions may update timestamps/status during fetch.
+
+Mitigation:
+
+- Use strictly read-only query methods.
+- Avoid dispatch mutation handlers.
+- Confirm page load does not trigger status changes.
+
+---
+
+### 7. Route protection mismatch
+
+Risk: Existing auth guard may be admin-only, not merchant/rider-role ready.
+
+Mitigation:
+
+- That is acceptable for Phase 5A.
+- Label internally as “protected preview”.
+- Do not create fake merchant/rider auth yet.
+- Later phase can replace guard with proper role-based auth.
+
+---
+
+### 8. Mobile usability issues
+
+Risk: Cards may become dense with code, area, address, phone, note, and tracking.
+
+Mitigation:
+
+- Use large spacing.
+- Use short Bangla labels.
+- Collapse absent values.
+- Put note in a muted section.
+- Keep primary code/status visible at top.
+
+---
+
+### Recommended implementation branch
 
 ```bash
-git checkout -b phase-5a-readonly-assigned-jobs
+git checkout -b phase-5a-merchant-rider-readonly-jobs
 ```
 
-- No env/secrets changes.
-- No migrations.
-- No production deploy.
-- Open PR with screenshots and test results.
+Commit scope should stay narrow:
+
+```txt
+feat: add protected merchant and rider readonly jobs previews
+```
+
+No deploy from this branch until reviewed.
