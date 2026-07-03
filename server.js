@@ -3254,6 +3254,265 @@ function renderTrackPage({ id = '', phone = '', code = '', orders = [], services
   return page('Track GOVO', `<section class="card app-hero"><span class="pill">Unified Tracking</span><h1>Track order, service request or support ticket</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Search by tracking ID, request ID, support ticket code, or phone number.</p><form method="GET" action="/track"><label>Tracking Code</label><input name="code" value="${esc(code)}" placeholder="GOVO-000001 / SRV-YYYYMMDD-0001 / SUP-YYYYMMDD-0001"><label>Order / Request / Ticket ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Phone Number</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/app">Home</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/support">Support</a></div></section>${orderHtml ? `<section class="card"><div class="section-head"><h2>Delivery Orders</h2><span class="pill">${orders.length}</span></div></section><section class="cards">${orderHtml}</section>` : ''}${serviceHtml ? `<section class="card"><div class="section-head"><h2>Service Requests</h2><span class="pill">${services.length}</span></div></section><section class="cards">${serviceHtml}</section>` : ''}${supportHtml ? `<section class="card"><div class="section-head"><h2>Support Tickets</h2><span class="pill">${support.length}</span></div></section><section class="cards">${supportHtml}</section>` : ''}${empty}`, 'track');
 }
 
+// GOVO_PHASE5D_TRACKING_ASSIGNED_INFO
+// Customer-safe assigned info for /track page.
+// Safety: code-based tracking only, no admin controls, no operator private note exposure, no DB schema changes.
+function govoTrackPublicSafe(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .trim();
+}
+
+function govoTrackPublicPick(item, keys, fallback = '') {
+  for (const key of keys) {
+    if (item && item[key] !== undefined && item[key] !== null && String(item[key]).trim() !== '') return item[key];
+  }
+  return fallback;
+}
+
+function govoTrackPublicCode(item, index = 0) {
+  if (typeof govoRoleCode === 'function') return govoRoleCode(item, index);
+  if (typeof govoDispatchCode === 'function') return govoDispatchCode(item, index);
+  return govoTrackPublicPick(item, ['code', 'request_code', 'requestId', 'request_id', 'order_code', 'tracking_code', 'id'], `REQ-${index + 1}`);
+}
+
+function govoTrackPublicPhone(value) {
+  const cleaned = String(value ?? '').trim().replace(/[^0-9+]/g, '');
+  return cleaned.length >= 6 ? cleaned : '';
+}
+
+function govoTrackPublicAssignedName(item) {
+  if (typeof govoRoleAssignedName === 'function') return govoRoleAssignedName(item);
+  if (typeof govoDispatchAssignedName === 'function') return govoDispatchAssignedName(item);
+  return govoTrackPublicPick(item, ['assigned_name', 'assignedName', 'provider_name', 'providerName', 'rider_name', 'worker_name', 'merchant_name'], '');
+}
+
+function govoTrackPublicAssignedPhone(item) {
+  if (typeof govoRoleAssignedPhone === 'function') return govoRoleAssignedPhone(item);
+  if (typeof govoDispatchAssignedPhone === 'function') return govoDispatchAssignedPhone(item);
+  return govoTrackPublicPick(item, ['assigned_phone', 'assignedPhone', 'provider_phone', 'providerPhone', 'rider_phone', 'worker_phone', 'merchant_phone'], '');
+}
+
+async function govoTrackPublicFindByCode(code) {
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode) return null;
+
+  let items = [];
+  if (typeof govoDispatchReadOnlyRequests === 'function') {
+    items = await govoDispatchReadOnlyRequests();
+  }
+
+  return (items || []).find((item, index) => {
+    const itemCode = String(govoTrackPublicCode(item, index) || '').trim();
+    return itemCode && itemCode === cleanCode;
+  }) || null;
+}
+
+function govoTrackPublicPayload(item, index = 0) {
+  if (!item) return null;
+
+  const code = govoTrackPublicCode(item, index);
+  const status = govoTrackPublicPick(item, ['status', 'current_status'], 'Phone Confirming');
+  const area = govoTrackPublicPick(item, ['area', 'customer_area', 'zone'], '');
+  const address = govoTrackPublicPick(item, ['address', 'customer_address', 'location', 'delivery_address'], '');
+  const need = govoTrackPublicPick(item, ['need', 'service', 'service_type', 'order_type', 'category', 'title'], 'Service request');
+  const assignedName = govoTrackPublicAssignedName(item);
+  const assignedPhone = govoTrackPublicPhone(govoTrackPublicAssignedPhone(item));
+
+  return {
+    ok: true,
+    code: String(code || ''),
+    status: String(status || ''),
+    area: String(area || ''),
+    address: String(address || ''),
+    need: String(need || ''),
+    assignedName: String(assignedName || ''),
+    assignedPhone: String(assignedPhone || '')
+  };
+}
+
+app.get('/api/track/safe-assigned-info', async (req, res, next) => {
+  try {
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+
+    const code = String(req.query.code || req.query.request_code || '').trim();
+    if (!code) {
+      return res.status(400).json({ ok: false, error: 'missing_code' });
+    }
+
+    const item = await govoTrackPublicFindByCode(code);
+    if (!item) {
+      return res.status(404).json({ ok: false, error: 'not_found' });
+    }
+
+    return res.json(govoTrackPublicPayload(item));
+  } catch (err) {
+    next(err);
+  }
+});
+
+const GOVO_TRACK_ASSIGNED_INJECT_HTML = `
+<style>
+  .govo-track-assigned-card{
+    max-width:980px;
+    margin:14px auto;
+    padding:16px;
+    border-radius:22px;
+    background:#fffaf0;
+    color:#10231d;
+    border:1px solid rgba(216,180,106,.55);
+    box-shadow:0 12px 35px rgba(0,0,0,.16);
+    font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;
+  }
+  .govo-track-assigned-card h2{
+    margin:0 0 8px;
+    color:#073f32;
+    font-size:20px;
+  }
+  .govo-track-assigned-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:10px;
+    margin-top:10px;
+  }
+  .govo-track-assigned-grid div{
+    background:#f4efe3;
+    border-radius:14px;
+    padding:10px;
+  }
+  .govo-track-assigned-grid b{
+    color:#073f32;
+  }
+  .govo-track-assigned-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .govo-track-assigned-actions a{
+    background:#073f32;
+    color:white;
+    text-decoration:none;
+    padding:10px 13px;
+    border-radius:14px;
+    font-weight:900;
+  }
+</style>
+<div id="govo-track-assigned-info-root"></div>
+<script>
+(function(){
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    var code = params.get('code') || params.get('request_code') || '';
+    if (!code) return;
+
+    fetch('/api/track/safe-assigned-info?code=' + encodeURIComponent(code), {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+    .then(function(res){ return res.ok ? res.json() : null; })
+    .then(function(data){
+      if (!data || !data.ok) return;
+
+      var root = document.getElementById('govo-track-assigned-info-root');
+      if (!root) return;
+
+      function addRow(grid, label, value) {
+        if (!value) value = '—';
+        var box = document.createElement('div');
+        var b = document.createElement('b');
+        b.textContent = label;
+        var br = document.createElement('br');
+        var span = document.createElement('span');
+        span.textContent = value;
+        box.appendChild(b);
+        box.appendChild(br);
+        box.appendChild(span);
+        grid.appendChild(box);
+      }
+
+      var card = document.createElement('section');
+      card.className = 'govo-track-assigned-card';
+
+      var title = document.createElement('h2');
+      title.textContent = 'Assigned service update';
+      card.appendChild(title);
+
+      var small = document.createElement('p');
+      small.textContent = 'আপনার request এখন GOVO tracking system-এ active আছে। নিচের তথ্য customer-safe update হিসেবে দেখানো হচ্ছে।';
+      card.appendChild(small);
+
+      var grid = document.createElement('div');
+      grid.className = 'govo-track-assigned-grid';
+
+      addRow(grid, 'Request code', data.code);
+      addRow(grid, 'Current status', data.status);
+      addRow(grid, 'Service', data.need);
+      addRow(grid, 'Area', data.area);
+      addRow(grid, 'Address', data.address);
+      addRow(grid, 'Assigned person', data.assignedName);
+
+      card.appendChild(grid);
+
+      if (data.assignedPhone) {
+        var actions = document.createElement('div');
+        actions.className = 'govo-track-assigned-actions';
+        var call = document.createElement('a');
+        call.href = 'tel:' + String(data.assignedPhone).replace(/[^0-9+]/g, '');
+        call.textContent = 'Call assigned person';
+        actions.appendChild(call);
+        card.appendChild(actions);
+      }
+
+      root.appendChild(card);
+    })
+    .catch(function(){});
+  } catch(e) {}
+})();
+</script>
+`;
+
+function govoTrackInjectAssignedInfo(html) {
+  if (typeof html !== 'string') return html;
+  if (!/<\/body>/i.test(html)) return html;
+  if (html.includes('govo-track-assigned-info-root')) return html;
+  return html.replace(/<\/body>/i, GOVO_TRACK_ASSIGNED_INJECT_HTML + '\n</body>');
+}
+
+app.use('/track', (req, res, next) => {
+  if (req.method !== 'GET') return next();
+
+  const originalSend = res.send.bind(res);
+
+  res.send = function govoTrackPatchedSend(body) {
+    try {
+      if (Buffer.isBuffer(body)) {
+        const html = body.toString('utf8');
+        const patched = govoTrackInjectAssignedInfo(html);
+        return originalSend(Buffer.from(patched, 'utf8'));
+      }
+
+      if (typeof body === 'string') {
+        return originalSend(govoTrackInjectAssignedInfo(body));
+      }
+    } catch (err) {
+      // Never break tracking page due to polish injection.
+    }
+
+    return originalSend(body);
+  };
+
+  next();
+});
+
+
+
+
 app.get('/track', async (req, res, next) => {
   try {
     const code = String(req.query.code || '').trim();
@@ -4923,6 +5182,11 @@ function govoDispatchRender(items) {
   .rider-action-buttons{display:flex;gap:8px;flex-wrap:wrap}
   .rider-action-buttons button{border:0;border-radius:999px;padding:10px 12px;font-weight:900;background:#ffffff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08)}
   .rider-action-buttons button.active{background:var(--gold);color:#1d261f}
+  .merchant-action-form{margin-top:14px;background:#fff7e4;border:1px solid rgba(216,180,106,.4);border-radius:16px;padding:12px}
+  .merchant-action-title{font-weight:900;color:var(--green);margin-bottom:8px}
+  .merchant-action-buttons{display:flex;gap:8px;flex-wrap:wrap}
+  .merchant-action-buttons button{border:0;border-radius:999px;padding:10px 12px;font-weight:900;background:#ffffff;color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .merchant-action-buttons button.active{background:var(--gold);color:#1d261f}
   .empty{background:rgba(255,255,255,.08);border:1px dashed rgba(216,180,106,.45);padding:22px;border-radius:20px;margin-top:18px}
 </style>
 </head>
@@ -5087,6 +5351,47 @@ function govoRiderActionButtons(code, currentStatus) {
 }
 
 
+
+// GOVO_PHASE5C_MERCHANT_ACTIONS
+// Admin-only merchant preview actions.
+// Safety: protected route only, no public /merchant changes, no DB schema changes.
+const GOVO_MERCHANT_ACTIONS = [
+  { action: 'accept', label: 'Accept', status: 'Confirmed' },
+  { action: 'prepare', label: 'Prepare', status: 'Working' },
+  { action: 'ready', label: 'Ready', status: 'Completed', confirm: true },
+  { action: 'completed', label: 'Completed', status: 'Completed', confirm: true },
+  { action: 'cancelled', label: 'Cancelled', status: 'Cancelled', confirm: true }
+];
+
+function govoMerchantStatusFromAction(action) {
+  const raw = String(action || '').trim().toLowerCase();
+  const found = GOVO_MERCHANT_ACTIONS.find(a => a.action === raw);
+  return found ? found.status : '';
+}
+
+function govoMerchantActionButtons(code, currentStatus) {
+  const safeCode = govoRoleSafe(code || '');
+  const current = String(currentStatus || '').toLowerCase();
+
+  const buttons = GOVO_MERCHANT_ACTIONS.map((item) => {
+    const active = String(item.status || '').toLowerCase() === current;
+    const confirmAttr = item.confirm
+      ? ` onclick="return confirm('Confirm merchant action: ${govoRoleSafe(item.label)}?')"`
+      : '';
+
+    return `<button class="${active ? 'active' : ''}" type="submit" name="action" value="${govoRoleSafe(item.action)}"${confirmAttr}>${govoRoleSafe(item.label)}</button>`;
+  }).join('');
+
+  return `
+    <form class="merchant-action-form" method="post" action="/admin/merchant-jobs-preview/action">
+      <input type="hidden" name="code" value="${safeCode}">
+      <div class="merchant-action-title">Merchant action — admin preview only</div>
+      <div class="merchant-action-buttons">${buttons}</div>
+    </form>
+  `;
+}
+
+
 function govoRoleRenderJobs(role, items) {
   const isMerchant = role === 'merchant';
   const title = isMerchant ? 'GOVO Admin Preview: Merchant Jobs' : 'GOVO Admin Preview: Rider / Worker Jobs';
@@ -5132,6 +5437,7 @@ function govoRoleRenderJobs(role, items) {
           <a href="${track}">Tracking দেখুন</a>
           ${safeCall ? `<a href="tel:${govoRoleSafe(safeCall)}">Call</a>` : ''}
         </div>
+        ${isMerchant ? govoMerchantActionButtons(code, status) : ''}
         ${!isMerchant ? govoRiderActionButtons(code, status) : ''}
       </article>
     `;
@@ -5174,6 +5480,37 @@ function govoRoleRenderJobs(role, items) {
 </body>
 </html>`;
 }
+
+
+app.post('/admin/merchant-jobs-preview/action', express.urlencoded({ extended: false, limit: '10kb' }), express.json({ limit: '10kb' }), async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+
+    const body = await govoDispatchParseBody(req);
+    const code = String(body.code || body.request_code || body.requestId || body.id || '').trim();
+    const action = String(body.action || '').trim();
+    const status = govoMerchantStatusFromAction(action);
+
+    if (!code) {
+      return res.redirect('/admin/merchant-jobs-preview?action_error=missing_code');
+    }
+
+    if (!status) {
+      return res.redirect('/admin/merchant-jobs-preview?action_error=invalid_action');
+    }
+
+    const result = await govoDispatchUpdateStatusOnly(code, status);
+
+    if (!result.ok) {
+      return res.redirect('/admin/merchant-jobs-preview?action_error=not_found');
+    }
+
+    return res.redirect('/admin/merchant-jobs-preview?action_updated=1');
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 app.get('/admin/merchant-jobs-preview', async (req, res, next) => {
   try {
