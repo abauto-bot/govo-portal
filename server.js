@@ -5958,6 +5958,111 @@ app.get('/admin/ops-summary-draft', async (req, res, next) => {
   }
 });
 
+// GOVO_PHASE6C_LAUNCH_CHECKLIST_AUDIT
+// Admin-only launch checklist. Safety: no deploy, no secret values, read-only.
+function govoLaunchChecklistItems() {
+  return [
+    { group: 'Security', item: 'Rotate Telegram bot token before live deploy', status: 'BLOCKER' },
+    { group: 'Security', item: 'Rotate SMS API key before live deploy', status: 'BLOCKER' },
+    { group: 'Security', item: 'Rotate admin PIN and session secret before live deploy', status: 'BLOCKER' },
+    { group: 'Security', item: 'Run filename-only secret scan; do not print secret values', status: 'REQUIRED' },
+    { group: 'Backup', item: 'Create /opt/govo-backups pre-live backup of server.js and git commit hash', status: 'REQUIRED' },
+    { group: 'Docker', item: 'Build release candidate image and test on local-only port', status: 'REQUIRED' },
+    { group: 'Routes', item: 'Public routes return 200; admin routes return 302 unauthenticated', status: 'REQUIRED' },
+    { group: 'Admin', item: 'Admin login works; dispatch/report/checklist pages return 200 after auth', status: 'REQUIRED' },
+    { group: 'Customer', item: 'Request create → tracking → assigned info flow works', status: 'REQUIRED' },
+    { group: 'Operator', item: 'Dispatch status update and assignment save work in test container', status: 'REQUIRED' },
+    { group: 'Mobile QA', item: 'Check /, /app, /service-request, /track on phone screen', status: 'REQUIRED' },
+    { group: 'DB', item: 'Run separate real DB mode smoke test before live promotion', status: 'REQUIRED' },
+    { group: 'Notify', item: 'Keep notify/report routes preview-only until credential rotation completed', status: 'REQUIRED' },
+    { group: 'Live Deploy', item: 'Do not promote to 8090 until all blockers are cleared', status: 'BLOCKER' }
+  ];
+}
+
+function govoLaunchChecklistPayload() {
+  const items = govoLaunchChecklistItems();
+  const counts = items.reduce((acc, row) => {
+    acc[row.status] = (acc[row.status] || 0) + 1;
+    return acc;
+  }, {});
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    counts,
+    items
+  };
+}
+
+function govoLaunchChecklistRender(payload) {
+  const rows = payload.items.map(row => `
+    <tr>
+      <td>${govoOpsSafe ? govoOpsSafe(row.group) : row.group}</td>
+      <td>${govoOpsSafe ? govoOpsSafe(row.item) : row.item}</td>
+      <td><span class="badge ${String(row.status).toLowerCase()}">${govoOpsSafe ? govoOpsSafe(row.status) : row.status}</span></td>
+    </tr>
+  `).join('');
+
+  const inner = `
+    <section class="hero">
+      <h1>GOVO Launch Checklist</h1>
+      <p>Admin-only pre-live audit. এই page live deploy করে না — শুধু checklist দেখায়।</p>
+      <a class="btn" href="/admin/ops-daily-report">Daily Report</a>
+      <a class="btn" href="/admin/ops-summary-draft">Ops Summary</a>
+      <a class="btn" href="/admin/dispatch">Dispatch</a>
+    </section>
+
+    <section class="grid">
+      <div class="card"><h2>Blockers</h2><div class="metric">${payload.counts.BLOCKER || 0}</div></div>
+      <div class="card"><h2>Required</h2><div class="metric">${payload.counts.REQUIRED || 0}</div></div>
+      <div class="card"><h2>Generated</h2><p class="muted">${govoOpsSafe ? govoOpsSafe(payload.generatedAt) : payload.generatedAt}</p></div>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <h2>Pre-live checklist</h2>
+      <table>
+        <tr><th>Group</th><th>Item</th><th>Status</th></tr>
+        ${rows}
+      </table>
+      <style>
+        .badge{display:inline-block;border-radius:999px;padding:7px 10px;font-weight:1000}
+        .badge.blocker{background:#ffe1df;color:#8a1f14}
+        .badge.required{background:#fff3cf;color:#6e5200}
+      </style>
+    </section>
+  `;
+
+  if (typeof govoOpsShell === 'function') {
+    return govoOpsShell('GOVO Launch Checklist', inner);
+  }
+
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GOVO Launch Checklist</title></head><body>${inner}</body></html>`;
+}
+
+app.get('/api/admin/launch-checklist', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+    return res.json(govoLaunchChecklistPayload());
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/admin/launch-checklist', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+    return res.send(govoLaunchChecklistRender(govoLaunchChecklistPayload()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
+
 
 
 
