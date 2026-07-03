@@ -22,3 +22,5 @@ uploads/
 server.js.before-*
 server.js.after-*
 .aider*
+.govo-ai/
+*.env
