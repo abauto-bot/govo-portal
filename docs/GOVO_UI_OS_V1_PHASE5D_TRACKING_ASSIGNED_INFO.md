@@ -1,22 +1,22 @@
 # GOVO UI OS v1 — Phase 5D Tracking Assigned Info
 
 Scope:
-- Improve customer tracking page to show safe assigned rider/merchant/worker info.
+- Improve customer tracking page with customer-safe assigned rider/worker/merchant info.
 - Do not expose admin/operator controls.
-- Do not expose private internal notes.
+- Do not expose private operator notes.
 - Do not change DB schema.
 - Do not edit secrets/env.
 - Do not deploy live.
 
-Customer-safe tracking info:
+Customer-safe fields:
+- request code
 - current status
 - assigned name if available
-- assigned phone only if intended as customer-callable
+- assigned phone if customer-callable
 - area/address summary
-- tracking timeline
-- support link
+- service/need summary
 
-Safety:
-- no admin action buttons on tracking
-- no hidden operator note unless sanitized/customer-safe
-- no request list exposure
+Implementation:
+- Add a public code-based safe API for tracking assigned info.
+- Inject a small customer-safe card into the existing /track HTML response.
+- Existing /track route remains intact.
