@@ -32,3 +32,24 @@ server.js.before-*
 *.bak
 *.backup
 backups/
+
+# Secrets and local env
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.secret
+*token*
+*TOKEN*
+*password*
+*PASSWORD*
+
+# Local backups / temporary files
+*.bak
+*.backup
+*.before-*
+server.js.bak*
+server.js.before-*
+backups/
+.govo-ai/
