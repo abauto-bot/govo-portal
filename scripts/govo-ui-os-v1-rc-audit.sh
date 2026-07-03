@@ -7,7 +7,14 @@ TS="$(date +%Y%m%d_%H%M%S)"
 IMAGE_TAG="govo_portal:ui-os-v1-rc-${TS}"
 CONTAINER="govo_portal_ui_os_rc_${PORT}"
 REPORT="docs/GOVO_UI_OS_V1_RC_AUDIT_REPORT_${TS}.md"
-BACKUP_DIR="/opt/govo-backups/ui-os-v1-rc-${TS}"
+
+BACKUP_ROOT="${GOVO_RC_BACKUP_ROOT:-/opt/govo-backups}"
+if ! mkdir -p "$BACKUP_ROOT" >/dev/null 2>&1; then
+  BACKUP_ROOT="$HOME/govo-backups"
+  mkdir -p "$BACKUP_ROOT"
+fi
+
+BACKUP_DIR="$BACKUP_ROOT/ui-os-v1-rc-${TS}"
 
 mkdir -p "$(dirname "$REPORT")" "$BACKUP_DIR"
 
