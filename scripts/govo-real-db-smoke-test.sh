@@ -199,10 +199,23 @@ curl -s -X POST "http://127.0.0.1:${PORT}/api/requests" \
   }' > /tmp/govo-real-db-request.json
 
 REQ_CODE="$(python3 - <<'PY'
-import json
+import json, re
 try:
     data=json.load(open("/tmp/govo-real-db-request.json"))
-    print(data.get("code") or data.get("requestId") or data.get("id") or "")
+    value = (
+        data.get("code")
+        or data.get("request_id")
+        or data.get("requestId")
+        or data.get("tracking_code")
+        or (data.get("request") or {}).get("request_code")
+        or (data.get("request") or {}).get("code")
+        or (data.get("request") or {}).get("id")
+        or ""
+    )
+    if not value and data.get("tracking_url"):
+        m = re.search(r"[?&]code=([^&]+)", str(data.get("tracking_url")))
+        value = m.group(1) if m else ""
+    print(value)
 except Exception:
     print("")
 PY
