@@ -4633,14 +4633,6 @@ app.get('/dashboard/rider', async (req, res, next) => {
     res.send(page('Rider Status', `<section class="card"><h1>Rider Status</h1><form><label>Phone</label><input name="phone" value="${esc(phone)}"><button>Check</button></form></section>${records}`, 'rider'));
   } catch (e) { next(e); }
 });
-
-app.use((err, req, res, next) => {
-  console.error('GOVO error:', err);
-  res.status(500).send(page('Server Error', `<section class="card"><h1>Server Error</h1><p>${esc(err.message || 'Unknown error')}</p></section>`));
-});
-
-ensureSchema().then(() => {
-
 // GOVO_PHASE4A_READONLY_DISPATCH
 // Read-only hidden operator/admin dispatch inbox.
 // Safety: no DB writes, no assignment writes, no status changes.
@@ -4651,6 +4643,12 @@ function govoDispatchEsc(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function govoDispatchTel(value) {
+  const cleaned = String(value ?? '').trim().replace(/[^0-9+]/g, '');
+  if (!cleaned || cleaned.length < 6) return '';
+  return cleaned;
 }
 
 function govoDispatchPick(item, keys, fallback = '') {
@@ -4706,7 +4704,7 @@ async function govoDispatchReadOnlyRequests() {
       for (const q of queries) {
         try {
           const result = await pool.query(q);
-          if (result && Array.isArray(result.rows)) return result.rows;
+          if (result && Array.isArray(result.rows) && result.rows.length) return result.rows;
         } catch (inner) {
           // Try next known read-only table.
         }
@@ -4737,6 +4735,13 @@ function govoDispatchStatusLabel(status) {
   return map[key] || status || 'Phone Confirming';
 }
 
+function govoDispatchPriorityLabel(value) {
+  if (value === true || String(value).toLowerCase() === 'true') return 'urgent';
+  if (value === false || String(value).toLowerCase() === 'false') return 'normal';
+  const raw = String(value || 'normal').trim();
+  return raw || 'normal';
+}
+
 function govoDispatchRender(items) {
   const cards = (items || []).map((item, index) => {
     const code = govoDispatchCode(item, index);
@@ -4746,7 +4751,7 @@ function govoDispatchRender(items) {
     const need = govoDispatchPick(item, ['need', 'service', 'service_type', 'order_type', 'category', 'title'], 'Service request');
     const note = govoDispatchPick(item, ['note', 'message', 'details', 'description', 'voice_note'], '');
     const address = govoDispatchPick(item, ['address', 'customer_address', 'location', 'delivery_address'], '');
-    const priority = govoDispatchPick(item, ['priority', 'urgent', 'urgency'], 'normal');
+    const priority = govoDispatchPriorityLabel(govoDispatchPick(item, ['priority', 'urgent', 'urgency'], 'normal'));
     const status = govoDispatchPick(item, ['status', 'current_status'], 'Phone Confirming');
     const created = govoDispatchPick(item, ['created_at', 'createdAt', 'time', 'created'], '');
     const track = `/track?code=${encodeURIComponent(code)}`;
@@ -4773,7 +4778,7 @@ function govoDispatchRender(items) {
 
         <div class="govo-actions">
           <a href="${track}">Tracking দেখুন</a>
-          ${mobile ? `<a href="tel:${govoDispatchEsc(mobile)}">Customer Call</a>` : ''}
+          ${govoDispatchTel(mobile) ? `<a href="tel:${govoDispatchEsc(govoDispatchTel(mobile))}">Customer Call</a>` : ''}
         </div>
 
         ${created ? `<small>Created: ${govoDispatchEsc(created)}</small>` : ''}
@@ -4822,12 +4827,24 @@ function govoDispatchRender(items) {
 app.get('/admin/dispatch', async (req, res, next) => {
   try {
     if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
     const items = await govoDispatchReadOnlyRequests();
     res.send(govoDispatchRender(items));
   } catch (err) {
     next(err);
   }
 });
+
+
+app.use((err, req, res, next) => {
+  console.error('GOVO error:', err);
+  res.status(500).send(page('Server Error', `<section class="card"><h1>Server Error</h1><p>${esc(err.message || 'Unknown error')}</p></section>`));
+});
+
+ensureSchema().then(() => {
+
+
 
 
   app.listen(PORT, () => console.log('GOVO Express v1.0 clean running on', PORT));
