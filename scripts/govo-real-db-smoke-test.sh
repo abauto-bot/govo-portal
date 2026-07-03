@@ -8,6 +8,11 @@ IMAGE_TAG="govo_portal:ui-os-v1-real-db-smoke-${TS}"
 CONTAINER="govo_portal_real_db_smoke_${PORT}"
 REPORT="docs/GOVO_UI_OS_V1_REAL_DB_SMOKE_REPORT_${TS}.md"
 TMP_ENV="/tmp/govo-real-db-smoke-env-${TS}"
+DOCKER_NETWORK_MODE="${GOVO_SMOKE_DOCKER_NETWORK:-bridge}"
+INTERNAL_PORT="3000"
+if [ "$DOCKER_NETWORK_MODE" = "host" ]; then
+  INTERNAL_PORT="$PORT"
+fi
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "❌ Env file not found: $ENV_FILE"
@@ -29,6 +34,8 @@ echo "ENV_FILE=$ENV_FILE"
 echo "PORT=$PORT"
 echo "IMAGE_TAG=$IMAGE_TAG"
 echo "REPORT=$REPORT"
+echo "DOCKER_NETWORK_MODE=$DOCKER_NETWORK_MODE"
+echo "INTERNAL_PORT=$INTERNAL_PORT"
 echo
 
 echo "===== CREATE SAFE TEMP ENV ====="
@@ -37,7 +44,7 @@ grep -Ev '^(GOVO_SKIP_DB|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|SMS_API_KEY|OPENROU
 {
   # Force container app to listen on internal Docker port 3000.
   # Real .env may contain PORT=8090/other, which causes host curl 000 in smoke tests.
-  echo "PORT=3000"
+  echo "PORT=$INTERNAL_PORT"
   echo "HOST=0.0.0.0"
   echo "GOVO_NOTIFY_DISABLED=1"
   echo "GOVO_SKIP_NOTIFY=1"
@@ -53,6 +60,8 @@ chmod 600 "$TMP_ENV"
   echo "- Git branch: $(git branch --show-current)"
   echo "- Git commit: $(git rev-parse --short HEAD)"
   echo "- Test port: $PORT"
+  echo "- Internal port: $INTERNAL_PORT"
+  echo "- Docker network mode: $DOCKER_NETWORK_MODE"
   echo "- Image tag: $IMAGE_TAG"
   echo "- Env file: $ENV_FILE"
   echo "- Notification/API keys stripped from temporary env."
@@ -76,11 +85,19 @@ docker build -t "$IMAGE_TAG" . >/tmp/govo-real-db-docker-build.txt
 echo "===== START REAL DB SMOKE CONTAINER ====="
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 
-docker run -d \
-  --name "$CONTAINER" \
-  -p "127.0.0.1:${PORT}:3000" \
-  --env-file "$TMP_ENV" \
-  "$IMAGE_TAG" >/tmp/govo-real-db-container-id.txt
+if [ "$DOCKER_NETWORK_MODE" = "host" ]; then
+  docker run -d \
+    --name "$CONTAINER" \
+    --network host \
+    --env-file "$TMP_ENV" \
+    "$IMAGE_TAG" >/tmp/govo-real-db-container-id.txt
+else
+  docker run -d \
+    --name "$CONTAINER" \
+    -p "127.0.0.1:${PORT}:${INTERNAL_PORT}" \
+    --env-file "$TMP_ENV" \
+    "$IMAGE_TAG" >/tmp/govo-real-db-container-id.txt
+fi
 
 sleep 7
 
