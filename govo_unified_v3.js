@@ -41,6 +41,15 @@ function esc(value) {
     .replace(/'/g, "&#39;");
 }
 
+function publicSupportPhone() {
+  return String(process.env.GOVO_SUPPORT_PHONE || process.env.SUPPORT_PHONE || process.env.GOVO_OPERATOR_PHONE || process.env.OPERATOR_PHONE || process.env.WHATSAPP_PHONE || '').trim();
+}
+
+function supportCallButton() {
+  const phone = publicSupportPhone();
+  return UI.ctaButton({ variant: "primary", size: "lg", leftIcon: "📞", label: phone ? "সরাসরি কল করুন" : "Support request করুন", href: phone ? "tel:" + phone : "/support?classic=1" });
+}
+
 function customerCategories(selected = "") {
   const items = [
     ["market", "Need Groceries", "বাজার লাগবে", "🛒"],
@@ -101,7 +110,7 @@ function customerHome() {
 <div class="govo-section-head"><h2 class="govo-section-title">ক্যাটাগরি বাছাই করুন</h2>${UI.trustBadge("fast")}</div>
 ${customerCategoryGrid()}
 ${voiceRecorderShell(true)}
-${UI.requestCard({ id: "#GV-MOCK", title: "রিকোয়েস্ট tracking preview", date: "Received → Assigned → Completed", status: "processing", href: "/track/mock-id-123", actionLabel: "Track দেখুন" })}`;
+${UI.requestCard({ id: "#GV-MOCK", title: "রিকোয়েস্ট tracking preview", date: "Received → Assigned → Completed", status: "processing", href: "/app/track/mock-id-123", actionLabel: "Track দেখুন" })}`;
 }
 
 function requestPage(query = {}) {
@@ -184,10 +193,10 @@ function supportPage() {
 <section class="govo-card govo-support-card">
   <div class="govo-operator-avatar" aria-hidden="true">👨‍💼</div>
   <div><h2 class="govo-section-title">রহমান ভাই</h2><p class="govo-copy">সিনিয়র অপারেটর · GOVO Express</p></div>
-  ${UI.ctaButton({ variant: "primary", size: "lg", leftIcon: "📞", label: "সরাসরি কল করুন", href: "tel:01900000000" })}
+  ${supportCallButton()}
   ${UI.ctaButton({ variant: "gold", size: "lg", leftIcon: "✍️", label: "Request লিখুন", href: "/service-request" })}
 </section>
-${UI.emptyState({ title: "অপারেটর flow", description: "এটি customer-facing support screen. Admin/operator hidden route publicly expose করা হয়নি।", emoji: "🛡️", actionLabel: "Track status", href: "/track/mock-id-123" })}`;
+${UI.emptyState({ title: "অপারেটর flow", description: "এটি customer-facing support screen. Admin/operator hidden route publicly expose করা হয়নি।", emoji: "🛡️", actionLabel: "Track status", href: "/app/track/mock-id-123" })}`;
 }
 
 function home(isStatic = false) {
@@ -327,7 +336,6 @@ function mount(app) {
     "/services": "services",
     "/merchant": "merchant",
     "/rider": "rider",
-    "/track": "track",
     "/admin/login": "admin"
   };
 
@@ -339,7 +347,7 @@ function mount(app) {
     });
   });
 
-  app.get(["/track/:id", "/app/track/:id"], (req, res, next) => {
+  app.get(["/app/track/:id"], (req, res, next) => {
     if (req.query && req.query.classic === "1") return next();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(UI.mobileShell({
