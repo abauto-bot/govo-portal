@@ -252,6 +252,370 @@ function govoFinalUiPolishInject(html) {
   return out;
 }
 
+// GOVO_PREMIUM_FLOW_SHELL_V2
+// Unified premium shell for public GOVO flows.
+// Safety: GET HTML UI layer only. No DB/auth/schema/secret behavior changes.
+const GOVO_PREMIUM_FLOW_SHELL_V2 = `
+<style id="govo-premium-flow-shell-v2">
+  :root{
+    --govo-p-bg:#061512;
+    --govo-p-bg2:#0b3d31;
+    --govo-p-card:#fffaf0;
+    --govo-p-ink:#10231d;
+    --govo-p-muted:#6b756f;
+    --govo-p-green:#073f32;
+    --govo-p-green2:#0b5a46;
+    --govo-p-gold:#d8b46a;
+    --govo-p-soft:#f4efe3;
+    --govo-p-shadow:0 18px 55px rgba(0,0,0,.24);
+  }
+
+  body.govo-premium-flow-v2{
+    padding-top:76px!important;
+    padding-bottom:82px!important;
+    background:
+      radial-gradient(circle at 20% 0%,rgba(216,180,106,.16),transparent 35%),
+      linear-gradient(135deg,var(--govo-p-bg),var(--govo-p-bg2))!important;
+    overflow-x:hidden!important;
+  }
+
+  body.govo-premium-flow-v2 header:not(.govo-premium-topbar),
+  body.govo-premium-flow-v2 nav:not(.govo-premium-bottomnav):not(.govo-premium-drawer-nav),
+  body.govo-premium-flow-v2 .navbar,
+  body.govo-premium-flow-v2 .topbar:not(.govo-premium-topbar),
+  body.govo-premium-flow-v2 .bottom-nav:not(.govo-premium-bottomnav),
+  body.govo-premium-flow-v2 .classic-menu,
+  body.govo-premium-flow-v2 .legacy-menu,
+  body.govo-premium-flow-v2 .old-menu,
+  body.govo-premium-flow-v2 .hamburger-menu,
+  body.govo-premium-flow-v2 .mobile-menu,
+  body.govo-premium-flow-v2 .menu-panel:not(.govo-premium-drawer),
+  body.govo-premium-flow-v2 .drawer:not(.govo-premium-drawer){
+    display:none!important;
+  }
+
+  .govo-premium-topbar{
+    position:fixed;
+    top:10px;
+    left:10px;
+    right:10px;
+    height:58px;
+    z-index:2147482000;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:0 12px 0 16px;
+    box-sizing:border-box;
+    border-radius:22px;
+    color:#fffaf0;
+    background:linear-gradient(135deg,rgba(7,63,50,.94),rgba(11,90,70,.90));
+    border:1px solid rgba(216,180,106,.38);
+    box-shadow:0 16px 45px rgba(0,0,0,.32);
+    backdrop-filter:blur(16px);
+  }
+
+  .govo-premium-brand{
+    display:flex;
+    flex-direction:column;
+    text-decoration:none;
+    color:#fffaf0!important;
+    line-height:1.05;
+    min-width:0;
+  }
+
+  .govo-premium-brand strong{
+    font-size:19px;
+    letter-spacing:-.04em;
+  }
+
+  .govo-premium-brand span{
+    font-size:11px;
+    color:#ead7a2;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .govo-premium-menu-btn{
+    width:44px;
+    height:44px;
+    border:0;
+    border-radius:16px;
+    color:#073f32;
+    background:#fffaf0;
+    font-weight:1000;
+    font-size:22px;
+    box-shadow:0 8px 22px rgba(0,0,0,.18);
+  }
+
+  .govo-premium-drawer{
+    position:fixed;
+    top:78px;
+    right:10px;
+    z-index:2147481999;
+    width:min(330px,calc(100vw - 20px));
+    border-radius:24px;
+    background:#fffaf0;
+    color:#10231d;
+    border:1px solid rgba(216,180,106,.55);
+    box-shadow:0 26px 75px rgba(0,0,0,.34);
+    transform:translateY(-10px) scale(.98);
+    opacity:0;
+    pointer-events:none;
+    transition:.18s ease;
+    overflow:hidden;
+  }
+
+  .govo-premium-drawer.open{
+    transform:translateY(0) scale(1);
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .govo-premium-drawer-head{
+    padding:16px;
+    background:linear-gradient(135deg,#073f32,#0b5a46);
+    color:#fffaf0;
+  }
+
+  .govo-premium-drawer-head b{
+    display:block;
+    font-size:18px;
+  }
+
+  .govo-premium-drawer-head small{
+    color:#ead7a2;
+  }
+
+  .govo-premium-drawer-nav{
+    display:grid;
+    gap:8px;
+    padding:12px;
+  }
+
+  .govo-premium-drawer-nav a{
+    text-decoration:none;
+    color:#10231d!important;
+    background:#f4efe3;
+    border:1px solid rgba(7,63,50,.08);
+    border-radius:16px;
+    padding:13px 14px;
+    font-weight:900;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+
+  .govo-premium-drawer-nav a.active{
+    background:#073f32;
+    color:#fffaf0!important;
+  }
+
+  .govo-premium-drawer-foot{
+    padding:12px 16px 16px;
+    color:#66756e;
+    font-size:12px;
+  }
+
+  .govo-premium-bottomnav{
+    position:fixed;
+    left:10px;
+    right:10px;
+    bottom:10px;
+    z-index:2147482000;
+    min-height:62px;
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:6px;
+    padding:8px;
+    box-sizing:border-box;
+    border-radius:24px;
+    background:rgba(255,250,240,.94);
+    border:1px solid rgba(216,180,106,.45);
+    box-shadow:0 16px 48px rgba(0,0,0,.28);
+    backdrop-filter:blur(16px);
+  }
+
+  .govo-premium-bottomnav a{
+    text-decoration:none;
+    color:#073f32!important;
+    border-radius:17px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    min-height:46px;
+    font-weight:950;
+    font-size:11px;
+  }
+
+  .govo-premium-bottomnav a b{
+    font-size:18px;
+    line-height:1;
+  }
+
+  .govo-premium-bottomnav a.active{
+    background:#073f32;
+    color:#fffaf0!important;
+  }
+
+  .govo-premium-flow-v2 main,
+  .govo-premium-flow-v2 .wrap,
+  .govo-premium-flow-v2 [class*="container"]{
+    max-width:1120px;
+  }
+
+  .govo-premium-flow-v2 input,
+  .govo-premium-flow-v2 textarea,
+  .govo-premium-flow-v2 select{
+    border-radius:15px!important;
+    min-height:46px;
+  }
+
+  .govo-premium-flow-v2 button,
+  .govo-premium-flow-v2 a{
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  @media(max-width:640px){
+    body.govo-premium-flow-v2{
+      padding-top:74px!important;
+      padding-bottom:84px!important;
+    }
+
+    .govo-premium-topbar{
+      top:8px;
+      left:8px;
+      right:8px;
+      height:56px;
+      border-radius:21px;
+    }
+
+    .govo-premium-brand strong{
+      font-size:17px;
+    }
+
+    .govo-premium-drawer{
+      top:72px;
+      right:8px;
+      width:calc(100vw - 16px);
+    }
+
+    .govo-premium-bottomnav{
+      left:8px;
+      right:8px;
+      bottom:8px;
+      border-radius:23px;
+    }
+  }
+</style>
+
+<header class="govo-premium-topbar">
+  <a class="govo-premium-brand" href="/app" aria-label="GOVO Express Home">
+    <strong>GOVO Express</strong>
+    <span>Local Premium Trust OS</span>
+  </a>
+  <button class="govo-premium-menu-btn" type="button" aria-label="Open GOVO menu" onclick="window.govoPremiumToggleMenu&&window.govoPremiumToggleMenu()">☰</button>
+</header>
+
+<aside class="govo-premium-drawer" id="govoPremiumDrawer" aria-label="GOVO Premium Menu">
+  <div class="govo-premium-drawer-head">
+    <b>GOVO Control Menu</b>
+    <small>Fast service, local trust, premium flow</small>
+  </div>
+  <nav class="govo-premium-drawer-nav">
+    <a href="/" data-govo-path="/">Home <span>›</span></a>
+    <a href="/app" data-govo-path="/app">Super App <span>›</span></a>
+    <a href="/service-request" data-govo-path="/service-request">Request Service <span>›</span></a>
+    <a href="/track" data-govo-path="/track">Track Order <span>›</span></a>
+    <a href="/shops" data-govo-path="/shops">Shops <span>›</span></a>
+    <a href="/services" data-govo-path="/services">Services <span>›</span></a>
+    <a href="/support" data-govo-path="/support">Support <span>›</span></a>
+  </nav>
+  <div class="govo-premium-drawer-foot">Bangla-first · Premium local service operating system</div>
+</aside>
+
+<nav class="govo-premium-bottomnav" aria-label="GOVO bottom navigation">
+  <a href="/" data-govo-path="/"><b>⌂</b><span>Home</span></a>
+  <a href="/app" data-govo-path="/app"><b>✦</b><span>App</span></a>
+  <a href="/service-request" data-govo-path="/service-request"><b>＋</b><span>Request</span></a>
+  <a href="/track" data-govo-path="/track"><b>◎</b><span>Track</span></a>
+  <a href="/support" data-govo-path="/support"><b>?</b><span>Help</span></a>
+</nav>
+
+<script>
+(function(){
+  try{
+    document.body.classList.add('govo-premium-flow-v2');
+
+    window.govoPremiumToggleMenu=function(){
+      var d=document.getElementById('govoPremiumDrawer');
+      if(d)d.classList.toggle('open');
+    };
+
+    document.addEventListener('click',function(e){
+      var d=document.getElementById('govoPremiumDrawer');
+      if(!d)return;
+      if(e.target.closest('.govo-premium-menu-btn') || e.target.closest('#govoPremiumDrawer'))return;
+      d.classList.remove('open');
+    });
+
+    var path=window.location.pathname || '/';
+    document.querySelectorAll('[data-govo-path]').forEach(function(a){
+      var p=a.getAttribute('data-govo-path');
+      if(p==='/' ? path==='/' : path.indexOf(p)===0){
+        a.classList.add('active');
+      }
+    });
+  }catch(e){}
+})();
+</script>
+`;
+
+function govoPremiumFlowShellInject(html) {
+  if (typeof html !== 'string') return html;
+  if (html.includes('govo-premium-flow-shell-v2')) return html;
+  if (!/<body[^>]*>/i.test(html)) return html;
+
+  let out = html.replace(/<body([^>]*)>/i, '<body$1>' + GOVO_PREMIUM_FLOW_SHELL_V2);
+  return out;
+}
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+
+  // Keep APIs untouched.
+  if (String(req.path || '').startsWith('/api/')) return next();
+
+  const originalSend = res.send.bind(res);
+
+  res.send = function govoPremiumFlowShellSend(body) {
+    try {
+      const contentType = String(res.getHeader('content-type') || '').toLowerCase();
+
+      if (Buffer.isBuffer(body)) {
+        const text = body.toString('utf8');
+        if (text.includes('<body') || contentType.includes('text/html')) {
+          return originalSend(Buffer.from(govoPremiumFlowShellInject(text), 'utf8'));
+        }
+      }
+
+      if (typeof body === 'string' && (body.includes('<body') || contentType.includes('text/html'))) {
+        return originalSend(govoPremiumFlowShellInject(body));
+      }
+    } catch (err) {}
+
+    return originalSend(body);
+  };
+
+  next();
+});
+
+
+
+
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
 
