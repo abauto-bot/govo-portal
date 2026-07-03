@@ -4640,6 +4640,196 @@ app.use((err, req, res, next) => {
 });
 
 ensureSchema().then(() => {
+
+// GOVO_PHASE4A_READONLY_DISPATCH
+// Read-only hidden operator/admin dispatch inbox.
+// Safety: no DB writes, no assignment writes, no status changes.
+function govoDispatchEsc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function govoDispatchPick(item, keys, fallback = '') {
+  for (const key of keys) {
+    if (item && item[key] !== undefined && item[key] !== null && String(item[key]).trim() !== '') return item[key];
+  }
+  return fallback;
+}
+
+function govoDispatchCode(item, index = 0) {
+  return govoDispatchPick(item, ['code', 'request_code', 'requestId', 'request_id', 'order_code', 'tracking_code', 'id'], `REQ-${index + 1}`);
+}
+
+function govoDispatchMemoryRequests() {
+  const candidates = [
+    global.govoRequests,
+    global.GOVO_REQUESTS,
+    global.govoServiceRequests,
+    global.serviceRequests,
+    global.__govoRequests,
+    global.__GOVO_REQUESTS,
+    global.govoRequestStore,
+    global.requestStore
+  ];
+
+  for (const store of candidates) {
+    if (!store) continue;
+    if (Array.isArray(store)) return store;
+    if (store instanceof Map) return Array.from(store.values());
+    if (typeof store === 'object') {
+      if (Array.isArray(store.requests)) return store.requests;
+      if (store.requests instanceof Map) return Array.from(store.requests.values());
+      const vals = Object.values(store).filter(v => v && typeof v === 'object');
+      if (vals.length) return vals;
+    }
+  }
+  return [];
+}
+
+async function govoDispatchReadOnlyRequests() {
+  const memoryItems = govoDispatchMemoryRequests();
+  if (memoryItems.length) return memoryItems.slice().reverse();
+
+  // Real DB mode: read-only, schema-tolerant.
+  // No INSERT/UPDATE/DELETE, no schema migration.
+  try {
+    if (typeof pool !== 'undefined' && pool && typeof pool.query === 'function') {
+      const queries = [
+        `SELECT * FROM service_requests ORDER BY created_at DESC LIMIT 80`,
+        `SELECT * FROM govo_orders ORDER BY created_at DESC LIMIT 80`
+      ];
+
+      for (const q of queries) {
+        try {
+          const result = await pool.query(q);
+          if (result && Array.isArray(result.rows)) return result.rows;
+        } catch (inner) {
+          // Try next known read-only table.
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('GOVO dispatch read-only fallback:', err.message);
+  }
+
+  return [];
+}
+
+function govoDispatchStatusLabel(status) {
+  const key = String(status || 'Phone Confirming').toLowerCase();
+  const map = {
+    received: 'পাওয়া গেছে',
+    'phone confirming': 'ফোন confirm হচ্ছে',
+    confirming: 'ফোন confirm হচ্ছে',
+    confirmed: 'confirm হয়েছে',
+    assigned: 'নিয়োগ হয়েছে',
+    'on the way': 'পথে আছে',
+    working: 'কাজ চলছে',
+    completed: 'কাজ শেষ',
+    paid: 'payment done',
+    feedback: 'feedback',
+    cancelled: 'বাতিল'
+  };
+  return map[key] || status || 'Phone Confirming';
+}
+
+function govoDispatchRender(items) {
+  const cards = (items || []).map((item, index) => {
+    const code = govoDispatchCode(item, index);
+    const name = govoDispatchPick(item, ['name', 'customer_name', 'customerName'], 'নাম নেই');
+    const mobile = govoDispatchPick(item, ['mobile', 'phone', 'customer_phone', 'customerPhone'], '');
+    const area = govoDispatchPick(item, ['area', 'customer_area', 'zone'], '');
+    const need = govoDispatchPick(item, ['need', 'service', 'service_type', 'order_type', 'category', 'title'], 'Service request');
+    const note = govoDispatchPick(item, ['note', 'message', 'details', 'description', 'voice_note'], '');
+    const address = govoDispatchPick(item, ['address', 'customer_address', 'location', 'delivery_address'], '');
+    const priority = govoDispatchPick(item, ['priority', 'urgent', 'urgency'], 'normal');
+    const status = govoDispatchPick(item, ['status', 'current_status'], 'Phone Confirming');
+    const created = govoDispatchPick(item, ['created_at', 'createdAt', 'time', 'created'], '');
+    const track = `/track?code=${encodeURIComponent(code)}`;
+
+    return `
+      <article class="govo-dispatch-card">
+        <div class="govo-dispatch-top">
+          <div>
+            <div class="govo-code">${govoDispatchEsc(code)}</div>
+            <h2>${govoDispatchEsc(need)}</h2>
+          </div>
+          <span class="govo-status">${govoDispatchEsc(govoDispatchStatusLabel(status))}</span>
+        </div>
+
+        <div class="govo-grid">
+          <p><b>Customer</b><br>${govoDispatchEsc(name)}</p>
+          <p><b>Mobile</b><br>${govoDispatchEsc(mobile || '—')}</p>
+          <p><b>Area</b><br>${govoDispatchEsc(area || '—')}</p>
+          <p><b>Priority</b><br>${govoDispatchEsc(priority || 'normal')}</p>
+        </div>
+
+        <p class="govo-note"><b>Note / Voice text</b><br>${govoDispatchEsc(note || '—')}</p>
+        <p class="govo-note"><b>Address</b><br>${govoDispatchEsc(address || '—')}</p>
+
+        <div class="govo-actions">
+          <a href="${track}">Tracking দেখুন</a>
+          ${mobile ? `<a href="tel:${govoDispatchEsc(mobile)}">Customer Call</a>` : ''}
+        </div>
+
+        ${created ? `<small>Created: ${govoDispatchEsc(created)}</small>` : ''}
+      </article>
+    `;
+  }).join('');
+
+  return `<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GOVO Dispatch Inbox</title>
+<style>
+  :root{--green:#073f32;--green2:#0b5a46;--gold:#d8b46a;--ivory:#fffaf0;--ink:#10231d;--muted:#66756e}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;background:linear-gradient(135deg,#061512,#0b3d31);color:var(--ivory)}
+  .wrap{max-width:1100px;margin:auto;padding:22px}
+  .hero{border:1px solid rgba(216,180,106,.35);border-radius:24px;padding:22px;background:rgba(255,255,255,.06);box-shadow:0 18px 50px rgba(0,0,0,.25)}
+  .hero h1{margin:0 0 8px;font-size:28px}
+  .hero p{margin:0;color:#dce8df}
+  .grid{display:grid;gap:16px;margin-top:18px}
+  .govo-dispatch-card{background:var(--ivory);color:var(--ink);border-radius:22px;padding:18px;border:1px solid rgba(216,180,106,.5)}
+  .govo-dispatch-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .govo-code{font-size:12px;color:var(--muted);font-weight:800;letter-spacing:.04em}
+  h2{margin:4px 0 10px;color:var(--green)}
+  .govo-status{background:#e8f6ef;color:var(--green);padding:8px 12px;border-radius:999px;font-weight:800;white-space:nowrap}
+  .govo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .govo-grid p,.govo-note{background:#f4efe3;border-radius:14px;padding:10px;margin:8px 0}
+  .govo-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .govo-actions a{background:var(--green);color:white;text-decoration:none;padding:12px 14px;border-radius:14px;font-weight:800}
+  .empty{background:rgba(255,255,255,.08);border:1px dashed rgba(216,180,106,.45);padding:22px;border-radius:20px;margin-top:18px}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>GOVO Operator Dispatch Inbox</h1>
+      <p>Read-only request view. এখানে status update, assignment বা database write হয় না।</p>
+    </section>
+    ${cards ? `<section class="grid">${cards}</section>` : `<section class="empty">এখন কোনো request পাওয়া যায়নি। Customer request তৈরি হলে এখানে দেখা যাবে।</section>`}
+  </main>
+</body>
+</html>`;
+}
+
+app.get('/admin/dispatch', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const items = await govoDispatchReadOnlyRequests();
+    res.send(govoDispatchRender(items));
+  } catch (err) {
+    next(err);
+  }
+});
+
+
   app.listen(PORT, () => console.log('GOVO Express v1.0 clean running on', PORT));
 }).catch((e) => {
   console.error('Startup failed:', e);
