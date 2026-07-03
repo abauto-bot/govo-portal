@@ -4980,6 +4980,180 @@ app.get('/admin/dispatch', async (req, res, next) => {
   }
 });
 
+// GOVO_PHASE5A_MERCHANT_RIDER_READONLY
+// Protected merchant/rider read-only fulfillment preview.
+// Safety: no status writes, no assignment writes, no DB schema changes.
+// Public /merchant and /rider routes are not replaced.
+function govoRoleSafe(value) {
+  if (typeof govoDispatchEsc === 'function') return govoDispatchEsc(value);
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function govoRolePick(item, keys, fallback = '') {
+  if (typeof govoDispatchPick === 'function') return govoDispatchPick(item, keys, fallback);
+  for (const key of keys) {
+    if (item && item[key] !== undefined && item[key] !== null && String(item[key]).trim() !== '') return item[key];
+  }
+  return fallback;
+}
+
+function govoRoleCode(item, index = 0) {
+  if (typeof govoDispatchCode === 'function') return govoDispatchCode(item, index);
+  return govoRolePick(item, ['code', 'request_code', 'requestId', 'request_id', 'order_code', 'tracking_code', 'id'], `REQ-${index + 1}`);
+}
+
+function govoRoleStatusLabel(status) {
+  if (typeof govoDispatchStatusLabel === 'function') return govoDispatchStatusLabel(status);
+  return status || 'Phone Confirming';
+}
+
+function govoRoleTel(value) {
+  if (typeof govoDispatchTel === 'function') return govoDispatchTel(value);
+  const cleaned = String(value ?? '').trim().replace(/[^0-9+]/g, '');
+  return cleaned.length >= 6 ? cleaned : '';
+}
+
+async function govoRoleReadOnlyRequests() {
+  if (typeof govoDispatchReadOnlyRequests === 'function') {
+    return await govoDispatchReadOnlyRequests();
+  }
+  return [];
+}
+
+function govoRoleAssignedName(item) {
+  if (typeof govoDispatchAssignedName === 'function') return govoDispatchAssignedName(item);
+  return govoRolePick(item, ['assigned_name', 'assignedName', 'provider_name', 'providerName', 'rider_name', 'worker_name', 'merchant_name'], '');
+}
+
+function govoRoleAssignedPhone(item) {
+  if (typeof govoDispatchAssignedPhone === 'function') return govoDispatchAssignedPhone(item);
+  return govoRolePick(item, ['assigned_phone', 'assignedPhone', 'provider_phone', 'providerPhone', 'rider_phone', 'worker_phone', 'merchant_phone'], '');
+}
+
+function govoRoleOperatorNote(item) {
+  if (typeof govoDispatchOperatorNote === 'function') return govoDispatchOperatorNote(item);
+  return govoRolePick(item, ['operator_note', 'operatorNote', 'assignment_note', 'status_note'], '');
+}
+
+function govoRoleRenderJobs(role, items) {
+  const isMerchant = role === 'merchant';
+  const title = isMerchant ? 'GOVO Admin Preview: Merchant Jobs' : 'GOVO Admin Preview: Rider / Worker Jobs';
+  const subtitle = isMerchant
+    ? 'Admin preview only — merchant fulfillment read-only. Do not share with merchants yet.'
+    : 'Admin preview only — rider/worker assigned job read-only. Do not share with riders yet.';
+
+  const cards = (items || []).map((item, index) => {
+    const code = govoRoleCode(item, index);
+    const area = govoRolePick(item, ['area', 'customer_area', 'zone'], '');
+    const address = govoRolePick(item, ['address', 'customer_address', 'location', 'delivery_address'], '');
+    const need = govoRolePick(item, ['need', 'service', 'service_type', 'order_type', 'category', 'title'], 'Service request');
+    const note = govoRolePick(item, ['note', 'message', 'details', 'description', 'voice_note'], '');
+    const status = govoRolePick(item, ['status', 'current_status'], 'Phone Confirming');
+    const assignedName = govoRoleAssignedName(item);
+    const assignedPhone = govoRoleAssignedPhone(item);
+    const operatorNote = govoRoleOperatorNote(item);
+    const customerPhone = govoRolePick(item, ['mobile', 'phone', 'customer_phone', 'customerPhone'], '');
+    const safeCall = govoRoleTel(isMerchant ? assignedPhone : (customerPhone || assignedPhone));
+    const track = `/track?code=${encodeURIComponent(code)}`;
+
+    return `
+      <article class="role-card">
+        <div class="role-top">
+          <div>
+            <div class="role-code">${govoRoleSafe(code)}</div>
+            <h2>${govoRoleSafe(need)}</h2>
+          </div>
+          <span class="role-status">${govoRoleSafe(govoRoleStatusLabel(status))}</span>
+        </div>
+
+        <div class="role-grid">
+          <p><b>Area</b><br>${govoRoleSafe(area || '—')}</p>
+          <p><b>${isMerchant ? 'Assigned / Contact' : 'Address'}</b><br>${govoRoleSafe(isMerchant ? (assignedName || '—') : (address || '—'))}</p>
+          <p><b>Status</b><br>${govoRoleSafe(status || '—')}</p>
+          <p><b>Assigned phone</b><br>${govoRoleSafe(assignedPhone || '—')}</p>
+        </div>
+
+        <p class="role-note"><b>Request note</b><br>${govoRoleSafe(note || '—')}</p>
+        <p class="role-note"><b>Operator note</b><br>${govoRoleSafe(operatorNote || '—')}</p>
+
+        <div class="role-actions">
+          <a href="${track}">Tracking দেখুন</a>
+          ${safeCall ? `<a href="tel:${govoRoleSafe(safeCall)}">Call</a>` : ''}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  return `<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${govoRoleSafe(title)}</title>
+<style>
+  :root{--green:#073f32;--green2:#0b5a46;--gold:#d8b46a;--ivory:#fffaf0;--ink:#10231d;--muted:#66756e}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;background:linear-gradient(135deg,#061512,#0b3d31);color:var(--ivory)}
+  .wrap{max-width:1080px;margin:auto;padding:22px}
+  .hero{border:1px solid rgba(216,180,106,.35);border-radius:24px;padding:22px;background:rgba(255,255,255,.06);box-shadow:0 18px 50px rgba(0,0,0,.25)}
+  .hero h1{margin:0 0 8px;font-size:28px}
+  .hero p{margin:0;color:#dce8df}
+  .grid{display:grid;gap:16px;margin-top:18px}
+  .role-card{background:var(--ivory);color:var(--ink);border-radius:22px;padding:18px;border:1px solid rgba(216,180,106,.5)}
+  .role-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .role-code{font-size:12px;color:var(--muted);font-weight:900;letter-spacing:.04em}
+  h2{margin:4px 0 10px;color:var(--green)}
+  .role-status{background:#e8f6ef;color:var(--green);padding:8px 12px;border-radius:999px;font-weight:900;white-space:nowrap}
+  .role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .role-grid p,.role-note{background:#f4efe3;border-radius:14px;padding:10px;margin:8px 0}
+  .role-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .role-actions a{background:var(--green);color:white;text-decoration:none;padding:12px 14px;border-radius:14px;font-weight:900}
+  .empty{background:rgba(255,255,255,.08);border:1px dashed rgba(216,180,106,.45);padding:22px;border-radius:20px;margin-top:18px}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>${govoRoleSafe(title)}</h1>
+      <p>${govoRoleSafe(subtitle)} No accept/reject/status write in Phase 5A. Admin preview only — do not share this URL with merchants/riders yet.</p>
+    </section>
+    ${cards ? `<section class="grid">${cards}</section>` : `<section class="empty">এখন কোনো assigned job পাওয়া যায়নি। Dispatch থেকে assignment হলে এখানে দেখা যাবে।</section>`}
+  </main>
+</body>
+</html>`;
+}
+
+app.get('/admin/merchant-jobs-preview', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+    const items = await govoRoleReadOnlyRequests();
+    res.send(govoRoleRenderJobs('merchant', items));
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/admin/rider-jobs-preview', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    res.set('Cache-Control', 'private, no-store');
+    const items = await govoRoleReadOnlyRequests();
+    res.send(govoRoleRenderJobs('rider', items));
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
+
 
 app.use((err, req, res, next) => {
   console.error('GOVO error:', err);
