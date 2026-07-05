@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>GOVO Express — Local Delivery, Shops & Services Network</title>
+<meta name="description" content="GOVO Express is a local delivery, shops, services, merchant and rider network starting from Meherpur."/>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6faf7;color:#07140d;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+.page{min-height:100svh;background:radial-gradient(circle at 0 0,rgba(22,163,74,.13),transparent 34%),radial-gradient(circle at 100% 0,rgba(4,120,55,.10),transparent 36%),#f6faf7}
+.wrap{max-width:1120px;margin:0 auto;padding:16px 14px 42px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:52px;height:52px;border-radius:18px;background:linear-gradient(145deg,#24dc70,#087434);display:grid;place-items:center;box-shadow:0 16px 34px rgba(22,163,74,.24)}
+.logo span{font-size:25px;font-weight:1000;color:#06170d}
+.brand h1{margin:0;font-size:23px;line-height:1;font-weight:1000;letter-spacing:-.7px}
+.brand p{margin:5px 0 0;color:#64748b;font-size:13px;font-weight:760}
+.navtop{display:flex;align-items:center;gap:9px}
+.navtop a{border:1px solid #dce8df;background:#fff;border-radius:999px;padding:10px 13px;font-size:13px;font-weight:900;box-shadow:0 10px 22px rgba(15,23,42,.05)}
+.menu{width:46px;height:46px;border-radius:17px;border:1px solid #dce8df;background:#fff;display:grid;place-items:center;font-size:22px;box-shadow:0 10px 22px rgba(15,23,42,.06)}
+.hero{position:relative;overflow:hidden;border-radius:28px;background:linear-gradient(135deg,#061d12 0%,#07351f 52%,#087c3c 100%);color:#fff;padding:30px 24px;box-shadow:0 26px 62px rgba(4,49,26,.18)}
+.hero:before{content:"";position:absolute;right:-74px;top:-90px;width:300px;height:300px;border-radius:50%;border:25px solid rgba(255,255,255,.13)}
+.badge{position:relative;z-index:2;display:inline-flex;gap:8px;align-items:center;border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:8px 13px;background:rgba(255,255,255,.10);font-weight:950;backdrop-filter:blur(12px)}
+.hero h2{position:relative;z-index:2;margin:16px 0 11px;max-width:820px;font-size:clamp(38px,7vw,68px);line-height:.98;letter-spacing:-2.2px;font-weight:1000}
+.hero p{position:relative;z-index:2;margin:0;max-width:760px;color:rgba(255,255,255,.82);font-size:17px;line-height:1.55;font-weight:680}
+.actions{position:relative;z-index:2;margin-top:22px;display:flex;gap:11px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:17px;padding:13px 17px;font-weight:1000;border:0;box-shadow:0 15px 32px rgba(0,0,0,.13)}
+.primary{background:linear-gradient(135deg,#24dc70,#07853b);color:#fff}
+.soft{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff}
+.white{background:#fff;color:#07140d}
+.statusbar{margin-top:13px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.status{background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:12px;color:rgba(255,255,255,.88);font-size:13px;font-weight:850}
+.search{position:relative;z-index:4;margin:-19px auto 18px;max-width:900px;background:#fff;border-radius:22px;padding:9px 9px 9px 16px;display:flex;align-items:center;gap:11px;box-shadow:0 18px 42px rgba(15,23,42,.12)}
+.search input{border:0;outline:0;flex:1;font-size:15px;font-weight:750;color:#0f172a}
+.search button{width:43px;height:43px;border:0;border-radius:50%;background:linear-gradient(135deg,#24dc70,#07853b);color:#fff;font-weight:1000}
+.section{margin-top:22px}
+.head{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-bottom:12px}
+.head h3{margin:0;font-size:28px;font-weight:1000;letter-spacing:-.8px}
+.head p{margin:4px 0 0;color:#64748b;font-weight:760;line-height:1.45}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{background:#fff;border:1px solid #e3ece6;border-radius:22px;padding:17px;box-shadow:0 12px 30px rgba(15,23,42,.055)}
+.card b{display:block;font-size:16px;letter-spacing:-.25px}
+.card p{margin:7px 0 0;color:#64748b;font-weight:720;line-height:1.45;font-size:13px}
+.icon{width:40px;height:40px;border-radius:15px;background:#ecfdf3;color:#087434;display:grid;place-items:center;font-size:20px;font-weight:1000;margin-bottom:11px}
+.dark{background:linear-gradient(135deg,#052414,#087434);color:#fff;border-radius:25px;padding:22px}
+.dark b,.dark h3{color:#fff}
+.dark p{color:rgba(255,255,255,.78)}
+.promise{display:grid;grid-template-columns:1.05fr .95fr;gap:13px}
+.promise h3{margin:0 0 9px;font-size:28px;line-height:1.08;font-weight:1000;letter-spacing:-.8px}
+.checklist{display:grid;gap:10px}
+.row{display:flex;gap:11px;align-items:flex-start}
+.check{width:25px;height:25px;border-radius:50%;background:#ecfdf3;color:#087434;display:grid;place-items:center;font-weight:1000;flex:0 0 auto}
+.step{position:relative;padding-left:54px;min-height:82px}
+.step:before{content:attr(data-step);position:absolute;left:0;top:0;width:40px;height:40px;border-radius:14px;background:#ecfdf3;color:#087434;display:grid;place-items:center;font-weight:1000;border:1px solid #bfebcf}
+.service-card{display:flex;gap:12px;align-items:flex-start}
+.service-card .icon{margin:0;flex:0 0 auto}
+.pill-list{display:flex;gap:8px;flex-wrap:wrap}
+.pill{border:1px solid #dce8df;background:#fff;border-radius:999px;padding:9px 12px;font-size:12px;font-weight:900;color:#334155}
+.faq{display:grid;gap:10px}
+.faq details{background:#fff;border:1px solid #e3ece6;border-radius:19px;padding:14px 15px;box-shadow:0 10px 24px rgba(15,23,42,.04)}
+.faq summary{font-weight:950;cursor:pointer}
+.faq p{color:#64748b;font-weight:720;line-height:1.5}
+.contact{background:#07140d;color:#fff;border-radius:26px;padding:22px;display:grid;grid-template-columns:1.1fr .9fr;gap:15px;align-items:center}
+.contact h3{font-size:28px;margin:0 0 8px;font-weight:1000}
+.contact p{margin:0;color:rgba(255,255,255,.75);font-weight:700;line-height:1.5}
+.footer{margin-top:24px;padding-top:18px;border-top:1px solid #e3ece6;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#64748b;font-size:13px;font-weight:820}
+@media(max-width:820px){
+  .wrap{padding:13px 9px 32px}
+  .top{margin-bottom:12px}
+  .logo{width:46px;height:46px;border-radius:15px}
+  .brand h1{font-size:20px}
+  .brand p{font-size:11px}
+  .navtop a{display:none}
+  .menu{width:44px;height:44px;border-radius:16px}
+  .hero{border-radius:22px;padding:22px 16px}
+  .hero h2{font-size:34px;line-height:1.02;letter-spacing:-1.2px;margin:14px 0 10px}
+  .hero p{font-size:14px;line-height:1.48}
+  .actions{display:grid;grid-template-columns:1fr;gap:9px;margin-top:18px}
+  .btn{padding:12px 14px;border-radius:15px;font-size:13px}
+  .statusbar{grid-template-columns:1fr;gap:8px}
+  .status{padding:10px;font-size:12px}
+  .search{margin:-14px 6px 17px;border-radius:20px;padding:8px 8px 8px 14px}
+  .search input{font-size:13px}
+  .search button{width:40px;height:40px}
+  .section{margin-top:19px}
+  .head{display:block;margin-bottom:10px}
+  .head h3{font-size:23px}
+  .head p{font-size:13px}
+  .promise,.grid2,.grid3{grid-template-columns:1fr;gap:10px}
+  .grid4{grid-template-columns:repeat(2,1fr);gap:10px}
+  .card{border-radius:18px;padding:14px}
+  .card b{font-size:14px;line-height:1.25}
+  .card p{font-size:11px;line-height:1.42}
+  .icon{width:36px;height:36px;border-radius:13px;font-size:18px;margin-bottom:9px}
+  .dark{border-radius:21px;padding:18px}
+  .promise h3{font-size:22px}
+  .step{padding-left:49px;min-height:72px}
+  .step:before{width:36px;height:36px;border-radius:13px}
+  .contact{grid-template-columns:1fr;border-radius:22px;padding:18px}
+  .contact h3{font-size:23px}
+}
+
+/* GOVO 12D-10 final public trust compact polish */
+@media(max-width:820px){
+  .wrap{padding:12px 8px 34px!important}
+
+  .hero{
+    padding:20px 15px!important;
+    border-radius:21px!important;
+  }
+  .hero h2{
+    font-size:30px!important;
+    line-height:1.04!important;
+    letter-spacing:-1px!important;
+    margin:13px 0 9px!important;
+  }
+  .hero p{
+    font-size:13px!important;
+    line-height:1.48!important;
+  }
+  .badge{
+    font-size:12px!important;
+    padding:7px 11px!important;
+  }
+
+  .actions{
+    margin-top:16px!important;
+    gap:8px!important;
+  }
+  .btn{
+    min-height:43px!important;
+    font-size:13px!important;
+    padding:11px 13px!important;
+  }
+
+  .statusbar{
+    margin-top:10px!important;
+    grid-template-columns:1fr!important;
+    gap:7px!important;
+  }
+  .status{
+    padding:9px 11px!important;
+    border-radius:14px!important;
+    font-size:11.5px!important;
+  }
+
+  .search{
+    margin:-13px 6px 15px!important;
+  }
+
+  .section{
+    margin-top:17px!important;
+  }
+  .head h3{
+    font-size:22px!important;
+    letter-spacing:-.5px!important;
+  }
+  .head p{
+    font-size:12px!important;
+  }
+
+  .dark{
+    padding:16px!important;
+    border-radius:20px!important;
+  }
+  .promise h3{
+    font-size:20px!important;
+    line-height:1.14!important;
+  }
+
+  .grid4{
+    gap:8px!important;
+  }
+  .service-card{
+    gap:9px!important;
+  }
+  .service-card .icon{
+    width:34px!important;
+    height:34px!important;
+    min-width:34px!important;
+  }
+
+  .card{
+    padding:12px!important;
+    border-radius:17px!important;
+  }
+  .card b{
+    font-size:13.5px!important;
+  }
+  .card p{
+    font-size:10.8px!important;
+  }
+
+  /* Make For Everyone compact instead of huge empty cards */
+  .section:has(.card .btn) .grid3{
+    grid-template-columns:1fr!important;
+    gap:9px!important;
+  }
+  .section:has(.card .btn) .card{
+    display:grid!important;
+    grid-template-columns:42px 1fr auto!important;
+    align-items:center!important;
+    gap:10px!important;
+    min-height:auto!important;
+  }
+  .section:has(.card .btn) .card .icon{
+    margin:0!important;
+  }
+  .section:has(.card .btn) .card br{
+    display:none!important;
+  }
+  .section:has(.card .btn) .card .btn{
+    min-width:112px!important;
+    white-space:nowrap!important;
+    box-shadow:none!important;
+  }
+
+  /* Trust verification cards compact */
+  .grid2{
+    gap:8px!important;
+  }
+
+  .faq details{
+    padding:12px!important;
+    border-radius:16px!important;
+  }
+  .faq summary{
+    font-size:14px!important;
+  }
+
+  .contact{
+    padding:16px!important;
+    border-radius:20px!important;
+  }
+  .contact h3{
+    font-size:22px!important;
+  }
+  .contact p{
+    font-size:12px!important;
+  }
+
+  .footer{
+    font-size:12px!important;
+    gap:9px!important;
+  }
+}
+
+/* better browser support fallback if :has unsupported */
+@supports not selector(:has(*)){
+  @media(max-width:820px){
+    .grid3 .card{
+      min-height:auto!important;
+    }
+  }
+}
+
+
+/* GOVO 12D-11 step readability fix */
+.step{
+  display:block!important;
+  overflow:visible!important;
+}
+.step b{
+  display:block!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  margin:0 0 4px!important;
+}
+.step p{
+  margin-top:4px!important;
+}
+@media(max-width:820px){
+  .step{
+    padding-left:48px!important;
+    min-height:64px!important;
+  }
+  .step:before{
+    top:12px!important;
+  }
+  .step b{
+    font-size:14px!important;
+    line-height:1.2!important;
+  }
+  .step p{
+    font-size:11px!important;
+    line-height:1.4!important;
+  }
+
+  /* For Everyone compact cards only */
+  .grid3 .card:not(.step):has(.btn){
+    display:grid!important;
+    grid-template-columns:38px 1fr!important;
+    gap:9px!important;
+    align-items:start!important;
+  }
+  .grid3 .card:not(.step):has(.btn) .btn{
+    grid-column:1 / -1!important;
+    width:max-content!important;
+    min-width:112px!important;
+    margin-top:4px!important;
+  }
+}
+
+</style>
+</head>
+<body>
+<main class="page">
+<div class="wrap">
+
+<header class="top">
+  <a class="brand" href="https://app.govoexpress.com/app">
+    <div class="logo"><span>G</span></div>
+    <div>
+      <h1>GOVO Express</h1>
+      <p>Local delivery, shops & service network</p>
+    </div>
+  </a>
+  <div class="navtop">
+    <a href="https://app.govoexpress.com/app">Open App</a>
+    <a href="https://app.govoexpress.com/merchant">Merchant</a>
+    <a href="https://app.govoexpress.com/rider">Rider</a>
+    <a class="menu" href="https://app.govoexpress.com/more">☰</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="badge">🚀 Meherpur থেকে শুরু</div>
+  <h2>GOVO Express — local delivery, shops & services.</h2>
+  <p>এক জায়গায় delivery, shops, home service, rider, merchant, AI search এবং tracking flow. GOVO local market-ke organized, faster and trusted korte kaj korche.</p>
+  <div class="actions">
+    <a class="btn primary" href="https://app.govoexpress.com/app">Open GOVO App →</a>
+    <a class="btn soft" href="https://app.govoexpress.com/order">Book Delivery</a>
+    <a class="btn soft" href="https://app.govoexpress.com/merchant">Join Merchant</a>
+  </div>
+  <div class="statusbar">
+    <div class="status">✓ Pilot launch phase</div>
+    <div class="status">✓ Merchant & rider onboarding</div>
+    <div class="status">✓ Local support system</div>
+  </div>
+</section>
+
+<form class="search" action="https://app.govoexpress.com/ai" method="get">
+  <span>⌕</span>
+  <input name="q" placeholder="Search pharmacy, delivery, cleaning, rider, support..." />
+  <button type="submit">AI</button>
+</form>
+
+<section class="section promise">
+  <div class="dark">
+    <span class="badge">Public trust promise</span>
+    <h3>GOVO শুধু app না — local support network.</h3>
+    <p>Customer, merchant, rider এবং service provider-ke ekta clear request, verification, communication and support flow-er moddhe anar system.</p>
+  </div>
+  <div class="card checklist">
+    <div class="row"><span class="check">✓</span><div><b>Local-first operation</b><p>Meherpur, Gangni, Bamundi, Mujibnagar, Amjhupi focused start.</p></div></div>
+    <div class="row"><span class="check">✓</span><div><b>Verified partner model</b><p>Merchant, rider and provider profile gradually verified hobe.</p></div></div>
+    <div class="row"><span class="check">✓</span><div><b>Digital + human support</b><p>App flow-er sathe local support and follow-up system thakbe.</p></div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="head">
+    <div>
+      <h3>How GOVO Works</h3>
+      <p>Simple public flow — choose, request, connect.</p>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card step" data-step="1"><b>Choose</b><p>Customer delivery, shop, service or support category select kore.</p></div>
+    <div class="card step" data-step="2"><b>Request</b><p>Phone, area, pickup/drop or service details submit kore.</p></div>
+    <div class="card step" data-step="3"><b>Connect</b><p>GOVO flow merchant, rider, provider or support team-er sathe connect kore.</p></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="head">
+    <div>
+      <h3>Services In One Place</h3>
+      <p>Daily local needs, not just one category.</p>
+    </div>
+  </div>
+  <div class="grid4">
+    <a class="card service-card" href="https://app.govoexpress.com/delivery"><div class="icon">🚚</div><div><b>Delivery</b><p>Parcel, food, medicine, grocery pickup/drop.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/shops"><div class="icon">🏪</div><div><b>Local Shops</b><p>Grocery, pharmacy, restaurant and daily needs.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/services"><div class="icon">🛠</div><div><b>Home Services</b><p>Cleaning, plumbing, electrician, AC repair.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/track"><div class="icon">🗺</div><div><b>Tracking</b><p>Order status and map support.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/doctor"><div class="icon">🩺</div><div><b>Doctor / Health</b><p>Health and pharmacy support flow.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/agri"><div class="icon">🌱</div><div><b>Agri Support</b><p>Farm product and local support.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/ai"><div class="icon">AI</div><div><b>AI Search</b><p>Voice/search diye fast direction.</p></div></a>
+    <a class="card service-card" href="https://app.govoexpress.com/support"><div class="icon">☎</div><div><b>Support</b><p>Help center and manual assistance.</p></div></a>
+  </div>
+</section>
+
+<section class="section">
+  <div class="head">
+    <div>
+      <h3>For Everyone</h3>
+      <p>Customer, merchant, rider, provider — sobai ek system-e.</p>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card"><div class="icon">👤</div><b>For Customers</b><p>Daily delivery, shop request, service request, tracking and support.</p><br><a class="btn primary" href="https://app.govoexpress.com/app">Use App →</a></div>
+    <div class="card"><div class="icon">🏪</div><b>For Merchants</b><p>Local shop visibility, delivery flow and customer lead receive.</p><br><a class="btn primary" href="https://app.govoexpress.com/merchant">Join Merchant →</a></div>
+    <div class="card"><div class="icon">🏍</div><b>For Riders</b><p>Local earning, delivery work and trusted rider network identity.</p><br><a class="btn primary" href="https://app.govoexpress.com/rider">Join Rider →</a></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="head">
+    <div>
+      <h3>Trust & Verification</h3>
+      <p>Trust baranor jonno clear operating process.</p>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="icon">✓</div><b>Partner onboarding</b><p>Merchant, rider and provider info collect kore admin flow-e manage kora hobe.</p></div>
+    <div class="card"><div class="icon">↗</div><b>Status transparency</b><p>Order/request track, customer support and manual confirmation flow thakbe.</p></div>
+    <div class="card"><div class="icon">☎</div><b>Local support</b><p>App, support page and community communication flow diye help kora hobe.</p></div>
+    <div class="card"><div class="icon">◎</div><b>Honest pilot phase</b><p>GOVO starting local-first. Coverage real onboarding-er sathe strong hobe.</p></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="head">
+    <div>
+      <h3>Service Areas</h3>
+      <p>Starting with known local zones.</p>
+    </div>
+  </div>
+  <div class="pill-list">
+    <span class="pill">Meherpur</span>
+    <span class="pill">Gangni</span>
+    <span class="pill">Bamundi</span>
+    <span class="pill">Mujibnagar</span>
+    <span class="pill">Amjhupi</span>
+  </div>
+</section>
+
+<section class="section">
+  <div class="head">
+    <div>
+      <h3>Common Questions</h3>
+      <p>Visitor trust baranor jonno clear answer.</p>
+    </div>
+  </div>
+  <div class="faq">
+    <details open><summary>GOVO Express ki?</summary><p>GOVO Express holo local delivery, shops, services, merchant, rider and support flow ek jaygay anar platform.</p></details>
+    <details><summary>Eta ki ekhon live?</summary><p>App shell and request flow live. Merchant/rider/provider onboarding-er sathe real coverage gradually strong hobe.</p></details>
+    <details><summary>Customer kivabe request korbe?</summary><p>App theke delivery, shop, service or support select kore phone/area/details submit korbe.</p></details>
+    <details><summary>Merchant/Rider join korte parbe?</summary><p>Haan. Merchant and rider registration flow connected. Verification/approval admin flow-er maddhome hobe.</p></details>
+  </div>
+</section>
+
+<section class="section contact">
+  <div>
+    <h3>Need local help?</h3>
+    <p>Delivery, shop, service, merchant join, rider join — GOVO support flow diye start korun.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="https://app.govoexpress.com/support">Get Support →</a>
+    <a class="btn white" href="https://app.govoexpress.com/app">Open App</a>
+  </div>
+</section>
+
+<footer class="footer">
+  <span>📍 Meherpur, Bangladesh</span>
+  <a href="https://app.govoexpress.com/support">Support Center</a>
+  <a href="https://app.govoexpress.com/merchant">Merchant Join</a>
+  <a href="https://app.govoexpress.com/rider">Rider Join</a>
+  <span>© GOVO Express</span>
+</footer>
+
+</div>
+</main>
+</body>
+</html>
