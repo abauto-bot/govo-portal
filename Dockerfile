@@ -6,5 +6,9 @@ COPY server.js server.js
 COPY govo_unified_v3.js ./
 COPY govo_ui_foundation.js ./
 COPY govo_theme_v1.js ./
+COPY govo_brand_v12c.js ./
+COPY govo_components_v12c.js ./
+COPY govo_pages_v12c.js ./
+COPY govo_data_v12c.js ./
 EXPOSE 3000
 CMD ["npm", "start"]

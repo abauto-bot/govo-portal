@@ -1,3 +1,5 @@
+const govoPagesV12c = require("./govo_pages_v12c");
+const govoV12c = require("./govo_components_v12c");
 // GOVO Express Portal - v1.0 Clean Release Phase 1
 // Canonical routes only. Additive schema setup. Telegram notifications preserved.
 
@@ -12,6 +14,436 @@ const multer = require("multer");
 loadEnv();
 
 const app = express();
+
+// GOVO_PHASE12C_AI_MAP_HARD_ROUTES_START
+app.get(["/ai", "/search", "/voice"], (req, res) => {
+  res.setHeader("X-GOVO-UI", "phase12c-live-ai");
+  res.setHeader("Cache-Control", "no-store");
+  return res.send(govoPagesV12c.render("ai", { base: "" }));
+});
+
+app.get(["/map", "/tracking-map"], (req, res) => {
+  res.setHeader("X-GOVO-UI", "phase12c-live-map");
+  res.setHeader("Cache-Control", "no-store");
+  return res.send(govoPagesV12c.render("map", { base: "" }));
+});
+// GOVO_PHASE12C_AI_MAP_HARD_ROUTES_END
+
+
+// GOVO_PHASE12C_LIVE_ROUTES_START
+const GOVO_V12C_LIVE_ROUTE_MAP = {
+  "/app": "app",
+  "/delivery": "delivery",
+  "/ride": "ride",
+  "/doctor": "doctor",
+  "/home-service": "home",
+  "/home": "home",
+  "/agri": "agri",
+  "/more": "more",
+  "/services": "services",
+  "/service": "service",
+  "/shops": "shops",
+  "/shop": "shop",
+  "/order": "order",
+  "/track": "track",
+  "/orders": "orders",
+  "/wallet": "wallet",
+  "/account": "account",
+  "/support": "support",
+  "/merchant": "merchant",
+  "/rider": "rider",
+  "/voice": "ai",
+  "/search": "ai",
+  "/map": "map",
+  "/ai": "ai"};
+
+app.get(Object.keys(GOVO_V12C_LIVE_ROUTE_MAP), (req, res) => {
+  const page = GOVO_V12C_LIVE_ROUTE_MAP[req.path] || "app";
+  res.setHeader("X-GOVO-UI", "phase12c-live");
+  res.setHeader("Cache-Control", "no-store");
+  return res.send(govoPagesV12c.render(page, { base: "" }));
+});
+// GOVO_PHASE12C_LIVE_ROUTES_END
+
+
+// GOVO_PHASE12C_ROUTE_FAMILY_START
+app.get(["/__v12c", "/__v12c/:page"], (req, res) => {
+  const page = req.params.page || "app";
+  if (!govoPagesV12c.hasPage(page)) {
+    res.status(404);
+    return res.send(govoPagesV12c.render("app", { base: "/preview-v12c" }));
+  }
+  res.setHeader("X-GOVO-UI", "v12c-route-family");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  return res.send(govoPagesV12c.render(page, { base: "/preview-v12c" }));
+});
+// GOVO_PHASE12C_ROUTE_FAMILY_END
+
+
+// GOVO_PHASE12C_DIRECT_PREVIEW_ROUTE_START
+app.get("/__internal-v12c-preview-direct", (req, res) => {
+  res.setHeader("X-GOVO-UI", "v12c-direct-preview");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  return res.send(govoV12c.appHomePage());
+});
+// GOVO_PHASE12C_DIRECT_PREVIEW_ROUTE_END
+
+
+// GOVO_PHASE12C_PREVIEW_HOOK_START
+app.use((req, res, next) => {
+  if (req.path === "/app" && String((req.query && req.query.v12c) || "") === "1") {
+    res.setHeader("X-GOVO-UI", "v12c-preview");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(govoV12c.appHomePage());
+  }
+  return next();
+});
+// GOVO_PHASE12C_PREVIEW_HOOK_END
+
+
+
+
+// GOVO_RESCUE_SHELL_V1_START
+// GOVO_RESCUE_SHELL_V2: customer-first local super app shell.
+// Safety: GET UI override only. Existing POST/admin/auth/db behavior remains untouched.
+const GOVO_RESCUE_SHELL_V1_ACTIVE = true;
+
+const GOVO_RESCUE_AREAS = ['Meherpur','Gangni','Bamundi','Mujibnagar','Amjhupi'];
+
+const GOVO_RESCUE_SHOPS = [
+  { icon:'🛒', name:'Grocery / Bazar', area:'Daily bazar, rice, oil, vegetables', tag:'daily needs', action:'/order?type=grocery' },
+  { icon:'🍛', name:'Food / Restaurant', area:'Local restaurant & homemade food', tag:'food delivery', action:'/order?type=food' },
+  { icon:'💊', name:'Medicine', area:'Pharmacy item request', tag:'urgent', action:'/order?type=medicine' },
+  { icon:'📦', name:'Parcel / Courier', area:'Pickup, drop, document, small parcel', tag:'fast pickup', action:'/order?type=parcel' },
+  { icon:'📱', name:'Mobile / Electronics', area:'Accessories, charger, cable, small gadgets', tag:'shop item', action:'/order?type=electronics' },
+  { icon:'👕', name:'Fashion / Print', area:'Cap, t-shirt, sticker, tailor support', tag:'local product', action:'/order?type=fashion' },
+  { icon:'🌾', name:'Agri Product', area:'Farmer product, seed, field support item', tag:'agri', action:'/order?type=agri' },
+  { icon:'🏠', name:'Home Needs', area:'Household item and daily local help', tag:'home', action:'/order?type=home' }
+];
+
+const GOVO_RESCUE_SERVICES = [
+  { icon:'🔌', name:'Electrician', desc:'Fan, light, switch, wiring issue', action:'/service-request?service=electrician' },
+  { icon:'🚰', name:'Plumber', desc:'Pipe, motor, bathroom, water line', action:'/service-request?service=plumber' },
+  { icon:'❄️', name:'AC / Fridge Service', desc:'AC install, cleaning, cooling issue', action:'/service-request?service=ac-fridge' },
+  { icon:'🛵', name:'Bike Support', desc:'Bike emergency and mechanic request', action:'/service-request?service=bike' },
+  { icon:'🧑‍⚕️', name:'Doctor Appointment', desc:'Local doctor or clinic appointment request', action:'/service-request?service=doctor' },
+  { icon:'🚜', name:'Agriculture Help', desc:'Farming, equipment, field support', action:'/service-request?service=agri' },
+  { icon:'🏡', name:'House Rent / Property', desc:'Rent, moving, local property support', action:'/service-request?service=rent' },
+  { icon:'🧹', name:'Home Helper', desc:'Cleaning, shifting, daily local help', action:'/service-request?service=helper' }
+];
+
+function govoRescueShell(title, active, body){
+  return `<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>${title} — GOVO Express</title>
+<style id="govo-rescue-shell-v2">
+:root{
+  --bg:#04120f;--bg2:#071c17;--card:#0e2a23;--card2:#12382f;
+  --line:rgba(255,255,255,.13);--text:#f4fff9;--muted:#a9c8bd;
+  --green:#22e68a;--green2:#0fbf70;--gold:#f6cf68;--red:#ff6b6b;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:
+radial-gradient(circle at 12% -10%,rgba(34,230,138,.22),transparent 34%),
+radial-gradient(circle at 90% 0%,rgba(246,207,104,.12),transparent 28%),
+linear-gradient(160deg,#010504,#04120f 46%,#08261f);color:var(--text)}
+a{text-decoration:none;color:inherit}
+button,input,select,textarea{font:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 96px}
+.top{position:sticky;top:0;z-index:30;background:rgba(4,18,15,.86);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.topin{max-width:1120px;margin:auto;padding:12px 14px;display:flex;align-items:center;gap:10px}
+.logo{width:46px;height:46px;border-radius:17px;background:linear-gradient(135deg,var(--green),#075c39);display:grid;place-items:center;font-weight:950;color:#001b10;box-shadow:0 10px 32px rgba(34,230,138,.24)}
+.brand{flex:1;min-width:0}
+.brand b{display:block;font-size:18px;letter-spacing:.2px}
+.brand small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.menu{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:10px 14px;background:rgba(255,255,255,.065);font-weight:850}
+.btn.primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#02110a;border:0}
+.btn.gold{background:rgba(246,207,104,.14);border-color:rgba(246,207,104,.38);color:#ffe29a}
+.btn.block{width:100%}
+.drawer{position:relative}
+.drawer summary{list-style:none;cursor:pointer;width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.06);font-size:22px}
+.drawer summary::-webkit-details-marker{display:none}
+.drawerbox{position:absolute;right:0;top:52px;width:min(330px,92vw);background:#071c17;border:1px solid var(--line);border-radius:24px;padding:14px;box-shadow:0 28px 90px rgba(0,0,0,.48)}
+.drawerbox a{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:16px;color:#eafff5;font-weight:850}
+.drawerbox a:hover{background:rgba(34,230,138,.10)}
+.drawerfoot{border-top:1px solid var(--line);margin-top:8px;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toggle{border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center;color:var(--muted);font-size:13px;font-weight:850}
+.hero{padding:30px 0 18px}
+.kicker{display:inline-flex;padding:8px 12px;border:1px solid rgba(34,230,138,.30);border-radius:999px;color:#bdf6da;background:rgba(34,230,138,.08);font-weight:900}
+h1{font-size:clamp(33px,7vw,70px);line-height:.95;margin:14px 0 12px;letter-spacing:-2.2px}
+.lead{font-size:17px;line-height:1.62;color:var(--muted);max-width:790px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.grid.three{grid-template-columns:repeat(3,1fr)}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));border:1px solid var(--line);border-radius:24px;padding:16px;box-shadow:0 22px 70px rgba(0,0,0,.22)}
+.card.link{transition:.16s ease}
+.card.link:hover{transform:translateY(-2px);border-color:rgba(34,230,138,.34)}
+.card h3{margin:8px 0 6px;font-size:18px}
+.card p{margin:0;color:var(--muted);line-height:1.45}
+.icon{font-size:31px}
+.tag{display:inline-block;margin-top:12px;padding:6px 10px;border-radius:999px;background:rgba(34,230,138,.10);color:#bdf6da;font-size:12px;font-weight:950}
+.section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:26px}
+.section-title h2{margin:0;font-size:25px}
+.form{display:grid;gap:10px;max-width:720px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.065);color:var(--text);padding:13px 14px;font-size:15px;outline:none}
+select option{background:#08231d;color:#fff}
+textarea{min-height:104px}
+label{font-weight:850;color:#dbfff0}
+.notice{border:1px dashed rgba(246,207,104,.42);background:rgba(246,207,104,.09);color:#ffe7a6;border-radius:20px;padding:14px;margin:14px 0;line-height:1.5}
+.flow{counter-reset:step}
+.step{position:relative;padding-left:54px}
+.step:before{counter-increment:step;content:counter(step);position:absolute;left:16px;top:16px;width:28px;height:28px;border-radius:10px;display:grid;place-items:center;background:rgba(34,230,138,.15);color:#bdf6da;font-weight:950;border:1px solid rgba(34,230,138,.25)}
+.area{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.area span{padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-weight:850;font-size:13px}
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(5,18,15,.94);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+.bottomin{max-width:760px;margin:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 10px}
+.nav{padding:9px 6px;border-radius:16px;text-align:center;color:var(--muted);font-size:12px;font-weight:850}
+.nav b{display:block;font-size:18px}
+.nav.active{background:rgba(34,230,138,.12);color:#dffff0}
+@media(max-width:900px){.grid,.grid.three{grid-template-columns:repeat(2,1fr)}.menu .pill{display:none}}
+@media(max-width:540px){.grid,.grid.three{grid-template-columns:1fr}h1{font-size:39px}.card{border-radius:20px}.wrap{padding-left:12px;padding-right:12px}.actions .btn{flex:1}.drawerbox{right:-4px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="topin">
+  <a class="logo" href="/app">G</a>
+  <div class="brand"><b>GOVO Express</b><small>Premium local delivery & service OS</small></div>
+  <nav class="menu">
+    <a class="pill" href="/shops">Shops</a>
+    <a class="pill" href="/services">Services</a>
+    <a class="pill" href="/merchant">Merchant</a>
+    <a class="pill" href="/rider">Rider</a>
+    <details class="drawer">
+      <summary>☰</summary>
+      <div class="drawerbox">
+        <a href="/app"><span>01. Home</span><b>🏠</b></a>
+        <a href="/shops"><span>02. Shop Menu</span><b>🏪</b></a>
+        <a href="/services"><span>03. Service Menu</span><b>🛠️</b></a>
+        <a href="/order"><span>04. Delivery Book</span><b>📦</b></a>
+        <a href="/merchant"><span>05. Merchant Join</span><b>🏪</b></a>
+        <a href="/rider"><span>06. Rider Join</span><b>🛵</b></a>
+        <a href="/support"><span>07. Support</span><b>☎️</b></a>
+        <div class="drawerfoot">
+          <div class="toggle">বাংলা / EN</div>
+          <div class="toggle">Light / Dark</div>
+        </div>
+      </div>
+    </details>
+  </nav>
+</div></header>
+<main class="wrap">${body}</main>
+<nav class="bottom"><div class="bottomin">
+  <a class="nav ${active==='home'?'active':''}" href="/app"><b>🏠</b>Home</a>
+  <a class="nav ${active==='shops'?'active':''}" href="/shops"><b>🏪</b>Shops</a>
+  <a class="nav ${active==='services'?'active':''}" href="/services"><b>🛠️</b>Service</a>
+  <a class="nav ${active==='order'?'active':''}" href="/order"><b>📦</b>Order</a>
+  <a class="nav ${active==='support'?'active':''}" href="/support"><b>☎️</b>Help</a>
+</div></nav>
+</body></html>`;
+}
+
+function govoCards(items, type){
+  return `<div class="grid">${items.map(x => `
+    <a class="card link" href="${x.action}">
+      <div class="icon">${x.icon}</div>
+      <h3>${x.name}</h3>
+      <p>${x.area || x.desc || ''}</p>
+      <span class="tag">${x.tag || type}</span>
+    </a>`).join('')}</div>`;
+}
+
+function govoAreaChips(){
+  return `<div class="area">${GOVO_RESCUE_AREAS.map(a=>`<span>${a}</span>`).join('')}</div>`;
+}
+
+function govoHomePage(){
+  return govoRescueShell('Home','home',`
+    <section class="hero">
+      <span class="kicker">🚀 Meherpur local super app shell</span>
+      <h1>Delivery, shops, services — এক জায়গায় GOVO.</h1>
+      <p class="lead">GOVO Express হলো local premium trust delivery operating system. Customer request করবে, merchant/rider join করবে, admin lead receive করবে.</p>
+      <div class="actions">
+        <a class="btn primary" href="/shops">🏪 দোকান দেখুন</a>
+        <a class="btn gold" href="/services">🛠️ সার্ভিস নিন</a>
+        <a class="btn" href="/order">📦 Delivery Book</a>
+      </div>
+      <div class="notice">✅ Rescue shell active: customer button flow restored. Menu serial-wise, language/theme UI, shop/service/order CTA connected.</div>
+      ${govoAreaChips()}
+    </section>
+
+    <div class="section-title"><h2>Customer Flow</h2><a class="pill" href="/order">Start Order</a></div>
+    <div class="grid three flow">
+      <div class="card step"><h3>Choose</h3><p>Shop অথবা service category select করুন।</p></div>
+      <div class="card step"><h3>Request</h3><p>Phone, area, delivery/service details submit করুন।</p></div>
+      <div class="card step"><h3>GOVO handles</h3><p>Admin/rider/merchant follow-up করবে।</p></div>
+    </div>
+
+    <div class="section-title"><h2>Popular Shops</h2><a class="pill" href="/shops">View all</a></div>
+    ${govoCards(GOVO_RESCUE_SHOPS.slice(0,4),'shop')}
+    <div class="section-title"><h2>Local Services</h2><a class="pill" href="/services">View all</a></div>
+    ${govoCards(GOVO_RESCUE_SERVICES.slice(0,4),'service')}
+  `);
+}
+
+function govoOrderPage(){
+  return govoRescueShell('Book Delivery','order',`
+    <section class="hero"><span class="kicker">📦 Delivery Request</span><h1>Delivery বুক করুন</h1><p class="lead">Pickup/drop/location details দিন। Existing backend থাকলে admin/Telegram flow receive করবে।</p>${govoAreaChips()}</section>
+    <section class="card">
+      <form class="form" method="POST" action="/order">
+        <label>Name</label><input name="name" required placeholder="আপনার নাম">
+        <label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX">
+        <label>Service Type</label>
+        <select name="type"><option>Parcel</option><option>Grocery</option><option>Food</option><option>Medicine</option><option>Shop Delivery</option></select>
+        <label>Area</label><select name="area"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select>
+        <label>Pickup / Shop</label><input name="pickup" placeholder="কোথা থেকে নিতে হবে">
+        <label>Drop / Address</label><input name="dropoff" required placeholder="কোথায় দিতে হবে">
+        <label>Details</label><textarea name="details" placeholder="Item, quantity, note"></textarea>
+        <button class="btn primary block" type="submit">Submit Delivery Request</button>
+      </form>
+    </section>
+  `);
+}
+
+function govoServiceRequestPage(){
+  return govoRescueShell('Service Request','services',`
+    <section class="hero"><span class="kicker">🛠️ Local Service</span><h1>সার্ভিস request করুন</h1><p class="lead">Electrician, plumber, AC/fridge, doctor, agriculture—সব request এক জায়গায়।</p>${govoAreaChips()}</section>
+    <section class="card">
+      <form class="form" method="POST" action="/service-request">
+        <label>Name</label><input name="name" required placeholder="আপনার নাম">
+        <label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX">
+        <label>Service</label><input name="service" required placeholder="Electrician / Plumber / Doctor">
+        <label>Location</label><select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select>
+        <label>Problem Details</label><textarea name="details" placeholder="সমস্যার বিস্তারিত লিখুন"></textarea>
+        <button class="btn primary block" type="submit">Submit Service Request</button>
+      </form>
+    </section>
+  `);
+}
+
+function govoMerchantPage(){
+  return govoRescueShell('Merchant','home',`
+    <section class="hero"><span class="kicker">🏪 Merchant Partner</span><h1>আপনার দোকান GOVO-তে যুক্ত করুন</h1><p class="lead">Local shop, pharmacy, restaurant, grocery, electronics—সব merchant GOVO Express shell-এ আসতে পারবে।</p></section>
+    <section class="card">
+      <form class="form" method="POST" action="/merchant/register">
+        <label>Shop Name</label><input name="shop_name" required placeholder="দোকানের নাম">
+        <label>Owner Name</label><input name="owner_name" required placeholder="মালিকের নাম">
+        <label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX">
+        <label>Area</label><select name="area"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select>
+        <label>Category</label><input name="category" placeholder="Grocery / Food / Medicine / Electronics">
+        <button class="btn primary block" type="submit">Submit Merchant Info</button>
+      </form>
+      <div class="actions"><a class="btn" href="/shops">View Shops</a><a class="btn gold" href="/merchant/dashboard">Merchant Login</a></div>
+    </section>
+  `);
+}
+
+function govoRiderPage(){
+  return govoRescueShell('Rider','home',`
+    <section class="hero"><span class="kicker">🛵 Rider Partner</span><h1>GOVO Rider হিসেবে join করুন</h1><p class="lead">Bike, cycle, auto—local delivery/rider network তৈরি হবে step by step।</p></section>
+    <section class="card">
+      <form class="form" method="POST" action="/rider/register">
+        <label>Rider Name</label><input name="rider_name" required placeholder="আপনার নাম">
+        <label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX">
+        <label>Location</label><select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select>
+        <label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select>
+        <label>Experience</label><textarea name="experience" placeholder="আগে delivery কাজ করেছেন কিনা"></textarea>
+        <button class="btn primary block" type="submit">Submit Rider Info</button>
+      </form>
+      <div class="actions"><a class="btn gold" href="/rider/dashboard">Rider Login</a><a class="btn" href="/support">Need Help?</a></div>
+    </section>
+  `);
+}
+
+function govoSupportPage(){
+  return govoRescueShell('Support','support',`
+    <section class="hero"><span class="kicker">☎️ Support</span><h1>Need Help?</h1><p class="lead">Customer, merchant, rider—সব help request এখান থেকে যাবে।</p></section>
+    <div class="grid">
+      <a class="card link" href="/order"><div class="icon">📦</div><h3>Delivery Help</h3><p>Order/delivery issue</p></a>
+      <a class="card link" href="/service-request"><div class="icon">🛠️</div><h3>Service Help</h3><p>Technician/local service</p></a>
+      <a class="card link" href="/merchant"><div class="icon">🏪</div><h3>Merchant Help</h3><p>Shop registration</p></a>
+      <a class="card link" href="/rider"><div class="icon">🛵</div><h3>Rider Help</h3><p>Rider registration</p></a>
+    </div>
+  `);
+}
+
+function govoTrackPage(){
+  return govoRescueShell('Track','support',`
+    <section class="hero"><span class="kicker">📍 Track</span><h1>Order tracking shell</h1><p class="lead">Tracking engine পরে connect হবে। এখন customer support/order reference flow active রাখা হলো।</p></section>
+    <section class="card">
+      <form class="form" method="GET" action="/track">
+        <label>Order / Phone</label><input name="q" placeholder="Order ID বা phone number">
+        <button class="btn primary block" type="submit">Check Status</button>
+      </form>
+      <div class="actions"><a class="btn" href="/support">Contact Support</a></div>
+    </section>
+  `);
+}
+
+
+// GOVO_NOTIFY_COMPAT_V1
+function govoNotifyCompatPage(){
+  return govoRescueShell('Notify','support',`
+    <section class="hero">
+      <span class="kicker">🔔 GOVO Notify</span>
+      <h1>Notification center</h1>
+      <p class="lead">GOVO Notify service আলাদা background service হিসেবে চলতে পারে। এই page fallback হিসেবে রাখা হলো যেন admin/support link কখনো 404 না দেয়।</p>
+      <div class="actions">
+        <a class="btn primary" href="/support">☎️ Support</a>
+        <a class="btn gold" href="/admin/login">Admin Login</a>
+        <a class="btn" href="/app">Back to GOVO</a>
+      </div>
+      <div class="notice">✅ Compatibility route active: /notify now returns a safe GOVO page instead of 404.</div>
+    </section>
+    <div class="grid three">
+      <a class="card link" href="/order"><div class="icon">📦</div><h3>Customer Order</h3><p>Delivery request flow</p></a>
+      <a class="card link" href="/merchant"><div class="icon">🏪</div><h3>Merchant</h3><p>Shop partner flow</p></a>
+      <a class="card link" href="/rider"><div class="icon">🛵</div><h3>Rider</h3><p>Rider partner flow</p></a>
+    </div>
+  `);
+}
+
+function govoRescueShellMiddleware(req,res,next){
+  if (!GOVO_RESCUE_SHELL_V1_ACTIVE || req.method !== 'GET') return next();
+  const cleanPath = (req.path || '/').replace(/\/+$/,'') || '/';
+
+  res.setHeader('X-GOVO-Rescue-Shell','v2');
+
+  if (cleanPath === '/' || cleanPath === '/app') return res.send(govoHomePage());
+  if (cleanPath === '/shops') return res.send(govoRescueShell('Shops','shops',`
+    <section class="hero"><span class="kicker">🏪 Shop Button Menu</span><h1>Local shops & daily needs</h1><p class="lead">Customer shop category select করবে, তারপর delivery/order request submit করবে।</p>
+    <div class="actions"><a class="btn primary" href="/order">📦 Book Delivery</a><a class="btn gold" href="/merchant">Add Your Shop</a></div>${govoAreaChips()}</section>
+    ${govoCards(GOVO_RESCUE_SHOPS,'shop')}
+  `));
+  if (cleanPath === '/services') return res.send(govoRescueShell('Services','services',`
+    <section class="hero"><span class="kicker">🛠️ Service Button Menu</span><h1>Local services এক জায়গায়</h1><p class="lead">Technician, doctor, agri, home helper—সব service request button flow।</p>
+    <div class="actions"><a class="btn primary" href="/service-request">Request Service</a></div>${govoAreaChips()}</section>
+    ${govoCards(GOVO_RESCUE_SERVICES,'service')}
+  `));
+  if (cleanPath === '/order') return res.send(govoOrderPage());
+  if (cleanPath === '/service-request') return res.send(govoServiceRequestPage());
+  if (cleanPath === '/merchant') return res.send(govoMerchantPage());
+  if (cleanPath === '/rider') return res.send(govoRiderPage());
+  if (cleanPath === '/support') return res.send(govoSupportPage());
+  if (cleanPath === '/track') return res.send(govoTrackPage());
+  if (cleanPath === '/notify') return res.send(govoNotifyCompatPage());
+
+  return next();
+}
+
+app.use(govoRescueShellMiddleware);
+// GOVO_RESCUE_SHELL_V1_END
+
+
+
 
 /* GOVO_TRUE_MERGE_V3 */
 require("./govo_unified_v3").mount(app);
@@ -1251,8 +1683,7 @@ function pgConfig() {
     port: Number(process.env.PGPORT || process.env.POSTGRES_PORT || 5432),
     database: process.env.PGDATABASE || process.env.POSTGRES_DB || 'govo',
     user: process.env.PGUSER || process.env.POSTGRES_USER || 'postgres',
-    password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || '',
-  };
+    password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || ''};
 }
 
 function esc(v) {
@@ -1268,8 +1699,7 @@ function bdTime(v) {
   if (!v) return '';
   try {
     return new Date(v).toLocaleString('en-GB', {
-      timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit',
-    });
+      timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'});
   } catch {
     return String(v);
   }
@@ -1361,8 +1791,7 @@ function setPortalSession(req, res, type, id) {
     sameSite: 'lax',
     secure: requestIsHttps(req),
     path: sessionPath(type),
-    maxAge: 1000 * 60 * 60 * 24 * 30,
-  });
+    maxAge: 1000 * 60 * 60 * 24 * 30});
 }
 
 function clearPortalSession(req, res, type) {
@@ -1370,8 +1799,7 @@ function clearPortalSession(req, res, type) {
     httpOnly: true,
     sameSite: 'lax',
     secure: requestIsHttps(req),
-    path: sessionPath(type),
-  });
+    path: sessionPath(type)});
 }
 
 function hashPassword(password) {
@@ -1477,8 +1905,7 @@ async function sendTelegram(text) {
     const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
-    });
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true })});
     if (!resp.ok) console.log('Telegram failed:', await resp.text());
   } catch (e) {
     console.log('Telegram error:', e.message);
@@ -1536,8 +1963,7 @@ function adminNav(active) {
     ['QA', '/admin/qa'],
     ['Launch', '/admin/launch-checklist'],
     ['Pilot', '/admin/pilot'],
-    ['CRM', '/admin/pilot-crm'],
-  ];
+    ['CRM', '/admin/pilot-crm']];
   return `<nav class="nav admin-nav">${links.map(([label, href]) => `<a class="${active === 'admin' && href === '/admin/os' ? 'active' : ''}" href="${href}">${label}</a>`).join('')}<a href="/admin/logout">Logout</a></nav>`;
 }
 
@@ -2434,8 +2860,7 @@ function approvalStatusWhere(alias = '') {
   return {
     pending: `(${prefix}status IS NULL OR TRIM(${prefix}status)='' OR LOWER(TRIM(${prefix}status))='pending')`,
     approved: `LOWER(TRIM(COALESCE(${prefix}status,'')))='approved'`,
-    rejected: `LOWER(TRIM(COALESCE(${prefix}status,'')))='rejected'`,
-  };
+    rejected: `LOWER(TRIM(COALESCE(${prefix}status,'')))='rejected'`};
 }
 
 function approvalFilterLinks(basePath, current) {
@@ -2455,8 +2880,7 @@ function visibilityWhere(alias = '') {
     visible: `COALESCE(${prefix}public_visible,true)=true AND COALESCE(${prefix}is_demo,false)=false`,
     hidden: `COALESCE(${prefix}public_visible,true)=false`,
     demo: `COALESCE(${prefix}is_demo,false)=true`,
-    all: 'TRUE',
-  };
+    all: 'TRUE'};
 }
 
 function publicVisibilitySql(alias = '') {
@@ -2577,8 +3001,7 @@ function adminTrustControls(type, x, pin) {
     ['is_verified', 'Verified'],
     ['is_trusted', 'Trusted'],
     ['is_available', 'Available'],
-    ['emergency_available', 'Emergency'],
-  ];
+    ['emergency_available', 'Emergency']];
   return `<div class="actions">${fields.map(([field, label]) => {
     const current = boolish(x[field]);
     const action = type === 'merchant' ? '/admin/merchant/trust' : '/admin/provider/trust';
@@ -2691,8 +3114,7 @@ function publicContactLinks() {
   const links = [
     ['WhatsApp', waHref],
     ['Facebook', facebook],
-    ['TikTok', tiktok],
-  ].filter((x) => x[1]);
+    ['TikTok', tiktok]].filter((x) => x[1]);
   if (!links.length) return '<span class="pill">Contact GOVO</span>';
   return links.map(([label, href]) => `<a class="btn secondary" href="${esc(href)}">${esc(label)}</a>`).join('');
 }
@@ -3297,8 +3719,7 @@ app.get('/admin/os', async (req, res, next) => {
       pool.query(`SELECT id, shop_name, customer_name, customer_phone, drop_location, COALESCE(status,'pending') AS status, created_at FROM govo_orders ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, provider_name, service_type, customer_name, customer_phone, COALESCE(status,'pending') AS status, created_at FROM govo_service_requests ORDER BY id DESC LIMIT 5`),
       pool.query(`SELECT id, shop_name, owner_name, phone, category, COALESCE(status,'pending') AS status, created_at FROM govo_merchant_leads ORDER BY id DESC LIMIT 5`),
-      pool.query(`SELECT id, provider_name, phone, service_type, area, COALESCE(status,'pending') AS status, created_at FROM govo_service_providers ORDER BY id DESC LIMIT 5`),
-    ]);
+      pool.query(`SELECT id, provider_name, phone, service_type, area, COALESCE(status,'pending') AS status, created_at FROM govo_service_providers ORDER BY id DESC LIMIT 5`)]);
     const o = orders.rows[0] || {};
     const m = merchants.rows[0] || {};
     const r = riders.rows[0] || {};
@@ -3311,8 +3732,7 @@ app.get('/admin/os', async (req, res, next) => {
       ['Pending rider approvals', r.pending, '/admin/riders?status=pending'],
       ['Pending provider approvals', p.pending, '/admin/providers?status=pending'],
       ['Pending service requests', sr.pending, '/admin/service-requests?status=pending'],
-      ['Pending orders', o.pending, '/admin/orders?status=pending'],
-    ].filter((x) => Number(x[1] || 0) > 0);
+      ['Pending orders', o.pending, '/admin/orders?status=pending']].filter((x) => Number(x[1] || 0) > 0);
     const alert = (label, count, href) => `<a class="card compact-card" href="${href}" style="text-decoration:none"><div class="section-head"><h2>${esc(label)}</h2>${badge('pending')}</div><p><b>${esc(count || 0)}</b> waiting for action</p></a>`;
     const alertSection = alertItems.length ? alertItems.map(([label, count, href]) => alert(label, count, href)).join('') : '<div class="card compact-card alert-clear"><h2>All clear — no pending action.</h2><p>No approval or operation is waiting right now.</p></div>';
     const recentSection = (title, rows, render) => `<section class="card"><h2>${esc(title)}</h2><div class="activity-list">${rows.length ? rows.map(render).join('') : '<div class="activity-row"><b>No recent activity</b><span>Nothing to show yet</span></div>'}</div></section>`;
@@ -3333,8 +3753,7 @@ app.get('/admin/command', async (req, res, next) => {
       tasks: await hasTable('govo_launch_tasks'),
       merchants: await hasTable('govo_merchant_leads'),
       providers: await hasTable('govo_service_providers'),
-      riders: await hasTable('govo_rider_leads'),
-    };
+      riders: await hasTable('govo_rider_leads')};
     const one = async (enabled, sql, fallback = {}) => enabled ? ((await pool.query(sql)).rows[0] || fallback) : fallback;
     const rows = async (enabled, sql, fallback = []) => enabled ? (await pool.query(sql)).rows : fallback;
     const zero = {};
@@ -3349,8 +3768,7 @@ app.get('/admin/command', async (req, res, next) => {
       rows(exists.orders, `SELECT id, order_code, customer_name, customer_phone, COALESCE(merchant_name,shop_name,provider_name,'GOVO Order') AS partner_name, COALESCE(status,'new') AS status, total_amount, created_at FROM govo_orders WHERE COALESCE(status,'new') IN ('new','pending','confirmed','accepted','preparing','ready') ORDER BY id DESC LIMIT 10`),
       rows(exists.services, `SELECT id, request_code, customer_name, customer_phone, service_type, COALESCE(status,'new') AS status, created_at FROM govo_service_requests WHERE COALESCE(status,'new') IN ('new','confirmed','in_progress') ORDER BY id DESC LIMIT 10`),
       rows(exists.support, `SELECT id, ticket_code, customer_name, customer_phone, subject, priority, COALESCE(status,'open') AS status, created_at FROM govo_support_tickets WHERE COALESCE(status,'open') IN ('open','working') ORDER BY CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 ELSE 3 END, id DESC LIMIT 10`),
-      rows(exists.tasks, `SELECT id, title, partner_type, partner_name, phone, priority, status, due_date, created_at FROM govo_launch_tasks WHERE COALESCE(status,'todo') IN ('todo','doing') ORDER BY CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END, NULLIF(due_date,'') NULLS LAST, id DESC LIMIT 10`),
-    ]);
+      rows(exists.tasks, `SELECT id, title, partner_type, partner_name, phone, priority, status, due_date, created_at FROM govo_launch_tasks WHERE COALESCE(status,'todo') IN ('todo','doing') ORDER BY CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END, NULLIF(due_date,'') NULLS LAST, id DESC LIMIT 10`)]);
     const stat = (label, value, hint = '') => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div>${hint ? `<p>${esc(hint)}</p>` : ''}</div>`;
     const quick = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
     const queueCard = ({ title, href, phone, name, status, priority, meta }) => `<div class="activity-row"><span><b>${esc(title || 'Untitled')}</b><span>${esc(meta || '')}</span></span><span>${status ? badge(status) : ''}${priority ? badge(priority) : ''}</span><div class="actions"><a class="btn secondary" href="${href}">Open</a></div>${customerContactActions(phone, name)}</div>`;
@@ -3367,8 +3785,7 @@ app.get('/admin/command', async (req, res, next) => {
       ['Support inbox active', exists.support, exists.support ? 'ready' : 'missing'],
       ['Order board active', exists.orders, exists.orders ? 'ready' : 'missing'],
       ['Service request board active', exists.services, exists.services ? 'ready' : 'missing'],
-      ['Task board active', exists.tasks, exists.tasks ? 'ready' : 'missing'],
-    ].map(([label, ok, value]) => `<div class="activity-row"><span><b>${esc(label)}</b><span>${esc(value)}</span></span>${pass(ok)}</div>`).join('');
+      ['Task board active', exists.tasks, exists.tasks ? 'ready' : 'missing']].map(([label, ok, value]) => `<div class="activity-row"><span><b>${esc(label)}</b><span>${esc(value)}</span></span>${pass(ok)}</div>`).join('');
     const hasUrgent = orderItems.length || serviceItems.length || supportItems.length || taskItems.length;
     res.send(page('Daily Command Center', `<section class="card app-hero"><span class="pill">Daily Operations</span><h1>Daily Command Center</h1><p>One control room for orders, service requests, support, launch tasks, and pilot readiness.</p><div class="actions"><a class="btn" href="/admin/command">Refresh</a>${quick('Order Dispatch','/admin/orders')}${quick('Service Requests','/admin/service-requests')}${quick('Support Inbox','/admin/support')}${quick('Finance Ledger','/admin/finance')}${quick('WhatsApp Control','/admin/whatsapp')}${quick('QA Dashboard','/admin/qa')}${quick('Launch Task Board','/admin/tasks')}${quick('Pilot Onboarding','/admin/onboarding')}</div></section><section class="card"><div class="section-head"><h2>Today Pulse</h2>${hasUrgent ? badge('active') : badge('clear')}</div></section><section class="grid">${stat('Total Orders Today', orderKpi.total_today)}${stat('New Orders', orderKpi.new_orders)}${stat('Assigned / On The Way', orderKpi.active_delivery)}${stat('Delivered Today', orderKpi.delivered_today)}${stat('Cancelled Today', orderKpi.cancelled_today)}${stat('Service Requests Today', serviceKpi.total_today)}${stat('New Service Requests', serviceKpi.new_requests)}${stat('In Progress', serviceKpi.in_progress)}${stat('Completed Today', serviceKpi.completed_today)}${stat('Open Support Tickets', supportKpi.open_tickets)}${stat('Urgent / High Tickets', supportKpi.urgent_high)}${stat('Resolved Today', supportKpi.resolved_today)}${stat('Todo Tasks', taskKpi.todo)}${stat('Doing Tasks', taskKpi.doing)}${stat('Due Today', taskKpi.due_today)}${stat('Urgent Tasks', taskKpi.urgent)}${stat('Public Merchants', merchantKpi.approved_public)}${stat('Public Providers', providerKpi.approved_public)}${stat('Approved Riders', riderKpi.approved)}</section><section class="card"><div class="section-head"><h2>Needs Action</h2>${hasUrgent ? badge('review') : badge('clear')}</div>${hasUrgent ? '' : '<p style="color:var(--muted);font-weight:900">No urgent items right now.</p>'}</section><section class="grid two">${queueSection('New Orders Queue', orderItems)}${queueSection('Service Requests Queue', serviceItems)}${queueSection('Support Queue', supportItems)}${queueSection('Task Queue', taskItems)}</section><section class="card"><div class="section-head"><h2>Launch Readiness</h2><span class="pill">Pilot checks</span></div><div class="activity-list">${readiness}</div></section><section class="card"><h2>Quick Control</h2><div class="toolbar">${quick('New Manual Order','/admin/orders')}${quick('New Service Request','/admin/service-requests')}${quick('New Support Ticket','/admin/support')}${quick('New Task','/admin/tasks')}${quick('Finance Ledger','/admin/finance')}${quick('WhatsApp Control','/admin/whatsapp')}${quick('QA Dashboard','/admin/qa')}${quick('Pilot Onboarding','/admin/onboarding')}</div></section>`, 'admin'));
   } catch (e) { next(e); }
@@ -3404,8 +3821,7 @@ app.get('/admin/whatsapp', async (req, res, next) => {
     const [merchants, providers, riders] = await Promise.all([
       pool.query(`SELECT id, shop_name AS name, owner_name, phone, whatsapp, COALESCE(shop_address, location) AS area, status FROM govo_merchant_leads ORDER BY id DESC LIMIT 12`),
       pool.query(`SELECT id, provider_name AS name, phone, whatsapp, COALESCE(area, address) AS area, service_type AS category, status FROM govo_service_providers ORDER BY id DESC LIMIT 12`),
-      pool.query(`SELECT id, COALESCE(rider_name,name) AS name, phone, whatsapp, COALESCE(area, location) AS area, vehicle_type AS category, status FROM govo_rider_leads ORDER BY id DESC LIMIT 12`),
-    ]);
+      pool.query(`SELECT id, COALESCE(rider_name,name) AS name, phone, whatsapp, COALESCE(area, location) AS area, vehicle_type AS category, status FROM govo_rider_leads ORDER BY id DESC LIMIT 12`)]);
     const quick = (label, href) => `<a class="btn secondary" href="${href}">${esc(label)}</a>`;
     const partnerList = (title, rows, type) => `<section class="card"><div class="section-head"><h2>${esc(title)}</h2><span class="pill">${rows.length}</span></div><div class="activity-list">${rows.map((x) => `<div class="activity-row"><span><b>${esc(x.name || type)}</b><span>${esc(x.phone || x.whatsapp || 'No phone')} - ${esc(x.area || x.category || 'No area')} - ${esc(x.status || 'pending')}</span></span><a class="btn secondary" href="/admin/${type}/${encodeURIComponent(x.id)}">View</a>${customerContactActions(x.whatsapp || x.phone, x.name)}</div>`).join('') || '<div class="activity-row"><b>No partners found</b><span>Add partners from onboarding.</span></div>'}</div></section>`;
     res.send(page('WhatsApp Control', `<section class="card app-hero"><span class="pill">Communication</span><h1>GOVO WhatsApp / Call Control</h1><p>Manual communication hub for customers, merchants, providers, riders, and support follow-up.</p><div class="actions"><a class="btn secondary" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a>${quick('Support Inbox','/admin/support')}${quick('Launch Task Board','/admin/tasks')}${quick('Pilot Onboarding','/admin/onboarding')}${quick('Order Dispatch','/admin/orders')}${quick('Service Requests','/admin/service-requests')}</div></section><section class="card"><div class="section-head"><h2>Public WhatsApp</h2>${publicHref ? badge('connected') : badge('manual')}</div>${publicHref ? `<p><a class="btn wa" href="${esc(publicHref)}">Open Public WhatsApp</a></p>` : '<p style="color:var(--muted);font-weight:900">WhatsApp automation is not connected yet. Use manual WhatsApp links for now.</p>'}</section><section class="grid two">${partnerList('Merchant Quick Communication', merchants.rows, 'merchant')}${partnerList('Provider Quick Communication', providers.rows, 'provider')}${partnerList('Rider Quick Communication', riders.rows, 'rider')}</section>`, 'admin'));
@@ -3428,8 +3844,7 @@ app.get('/admin/finance', async (req, res, next) => {
     if (!requireAdmin(req, res)) return;
     const [summary, entries] = await Promise.all([
       pool.query(`SELECT COALESCE(SUM(cash_collected) FILTER (WHERE created_at::date=CURRENT_DATE),0) AS today_cash_collected, COALESCE(SUM(delivery_fee) FILTER (WHERE created_at::date=CURRENT_DATE),0) AS today_delivery_fee, COALESCE(SUM(commission_amount) FILTER (WHERE created_at::date=CURRENT_DATE),0) AS today_commission, COALESCE(SUM(merchant_payable) FILTER (WHERE created_at::date=CURRENT_DATE),0) AS today_merchant_payable, COALESCE(SUM(rider_payout) FILTER (WHERE created_at::date=CURRENT_DATE),0) AS today_rider_payout, COALESCE(SUM(amount) FILTER (WHERE COALESCE(settlement_status,'pending') <> 'settled'),0) AS unsettled_amount FROM govo_finance_ledger`),
-      pool.query(`SELECT id, ref_type, ref_code, partner_type, partner_name, phone, amount, delivery_fee, commission_amount, merchant_payable, rider_payout, cash_collected, payment_method, payment_status, settlement_status, direction, note, created_at FROM govo_finance_ledger ORDER BY id DESC LIMIT 120`),
-    ]);
+      pool.query(`SELECT id, ref_type, ref_code, partner_type, partner_name, phone, amount, delivery_fee, commission_amount, merchant_payable, rider_payout, cash_collected, payment_method, payment_status, settlement_status, direction, note, created_at FROM govo_finance_ledger ORDER BY id DESC LIMIT 120`)]);
     const srow = summary.rows[0] || {};
     const stat = (label, value) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">৳${esc(moneyValue(value).toFixed(2).replace(/\.00$/, ''))}</div></div>`;
     const opts = (values, current) => values.map((v) => `<option value="${esc(v)}" ${String(current || '').toLowerCase() === v ? 'selected' : ''}>${esc(v)}</option>`).join('');
@@ -3627,8 +4042,7 @@ app.get('/admin/onboarding', async (req, res, next) => {
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE LOWER(TRIM(COALESCE(status,'')))='approved')::int approved FROM govo_rider_leads WHERE ${realWhere}`),
       pool.query(`SELECT m.id, m.shop_name, m.owner_name, m.phone, m.whatsapp, m.location, m.shop_address, m.category, CASE WHEN m.status IS NULL OR TRIM(m.status)='' THEN 'pending' ELSE LOWER(TRIM(m.status)) END AS status, COALESCE(m.public_visible,true) AS public_visible, COALESCE(m.is_demo,false) AS is_demo, m.image_url, COUNT(p.id)::int AS product_count FROM govo_merchant_leads m ${productJoin} WHERE COALESCE(m.is_demo,false)=false GROUP BY m.id, m.shop_name, m.owner_name, m.phone, m.whatsapp, m.location, m.shop_address, m.category, m.status, m.public_visible, m.is_demo, m.image_url ORDER BY CASE WHEN LOWER(TRIM(COALESCE(m.status,'')))='approved' THEN 1 ELSE 0 END ASC, COALESCE(m.public_visible,true) ASC, COUNT(p.id) ASC, m.id DESC LIMIT 80`),
       pool.query(`SELECT id, provider_name, phone, whatsapp, service_type, area, address, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, image_url FROM govo_service_providers WHERE ${realWhere} ORDER BY CASE WHEN LOWER(TRIM(COALESCE(status,'')))='approved' THEN 1 ELSE 0 END ASC, COALESCE(public_visible,true) ASC, id DESC LIMIT 80`),
-      pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, vehicle_type, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo FROM govo_rider_leads WHERE ${realWhere} ORDER BY CASE WHEN LOWER(TRIM(COALESCE(status,'')))='approved' THEN 1 ELSE 0 END ASC, COALESCE(public_visible,true) ASC, id DESC LIMIT 80`),
-    ]);
+      pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, whatsapp, location, area, vehicle_type, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo FROM govo_rider_leads WHERE ${realWhere} ORDER BY CASE WHEN LOWER(TRIM(COALESCE(status,'')))='approved' THEN 1 ELSE 0 END ASC, COALESCE(public_visible,true) ASC, id DESC LIMIT 80`)]);
     const mc = merchantCounts.rows[0] || {};
     const pc = providerCounts.rows[0] || {};
     const rc = riderCounts.rows[0] || {};
@@ -3639,8 +4053,7 @@ app.get('/admin/onboarding', async (req, res, next) => {
       ['At least 2 approved riders', Number(rc.approved || 0) >= 2],
       ['Public pages clean', true],
       ['Contact links active', true],
-      ['Admin can call/WhatsApp partners', true],
-    ];
+      ['Admin can call/WhatsApp partners', true]];
     const passCount = checklist.filter((x) => x[1]).length;
     const readyScore = Math.round((passCount / checklist.length) * 100);
     const stat = (label, value, hint = '') => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint)}</p></div>`;
@@ -3674,8 +4087,7 @@ app.get('/admin/pilot', async (req, res, next) => {
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending FROM govo_service_providers`),
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending FROM govo_rider_leads`),
       pool.query(`SELECT COUNT(*) FILTER (WHERE ${today})::int total_today, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='delivered')::int delivered FROM govo_orders`),
-      pool.query(`SELECT COUNT(*) FILTER (WHERE ${today})::int total_today, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`),
-    ]);
+      pool.query(`SELECT COUNT(*) FILTER (WHERE ${today})::int total_today, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='pending')::int pending, COUNT(*) FILTER (WHERE ${today} AND COALESCE(status,'pending')='completed')::int completed FROM govo_service_requests`)]);
     const m = merchants.rows[0] || {}, p = providers.rows[0] || {}, r = riders.rows[0] || {}, o = orders.rows[0] || {}, sr = requests.rows[0] || {};
     const ready = healthOk && Number(m.approved || 0) > 0 && Number(p.approved || 0) > 0 && Number(r.approved || 0) > 0;
     const stat = (label, value, hint) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div><p>${esc(hint || '')}</p></div>`;
@@ -3807,8 +4219,7 @@ async function updateVisibilityRecord(req, res, table, type, returnFields, redir
     show_public: { public_visible: true },
     hide_public: { public_visible: false },
     mark_demo: { is_demo: true, public_visible: false },
-    unmark_demo: { is_demo: false },
-  };
+    unmark_demo: { is_demo: false }};
   const nextState = map[action];
   if (!id || !nextState) {
     res.status(400).send(page('Invalid Visibility Action', '<section class="card"><h1>Invalid visibility action</h1></section>', 'admin'));
@@ -3953,8 +4364,7 @@ app.get('/admin/orders', async (req, res, next) => {
     const [orders, riders, counts] = await Promise.all([
       pool.query(`SELECT id, order_code, customer_name, customer_phone, customer_area, customer_address, order_type, merchant_id, COALESCE(merchant_name, shop_name) AS merchant_name, shop_name, merchant_phone, provider_id, provider_name, rider_id, rider_name, rider_phone, assigned_rider_id, assigned_rider_name, assigned_rider_phone, COALESCE(items, item_details) AS items, item_details, note, customer_note, pickup_location, drop_location, delivery_fee, subtotal, total_amount, payment_method, payment_status, COALESCE(status,'new') AS status, priority, admin_note, rider_note, created_at, updated_at FROM govo_orders ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY CASE COALESCE(status,'new') WHEN 'new' THEN 1 WHEN 'pending' THEN 1 WHEN 'confirmed' THEN 2 WHEN 'accepted' THEN 2 WHEN 'preparing' THEN 3 WHEN 'ready' THEN 3 WHEN 'assigned' THEN 4 WHEN 'picked_up' THEN 5 WHEN 'on_the_way' THEN 5 WHEN 'delivered' THEN 6 ELSE 7 END, id DESC LIMIT 250`, params),
       pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(area,location) AS area FROM govo_rider_leads WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 150`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('new','pending'))::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('confirmed','accepted','preparing','ready'))::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('picked_up','on_the_way'))::int on_the_way, COUNT(*) FILTER (WHERE COALESCE(status,'new')='delivered')::int delivered, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('cancelled','rejected','failed'))::int cancelled FROM govo_orders`),
-    ]);
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('new','pending'))::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('confirmed','accepted','preparing','ready'))::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('picked_up','on_the_way'))::int on_the_way, COUNT(*) FILTER (WHERE COALESCE(status,'new')='delivered')::int delivered, COUNT(*) FILTER (WHERE COALESCE(status,'new') IN ('cancelled','rejected','failed'))::int cancelled FROM govo_orders`)]);
     const riderOptions = (selectedId) => riders.rows.map((r) => `<option value="${esc(r.id)}" ${String(selectedId || '') === String(r.id) ? 'selected' : ''}>${esc(r.rider_name || 'Rider')} - ${esc(r.phone || '')}${r.area ? ` (${esc(r.area)})` : ''}</option>`).join('');
     const statusOptions = (current) => ['new','confirmed','preparing','assigned','picked_up','on_the_way','delivered','cancelled'].map((v) => `<option value="${v}" ${String(current || '').toLowerCase() === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('');
     const eventForm = (x) => `<form method="POST" action="/admin/orders/add-event"><input type="hidden" name="order_id" value="${esc(x.id)}"><div class="filters"><select name="event_type"><option>note</option><option>call</option><option>whatsapp</option><option>dispatch</option><option>payment</option></select><input name="note" placeholder="Add dispatch note/event"></div><button class="secondary">Add Event</button></form>`;
@@ -4056,8 +4466,7 @@ const superAppCategories = [
   { slug: 'courier', icon: '📦', title: 'Courier / Delivery', desc: 'Parcel, delivery and local courier services.', keywords: ['courier', 'delivery', 'parcel', 'logistics'] },
   { slug: 'transport', icon: '🚗', title: 'Transport', desc: 'Ride, rental, moving and transport support.', keywords: ['transport', 'car', 'bike', 'ride', 'rental', 'truck', 'pickup'] },
   { slug: 'house-rent', icon: '🏘️', title: 'House Rent', desc: 'House, flat, room and property rent listings.', keywords: ['house rent', 'rent', 'flat', 'room', 'property', 'to-let', 'tolet'] },
-  { slug: 'other-services', icon: '✨', title: 'Other Services', desc: 'Everything else available through GOVO partners.', keywords: ['other', 'service', 'services', 'misc'] },
-];
+  { slug: 'other-services', icon: '✨', title: 'Other Services', desc: 'Everything else available through GOVO partners.', keywords: ['other', 'service', 'services', 'misc'] }];
 
 function merchantSearchText(x) {
   return [x.shop_name, x.owner_name, x.phone, x.whatsapp, x.location, x.shop_address, x.category, x.delivery_needed, x.shop_description, x.products, x.product_search].join(' ').toLowerCase();
@@ -4216,8 +4625,7 @@ function normalizeOrderBody(body = {}) {
     items,
     note: String(body.note || body.notes || '').trim(),
     pickup_location: String(body.pickup_location || body.pickup_address || '').trim(),
-    payment_method: String(body.payment_method || 'cash').trim(),
-  };
+    payment_method: String(body.payment_method || 'cash').trim()};
 }
 
 app.all('/order', async (req, res, next) => {
@@ -4273,8 +4681,7 @@ function statusMeaning(status) {
     completed: 'finished',
     rejected: 'cancelled/rejected',
     failed: 'failed',
-    cancelled: 'cancelled/failed',
-  }[s] || 'status update in progress';
+    cancelled: 'cancelled/failed'}[s] || 'status update in progress';
 }
 
 function progressStage(type, status) {
@@ -4888,8 +5295,7 @@ app.get('/merchant/products', async (req, res, next) => {
     if (filter !== 'all') { params.push(filter); where.push(`stock_status=$${params.length}`); }
     const [products, counts] = await Promise.all([
       pool.query(`SELECT id, merchant_id, merchant_name, name, category, price, description, image_url, stock_status, public_visible, is_demo, created_at, updated_at FROM govo_products WHERE ${where.join(' AND ')} ORDER BY CASE stock_status WHEN 'available' THEN 1 WHEN 'out_of_stock' THEN 2 ELSE 3 END, category NULLS LAST, id DESC LIMIT 200`, params),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE stock_status='available' AND COALESCE(public_visible,true)=true AND COALESCE(is_demo,false)=false)::int available, COUNT(*) FILTER (WHERE stock_status='out_of_stock')::int out_of_stock, COUNT(*) FILTER (WHERE stock_status='hidden' OR COALESCE(public_visible,true)=false)::int hidden FROM govo_products WHERE merchant_id=$1`, [m.id]),
-    ]);
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE stock_status='available' AND COALESCE(public_visible,true)=true AND COALESCE(is_demo,false)=false)::int available, COUNT(*) FILTER (WHERE stock_status='out_of_stock')::int out_of_stock, COUNT(*) FILTER (WHERE stock_status='hidden' OR COALESCE(public_visible,true)=false)::int hidden FROM govo_products WHERE merchant_id=$1`, [m.id])]);
     const c = counts.rows[0] || {};
     const filterLink = (label, value) => `<a class="btn ${filter === value ? '' : 'secondary'}" href="/merchant/products?filter=${encodeURIComponent(value)}">${esc(label)}</a>`;
     const stockSelect = (x) => ['available', 'out_of_stock', 'hidden'].map((v) => `<option value="${v}" ${x.stock_status === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('');
@@ -5039,8 +5445,7 @@ const serviceCategories = [
   { slug: 'agriculture', icon: '🌾', title: 'Agriculture', desc: 'Agro support, field service and farming help.', keywords: ['agriculture', 'agro', 'farm', 'seed', 'fertilizer'] },
   { slug: 'transport', icon: '🚗', title: 'Transport', desc: 'Ride, rental, pickup and local transport.', keywords: ['transport', 'ride', 'car', 'bike', 'pickup', 'truck'] },
   { slug: 'house-rent', icon: '🏘️', title: 'House Rent', desc: 'House, room, flat and property rent help.', keywords: ['house rent', 'rent', 'flat', 'room', 'property'] },
-  { slug: 'other', icon: '✨', title: 'Other', desc: 'Other approved GOVO service providers.', keywords: ['other', 'service', 'misc'] },
-];
+  { slug: 'other', icon: '✨', title: 'Other', desc: 'Other approved GOVO service providers.', keywords: ['other', 'service', 'misc'] }];
 
 
 function cleanServiceStatus(v, fallback = 'new') {
@@ -5056,8 +5461,7 @@ function cleanServiceStatus(v, fallback = 'new') {
     active: 'working',
     quality_check: 'completed',
     settled: 'paid',
-    rejected: 'cancelled',
-  };
+    rejected: 'cancelled'};
   const normalized = map[s] || s;
   return ['new', 'phone_confirming', 'confirmed', 'assigned', 'on_the_way', 'working', 'completed', 'paid', 'feedback', 'cancelled'].includes(normalized) ? normalized : fallback;
 }
@@ -5071,8 +5475,7 @@ const GOVO_SERVICE_STATUS_STEPS = [
   { key: 'working', publicKey: 'working', label: 'Working', bangla: 'কাজ চলছে' },
   { key: 'completed', publicKey: 'completed', label: 'Completed', bangla: 'কাজ সম্পন্ন' },
   { key: 'paid', publicKey: 'paid', label: 'Paid', bangla: 'পেমেন্ট সম্পন্ন' },
-  { key: 'feedback', publicKey: 'feedback', label: 'Feedback', bangla: 'মতামত দিন' },
-];
+  { key: 'feedback', publicKey: 'feedback', label: 'Feedback', bangla: 'মতামত দিন' }];
 
 const govoMemoryState = globalThis.__govoMemoryState || { serviceRequests: new Map(), serviceEvents: new Map(), nextServiceId: 1 };
 globalThis.__govoMemoryState = govoMemoryState;
@@ -5115,8 +5518,7 @@ function serviceTimeline(status, events = []) {
     timestamp: eventByStatus.get(step.key) || null,
     completed: index < currentIndex,
     current: index === currentIndex,
-    pending: index > currentIndex,
-  }));
+    pending: index > currentIndex}));
 }
 
 function serviceStatusOptions(current) {
@@ -5142,12 +5544,10 @@ function seedGovoMemoryServiceStore() {
     status: 'phone_confirming',
     priority: 'normal',
     created_at: now,
-    updated_at: now,
-  };
+    updated_at: now};
   const events = [
     { event_type: 'created', status: 'new', note: 'Mock request created', actor_type: 'system', actor_name: 'GOVO', created_at: now },
-    { event_type: 'status', status: 'phone_confirming', note: 'Phone confirmation in progress', actor_type: 'system', actor_name: 'GOVO', created_at: now },
-  ];
+    { event_type: 'status', status: 'phone_confirming', note: 'Phone confirmation in progress', actor_type: 'system', actor_name: 'GOVO', created_at: now }];
   govoMemoryState.serviceRequests.set(request.request_code, request);
   govoMemoryState.serviceEvents.set(request.id, events);
 }
@@ -5204,8 +5604,7 @@ async function createServiceRequest(data, actorType = 'customer') {
       status,
       priority,
       created_at: now,
-      updated_at: now,
-    };
+      updated_at: now};
     govoMemoryState.serviceRequests.set(code, request);
     govoMemoryState.serviceEvents.set(id, [{ event_type: 'created', status, note: data.note || 'Service request created', actor_type: actorType, actor_name: actorType === 'admin' ? 'Admin' : 'Customer', created_at: now }]);
     return { id, code, request };
@@ -5281,8 +5680,7 @@ app.post('/support', async (req, res, next) => {
       message: String(req.body.message || '').trim(),
       related_type: cleanSupportRelatedType(req.body.related_type),
       related_code: String(req.body.related_code || '').trim(),
-      priority: 'normal',
-    };
+      priority: 'normal'};
     const missing = [];
     if (!data.customer_phone) missing.push('phone');
     if (!data.message) missing.push('message');
@@ -5304,8 +5702,7 @@ app.get('/admin/support', async (req, res, next) => {
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(ticket_code,'') || ' ' || CAST(id AS TEXT) || ' ' || COALESCE(customer_name,'') || ' ' || COALESCE(customer_phone,'') || ' ' || COALESCE(customer_area,'') || ' ' || COALESCE(subject,'') || ' ' || COALESCE(message,'') || ' ' || COALESCE(related_type,'') || ' ' || COALESCE(related_code,'')) LIKE $${params.length}`); }
     const [tickets, counts] = await Promise.all([
       pool.query(`SELECT * FROM govo_support_tickets ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY CASE COALESCE(status,'open') WHEN 'open' THEN 1 WHEN 'working' THEN 2 WHEN 'resolved' THEN 3 ELSE 4 END, CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END, id DESC LIMIT 250`, params),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'open')='open')::int open, COUNT(*) FILTER (WHERE COALESCE(status,'open')='working')::int working, COUNT(*) FILTER (WHERE COALESCE(status,'open')='resolved')::int resolved, COUNT(*) FILTER (WHERE COALESCE(status,'open')='cancelled')::int cancelled FROM govo_support_tickets`),
-    ]);
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'open')='open')::int open, COUNT(*) FILTER (WHERE COALESCE(status,'open')='working')::int working, COUNT(*) FILTER (WHERE COALESCE(status,'open')='resolved')::int resolved, COUNT(*) FILTER (WHERE COALESCE(status,'open')='cancelled')::int cancelled FROM govo_support_tickets`)]);
     const ids = tickets.rows.map((x) => x.id);
     const eventMap = new Map();
     if (ids.length) {
@@ -5386,8 +5783,7 @@ const pilotLinks = [
   ['Join Merchant', 'https://merchant.govoexpress.com/merchant'],
   ['Join Provider', 'https://merchant.govoexpress.com/provider'],
   ['Join Rider', 'https://rider.govoexpress.com/rider'],
-  ['Track Order', 'https://merchant.govoexpress.com/track'],
-];
+  ['Track Order', 'https://merchant.govoexpress.com/track']];
 
 function shareCards() {
   return `<section class="card"><h2>Share GOVO Pilot Links</h2><div class="cards">${pilotLinks.map(([label, href]) => `<div class="card"><h2>${esc(label)}</h2><input value="${esc(href)}" readonly onclick="this.select()"><div class="actions"><a class="btn secondary" href="${href}">Open</a></div></div>`).join('')}</div></section>`;
@@ -5607,8 +6003,7 @@ function normalizeServiceRequestBody(body = {}) {
     preferred_time: String(body.preferred_time || '').trim(),
     notes: note,
     note,
-    priority: cleanServicePriority(body.priority || body.urgency),
-  };
+    priority: cleanServicePriority(body.priority || body.urgency)};
 }
 function serviceRequestForm(provider, data = {}, error = '') {
   const action = provider.id ? `/service/${encodeURIComponent(provider.id)}/request` : '/service-request';
@@ -5710,8 +6105,7 @@ function publicServiceTrackingPayload(request) {
     label: e.status ? serviceStatusLabel(e.status) : String(e.event_type || 'Event'),
     bangla: e.status ? serviceStatusBangla(e.status) : '',
     note: e.note || '',
-    timestamp: e.created_at || null,
-  }));
+    timestamp: e.created_at || null}));
   return {
     code,
     status: serviceStatusPublicKey(request.status),
@@ -5725,11 +6119,9 @@ function publicServiceTrackingPayload(request) {
       service_type: request.service_type || 'Service Request',
       customer_area: request.customer_area || '',
       priority: request.priority || 'normal',
-      provider_name: request.provider_name || '',
-    },
+      provider_name: request.provider_name || ''},
     timeline: serviceTimeline(request.status, events),
-    history,
-  };
+    history};
 }
 
 function adminPinAuthorized(req) {
@@ -5816,13 +6208,11 @@ app.post('/api/requests', async (req, res, next) => {
         customer_address: data.customer_address,
         service_type: data.service_type || p.service_type || '',
         problem_details: data.problem_details,
-        note: data.note,
-      },
+        note: data.note},
       request_id: created.code,
       status: 'Phone Confirming',
       tracking_url: `/track?code=${encodeURIComponent(created.code)}`,
-      support_url: publicSupportPhone() ? `tel:${publicSupportPhone()}` : '/support',
-    });
+      support_url: publicSupportPhone() ? `tel:${publicSupportPhone()}` : '/support'});
   } catch (e) { next(e); }
 });
 
@@ -5883,8 +6273,7 @@ app.get('/admin/pilot-crm', async (req, res, next) => {
     if (q) { params.push(`%${q}%`); where.push(`LOWER(COALESCE(name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(whatsapp,'') || ' ' || COALESCE(area,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(note,'')) LIKE $${params.length}`); }
     const [counts, leads] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE status='new')::int new, COUNT(*) FILTER (WHERE status='interested')::int interested, COUNT(*) FILTER (WHERE status='follow_up')::int follow_up, COUNT(*) FILTER (WHERE status='onboarded')::int onboarded, COUNT(*) FILTER (WHERE priority='high')::int high FROM govo_pilot_crm`),
-      pool.query(`SELECT * FROM govo_pilot_crm ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY COALESCE(next_followup_at, created_at) ASC NULLS LAST, id DESC LIMIT 200`, params),
-    ]);
+      pool.query(`SELECT * FROM govo_pilot_crm ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY COALESCE(next_followup_at, created_at) ASC NULLS LAST, id DESC LIMIT 200`, params)]);
     const c = counts.rows[0] || {};
     const stat = (label, value) => `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value || 0)}</div></div>`;
     const opt = (current, value, label) => `<option value="${esc(value)}" ${current === value ? 'selected' : ''}>${esc(label)}</option>`;
@@ -5930,8 +6319,7 @@ app.post('/admin/pilot-crm/quick-import', async (req, res, next) => {
     const [m, pvd, r] = await Promise.all([
       pool.query(`SELECT shop_name AS name, phone, whatsapp, COALESCE(shop_address,location) AS area, category, status AS note FROM govo_merchant_leads ORDER BY id DESC LIMIT 500`),
       pool.query(`SELECT provider_name AS name, phone, whatsapp, area, service_type AS category, status AS note FROM govo_service_providers ORDER BY id DESC LIMIT 500`),
-      pool.query(`SELECT COALESCE(rider_name,name) AS name, phone, '' AS whatsapp, location AS area, vehicle_type AS category, status AS note FROM govo_rider_leads ORDER BY id DESC LIMIT 500`),
-    ]);
+      pool.query(`SELECT COALESCE(rider_name,name) AS name, phone, '' AS whatsapp, location AS area, vehicle_type AS category, status AS note FROM govo_rider_leads ORDER BY id DESC LIMIT 500`)]);
     await importRows('merchant', m.rows);
     await importRows('provider', pvd.rows);
     await importRows('rider', r.rows);
@@ -6034,8 +6422,7 @@ app.get('/admin/service-requests', async (req, res, next) => {
     const [requests, providers, counts] = await Promise.all([
       pool.query(`SELECT sr.*, COALESCE(sr.customer_note,sr.note,'') AS display_note, COALESCE(sr.customer_address,sr.service_address) AS display_address, sp.area AS provider_area FROM govo_service_requests sr LEFT JOIN govo_service_providers sp ON sp.id=sr.provider_id ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY CASE COALESCE(sr.status,'new') WHEN 'new' THEN 1 WHEN 'phone_confirming' THEN 2 WHEN 'confirmed' THEN 3 WHEN 'assigned' THEN 4 WHEN 'on_the_way' THEN 5 WHEN 'working' THEN 6 WHEN 'completed' THEN 7 WHEN 'paid' THEN 8 WHEN 'feedback' THEN 9 ELSE 10 END, sr.id DESC LIMIT 250`, params),
       pool.query(`SELECT id, provider_name, phone, whatsapp, service_type, area FROM govo_service_providers WHERE COALESCE(status,'pending')='approved' ORDER BY id DESC LIMIT 150`),
-      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new')='new')::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new')='phone_confirming')::int phone_confirming, COUNT(*) FILTER (WHERE COALESCE(status,'new')='confirmed')::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new')='on_the_way')::int on_the_way, COUNT(*) FILTER (WHERE COALESCE(status,'new')='working')::int working, COUNT(*) FILTER (WHERE COALESCE(status,'new')='completed')::int completed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='paid')::int paid, COUNT(*) FILTER (WHERE COALESCE(status,'new')='feedback')::int feedback, COUNT(*) FILTER (WHERE COALESCE(status,'new')='cancelled')::int cancelled FROM govo_service_requests`),
-    ]);
+      pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE COALESCE(status,'new')='new')::int new, COUNT(*) FILTER (WHERE COALESCE(status,'new')='phone_confirming')::int phone_confirming, COUNT(*) FILTER (WHERE COALESCE(status,'new')='confirmed')::int confirmed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='assigned')::int assigned, COUNT(*) FILTER (WHERE COALESCE(status,'new')='on_the_way')::int on_the_way, COUNT(*) FILTER (WHERE COALESCE(status,'new')='working')::int working, COUNT(*) FILTER (WHERE COALESCE(status,'new')='completed')::int completed, COUNT(*) FILTER (WHERE COALESCE(status,'new')='paid')::int paid, COUNT(*) FILTER (WHERE COALESCE(status,'new')='feedback')::int feedback, COUNT(*) FILTER (WHERE COALESCE(status,'new')='cancelled')::int cancelled FROM govo_service_requests`)]);
     const providerOptions = (selectedId) => providers.rows.map((p) => `<option value="${esc(p.id)}" ${String(selectedId || '') === String(p.id) ? 'selected' : ''}>${esc(p.provider_name || 'Provider')} - ${esc(p.phone || '')}${p.service_type ? ` (${esc(p.service_type)})` : ''}</option>`).join('');
     const statusOptions = (current) => serviceStatusOptions(current) + '<option value="cancelled" ' + (canonicalServiceStatus(current) === 'cancelled' ? 'selected' : '') + '>Cancelled - বাতিল</option>';
     const updateForm = (x) => `<form method="POST" action="/admin/service-requests/update-status"><input type="hidden" name="id" value="${esc(x.id)}"><div class="filters"><select name="status">${statusOptions(x.status)}</select><input name="admin_note" value="${esc(x.admin_note || '')}" placeholder="Admin note"></div><button>Update Status</button></form>`;

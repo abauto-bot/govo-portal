@@ -38,3 +38,7 @@ server.js.before-*
 server.js.current-working-*
 server.js.fix-before-*
 uploads/
+govo_data_v12c.js
+docs/phase12c_*
+docs/phase12d_*
+docs/phase12e_*
