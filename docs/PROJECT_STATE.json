@@ -1,0 +1,99 @@
+{
+  "project": "GOVO Express",
+  "repository": "/opt/govo-portal",
+  "operating_mode": "Build -> Test -> Improve",
+  "public_launch_ready": false,
+  "ui_system": {
+    "status": "LOCKED",
+    "source_of_truth": "Current premium dark-green customer UI on app.govoexpress.com",
+    "rule": "New pages and routes reuse the same shared GOVO design system. Only central content changes.",
+    "legacy_light_ui_allowed": false
+  },
+  "hosts": {
+    "govoexpress.com": {
+      "role": "public_homepage",
+      "routing_status": "working",
+      "ui_unification_status": "pending"
+    },
+    "app.govoexpress.com": {
+      "role": "customer_app",
+      "routing_status": "working",
+      "ui_status": "approved_locked"
+    },
+    "merchant.govoexpress.com": {
+      "role": "merchant",
+      "routing_status": "working",
+      "deep_route_mapping": "completed"
+    },
+    "rider.govoexpress.com": {
+      "role": "rider",
+      "routing_status": "working",
+      "deep_route_mapping": "completed"
+    },
+    "add.govoexpress.com": {
+      "role": "admin_operations",
+      "routing_status": "working",
+      "deep_route_mapping": "completed"
+    }
+  },
+  "completed": [
+    "Production host isolation",
+    "Customer host separated from public homepage",
+    "Merchant role-host mapping",
+    "Rider role-host mapping",
+    "Admin role-host mapping",
+    "Nginx validation passed after role mapping",
+    "Customer route flow repaired for main pages",
+    "Current stable progress backed up locally and to Git branch"
+  ],
+  "current_git_backup": {
+    "branch": "backup/govo-progress-20260712-224627",
+    "commit": "6d24028",
+    "local_backup": "/home/abu/govo-backups/govo-progress-20260712-224627"
+  },
+  "pending": [
+    {
+      "priority": 1,
+      "task": "Apply the locked premium dark-green GOVO UI to govoexpress.com public homepage",
+      "constraint": "Keep it a public homepage; do not copy the customer bottom navigation"
+    },
+    {
+      "priority": 2,
+      "task": "Connect actual shop, product and service data to customer pages",
+      "constraint": "Use real backend data and proper empty states"
+    },
+    {
+      "priority": 3,
+      "task": "Complete and verify merchant onboarding and dashboard flows"
+    },
+    {
+      "priority": 4,
+      "task": "Complete and verify rider onboarding, assignment and status flows"
+    },
+    {
+      "priority": 5,
+      "task": "Complete and verify admin lead, assignment, payment and feedback flows"
+    },
+    {
+      "priority": 6,
+      "task": "Run a safe isolated end-to-end order workflow test",
+      "constraint": "No real SMS, WhatsApp, customer phone or payment"
+    }
+  ],
+  "known_issues": [
+    "The public homepage premium UI patch previously failed because the coding-agent sandbox could not run bwrap loopback networking.",
+    "Full backend end-to-end workflow has not yet been conclusively verified.",
+    "Some backend capabilities or endpoints may still be missing and must be inspected rather than assumed."
+  ],
+  "do_not_change_without_approval": [
+    "Locked UI direction",
+    "DNS",
+    "Cloudflare",
+    "SSL certificates",
+    "Production database records",
+    "Unrelated containers",
+    "Payment data",
+    "Real notification delivery"
+  ],
+  "last_updated": "2026-07-13"
+}
