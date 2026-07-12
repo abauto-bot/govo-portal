@@ -44,3 +44,5 @@ docs/phase12d_*
 docs/phase12e_*
 docs/phase12*
 previews/
+node_modules/
+govo-backups/

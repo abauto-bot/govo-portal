@@ -1,6 +1,7 @@
 const ui = require("./govo_components_v12c");
 const BRAND = require("./govo_brand_v12c");
 const DATA = require("./govo_data_v12c");
+const VISUAL = require("./govo_visual_v12f");
 
 function esc(v) {
   return String(v ?? "")
@@ -88,36 +89,147 @@ const ORDER_FALLBACKS = [
 
 function extraCss() {
   return `
-  .flow-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 2px 14px}
-  .flow-title{font-size:26px;line-height:1.05;margin:0;font-weight:950;letter-spacing:-.7px}
-  .flow-sub{margin:6px 0 0;color:#64748b;font-size:13px;font-weight:650}
-  .flow-card{border:1px solid #edf1ed;background:#fff;border-radius:18px;box-shadow:0 10px 22px rgba(15,23,42,.045);padding:14px}
+  .flow-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px 16px}
+  .flow-title{font-size:27px;line-height:1.05;margin:0;font-weight:950;letter-spacing:0;color:var(--govo-text)}
+  .flow-sub{margin:7px 0 0;color:var(--govo-muted);font-size:13.5px;font-weight:700;line-height:1.45}
+  .flow-card{border:1px solid rgba(207,255,232,.30);background:linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.028)),linear-gradient(180deg,rgba(22,88,70,.88),rgba(5,28,23,.82));color:var(--govo-text);border-radius:20px;box-shadow:0 26px 76px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.15);padding:16px;backdrop-filter:blur(24px) saturate(1.08)}
   .flow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
   .flow-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   .flow-list{display:flex;flex-direction:column;gap:10px}
   .flow-row{display:flex;align-items:center;gap:12px}
   .flow-between{display:flex;align-items:center;justify-content:space-between;gap:12px}
-  .flow-svg{width:30px;height:30px;color:#047A3D;display:inline-grid;place-items:center}
+  .flow-svg{width:30px;height:30px;color:var(--govo-mint);display:inline-grid;place-items:center}
   .flow-svg svg{width:100%;height:100%}
   .flow-chip-row{display:flex;gap:8px;overflow:auto;padding:2px 0 12px}
-  .flow-chip{white-space:nowrap;border:1px solid #e8eee9;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:850;background:#fff}
-  .flow-chip.active{background:#16A34A;color:#fff;border-color:#16A34A}
-  .flow-btn{border:0;background:linear-gradient(135deg,#18c45d,#087234);color:#fff;border-radius:14px;padding:11px 14px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-  .flow-btn.light{background:#f3f5f9;color:#111}
-  .flow-input{border:1px solid #edf1ed;background:#fff;border-radius:16px;padding:13px 14px;width:100%;font-weight:750;color:#111}
+  .flow-chip{white-space:nowrap;border:1px solid var(--govo-line);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:850;background:rgba(255,255,255,.12);color:#e8fff4;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+  .flow-chip.active{background:linear-gradient(135deg,#adffd8,#39e59b);color:var(--govo-ink);border-color:#78f5ba}
+  .flow-btn{border:0;background:linear-gradient(135deg,#d6ffea,#39e59b 46%,#0ca66c);color:var(--govo-ink);border-radius:15px;padding:12px 15px;font-weight:950;display:inline-flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 16px 36px rgba(12,166,108,.34), inset 0 1px 0 rgba(255,255,255,.55)}
+  .flow-btn.light{background:rgba(255,255,255,.11);color:var(--govo-text);border:1px solid var(--govo-line)}
+  .flow-input{border:1px solid rgba(207,255,232,.30);background:rgba(1,12,9,.66);border-radius:16px;padding:13px 14px;width:100%;font-weight:750;color:var(--govo-text);outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+  .flow-input:focus{border-color:var(--govo-line-strong);box-shadow:0 0 0 4px rgba(88,242,173,.10)}
+  .flow-input::placeholder{color:#93b9a8}
   .flow-field{display:flex;flex-direction:column;gap:6px}
-  .flow-label{font-size:12px;color:#64748b;font-weight:850}
-  .shop-thumb{width:58px;height:58px;border-radius:14px;background:linear-gradient(135deg,#064e2a,#16A34A);display:grid;place-items:center;color:#fff;font-weight:950;flex:none}
-  .status{font-size:12px;font-weight:900;color:#047A3D}
+  .flow-label{font-size:12px;color:var(--govo-muted);font-weight:850}
+  .shop-thumb{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,#0b3e31,#d6ffea 48%,#39e59b);display:grid;place-items:center;color:var(--govo-ink);font-weight:950;flex:none;box-shadow:0 16px 34px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.54)}
+  .status{font-size:12px;font-weight:900;color:var(--govo-mint-2)}
   .price{font-weight:950}
-  .map-box{height:250px;border-radius:20px;background:linear-gradient(135deg,#eef5ef,#f8fafc);position:relative;overflow:hidden;border:1px solid #e8eee9}
-  .map-line{position:absolute;left:20%;top:52%;width:60%;height:5px;background:#16A34A;border-radius:20px;transform:rotate(-22deg)}
-  .pin-a,.pin-b{position:absolute;width:24px;height:24px;border-radius:50%;background:#16A34A;border:5px solid #fff;box-shadow:0 8px 18px rgba(0,0,0,.14)}
+  .map-box{height:250px;border-radius:20px;background:linear-gradient(135deg,rgba(9,43,35,.86),rgba(2,16,12,.96));position:relative;overflow:hidden;border:1px solid var(--govo-line);box-shadow:0 20px 54px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)}
+  .map-line{position:absolute;left:20%;top:52%;width:60%;height:5px;background:linear-gradient(90deg,#adffd8,#39e59b);border-radius:20px;transform:rotate(-22deg)}
+  .pin-a,.pin-b{position:absolute;width:24px;height:24px;border-radius:50%;background:#39e59b;border:5px solid #f7fff9;box-shadow:0 8px 18px rgba(0,0,0,.22)}
   .pin-a{left:16%;top:60%}.pin-b{right:16%;top:31%;background:#ef4444}
-  .wallet-hero{border-radius:22px;padding:18px;color:#fff;background:linear-gradient(135deg,#052a17,#16A34A);box-shadow:0 14px 35px rgba(15,23,42,.10)}
+  .wallet-hero{border-radius:22px;padding:18px;color:var(--govo-text);background:linear-gradient(135deg,#02100c,#073f32 58%,#0b704f);border:1px solid var(--govo-line);box-shadow:0 24px 62px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08)}
   .wallet-balance{font-size:32px;font-weight:950;margin-top:8px}
-  .mini-note{font-size:12px;color:#64748b;font-weight:700}
+  .mini-note{font-size:12px;color:var(--govo-muted);font-weight:750;line-height:1.5}
   .flow-page-gap{display:flex;flex-direction:column;gap:12px}
+  .flow-card:hover{border-color:rgba(88,242,173,.40)}
+  .flow-card.flow-row,
+  .flow-card.flow-between{
+    min-height:74px;
+  }
+  .flow-card > b,.flow-row b,.flow-between b{font-size:15px;line-height:1.25}
+  .flow-grid-2 .flow-card{min-height:104px}
+  .govo-topbar{
+    position:sticky;
+    top:0;
+    z-index:30;
+    margin:0 -6px 2px;
+    padding:9px 6px 14px;
+    background:linear-gradient(180deg,rgba(0,5,3,.86),rgba(0,5,3,.42) 72%,transparent);
+    backdrop-filter:blur(18px);
+  }
+  .govo-icon-btn{
+    color:#ecfff5;
+    font-weight:950;
+  }
+  .govo-hero-v12f,
+  .govo-banner,
+  .flow-card,
+  .govo-service-card,
+  .govo-trust-card,
+  .govo-quick-action,
+  .govo-search,
+  .wallet-hero,
+  .map-box{
+    border-color:rgba(202,255,229,.34)!important;
+    box-shadow:0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.15)!important;
+  }
+  .govo-hero-v12f,
+  .govo-banner{
+    background:
+      radial-gradient(circle at 86% 18%,rgba(88,242,173,.34),transparent 27%),
+      radial-gradient(circle at 13% 3%,rgba(232,198,109,.18),transparent 28%),
+      linear-gradient(145deg,#000604 0%,#031b14 45%,#075a42 100%)!important;
+  }
+  .govo-service-card,
+  .govo-trust-card,
+  .govo-quick-action,
+  .flow-card{
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.115),rgba(255,255,255,.030)),
+      linear-gradient(180deg,rgba(15,75,58,.88),rgba(2,18,14,.82))!important;
+  }
+  .flow-card,
+  .govo-service-card,
+  .govo-trust-card,
+  .govo-quick-action{
+    backdrop-filter:blur(22px) saturate(1.1);
+  }
+  .govo-search{
+    margin-top:2px;
+    background:
+      linear-gradient(180deg,rgba(23,96,75,.96),rgba(3,20,15,.92))!important;
+  }
+  .govo-service-label,
+  .flow-card,
+  .flow-card span,
+  .flow-card input,
+  .flow-card label{
+    text-shadow:0 1px 1px rgba(0,0,0,.18);
+  }
+  .mini-note,
+  .flow-sub,
+  .govo-quick-action span,
+  .govo-trust-card span{
+    color:#d8f4e6!important;
+  }
+  .flow-btn,
+  .govo-primary-btn,
+  .govo-hero-cta{
+    background:linear-gradient(135deg,#e4fff0 0%,#63f5b7 42%,#0aae74 100%)!important;
+    color:#03120d!important;
+    border:0!important;
+    box-shadow:0 18px 44px rgba(24,213,133,.36), inset 0 1px 0 rgba(255,255,255,.68)!important;
+  }
+  .flow-btn.light{
+    background:rgba(255,255,255,.12)!important;
+    color:#f5fff9!important;
+    border:1px solid rgba(202,255,229,.32)!important;
+  }
+  .flow-chip{
+    color:#ecfff5;
+    background:rgba(255,255,255,.115);
+  }
+  .flow-chip.active{
+    color:#03120d;
+  }
+  .govo-bottom-nav{
+    background:linear-gradient(180deg,rgba(10,54,42,.97),rgba(0,8,5,.99))!important;
+    border-color:rgba(202,255,229,.30)!important;
+  }
+  .govo-nav-item{
+    min-width:0;
+  }
+  .govo-nav-item span{
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  @media(max-width:380px){
+    .flow-grid{grid-template-columns:repeat(2,1fr)}
+    .flow-grid-2{gap:9px}
+    .flow-title{font-size:25px}
+  }
   `;
 }
 
@@ -147,7 +259,7 @@ function shell(title, active, body, base = "") {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>${esc(title)} — GOVO Express</title>
-<style>${ui.govoCss()}${extraCss()}</style>
+<style>${ui.govoCss()}${VISUAL.css()}${extraCss()}</style>
 </head>
 <body>
 <main class="govo-page">
@@ -165,7 +277,7 @@ function top(base, title, sub) {
   return `
   <header class="govo-topbar">
     <a class="govo-icon-btn" href="${href(base,"app")}">←</a>
-    ${ui.logo()}
+    ${VISUAL.logo()}
     <a class="govo-icon-btn" href="${href(base,"support")}">⌁</a>
   </header>
   <section class="flow-head">
@@ -192,7 +304,12 @@ function app(base) {
 
   return shell("App Home", "home", `
     ${appTopbar(base)}
-    ${ui.hero().replace('/order', href(base,"order"))}
+    ${VISUAL.hero(base, href)}
+    <section class="govo-quick-actions" aria-label="Quick actions">
+      <a class="govo-quick-action" href="${href(base,"order")}"><b>Book now</b><span>Parcel, food, medicine</span></a>
+      <a class="govo-quick-action" href="${href(base,"shops")}"><b>Nearby shops</b><span>Grocery and pharmacy</span></a>
+      <a class="govo-quick-action" href="${href(base,"track")}"><b>Track order</b><span>Live status preview</span></a>
+    </section>
     <form class="govo-search" action="${href(base,"services")}" method="get">
       <span>⌕</span><input name="q" placeholder="Search services, shops..." />
       <button class="govo-mic" type="button">🎙</button>
@@ -283,11 +400,6 @@ function trackPage(base) {
       <span class="status">On the way</span>
     </section>
     <section class="map-box"><div class="map-line"></div><div class="pin-a"></div><div class="pin-b"></div></section>
-    <section class="flow-grid-2">
-      <a class="flow-btn" href="${href(base,"map")}">Open GOVO Map</a>
-      <button class="flow-btn light govo-location-btn" type="button">Use My Location</button>
-    </section>
-    <div class="mini-note govo-location-output">Tracking map ready. Location দিলে live link হবে।</div>
     <section class="flow-grid-2">
       <a class="flow-btn" href="${href(base,"map")}">Open GOVO Map</a>
       <button class="flow-btn light govo-location-btn" type="button">Use My Location</button>
@@ -516,7 +628,7 @@ function appTopbar(base) {
   return `
     <header class="govo-topbar">
       <a class="govo-icon-btn" href="${href(base,"more")}" aria-label="Menu">☰</a>
-      ${ui.logo()}
+      ${VISUAL.logo()}
       <a class="govo-icon-btn" href="${href(base,"ai")}" aria-label="AI Assistant">AI</a>
     </header>
   `;

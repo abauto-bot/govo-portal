@@ -41,9 +41,21 @@ function govoCss() {
     --govo-white:${c.white};
     --govo-danger:${c.danger};
     --govo-warning:${c.warning};
+    --govo-bg:#000503;
+    --govo-bg-2:#031811;
+    --govo-glass:rgba(8,45,36,.82);
+    --govo-glass-strong:rgba(13,70,54,.94);
+    --govo-line:rgba(207,255,232,.30);
+    --govo-line-strong:rgba(124,255,194,.54);
+    --govo-text:#f8fff9;
+    --govo-muted:#cfeadd;
+    --govo-mint:#58f2ad;
+    --govo-mint-2:#adffd8;
+    --govo-gold:#e8c66d;
+    --govo-ink:#02100b;
     --govo-radius:${ui.radius};
     --govo-big-radius:${ui.bigRadius};
-    --govo-shadow:${ui.shadow};
+    --govo-shadow:0 34px 104px rgba(0,0,0,.54);
     --govo-fast:${ui.fastTransition};
     --govo-normal:${ui.normalTransition};
   }
@@ -53,16 +65,19 @@ function govoCss() {
     width:100%;
     min-width:100%;
     overflow-x:hidden;
-    background:#fff;
+    background:var(--govo-bg);
   }
   body{
     margin:0;
     width:100%;
     min-width:100%;
     overflow-x:hidden;
+    line-height:1.35;
     font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background:linear-gradient(180deg,#ffffff 0%,#f4f8f5 100%);
-    color:var(--govo-dark);
+    background:var(--govo-bg);
+    color:var(--govo-text);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
   }
 
   a{text-decoration:none;color:inherit}
@@ -74,20 +89,34 @@ function govoCss() {
     min-height:100svh;
     display:block;
     background:
-      radial-gradient(circle at 20% 0%, rgba(22,163,74,.08), transparent 28%),
-      radial-gradient(circle at 90% 20%, rgba(4,122,61,.08), transparent 26%),
-      #f7faf8;
+      radial-gradient(circle at 14% -8%, rgba(88,242,173,.26), transparent 30%),
+      radial-gradient(circle at 91% 1%, rgba(232,198,109,.18), transparent 24%),
+      radial-gradient(circle at 50% 105%, rgba(17,115,84,.30), transparent 38%),
+      linear-gradient(160deg,#000302 0%,#02100c 42%,#043326 100%);
+  }
+
+  .govo-page:before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:
+      linear-gradient(rgba(255,255,255,.032) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.024) 1px, transparent 1px);
+    background-size:42px 42px;
+    mask-image:linear-gradient(to bottom, rgba(0,0,0,.72), transparent 76%);
   }
 
   .govo-phone{
     width:100%;
-    max-width:none;
+    max-width:500px;
     min-height:100svh;
-    background:#fff;
+    background:transparent;
     position:relative;
-    overflow:hidden;
-    padding:10px 10px calc(76px + env(safe-area-inset-bottom, 0px));
-    margin:0;
+    overflow:visible;
+    padding:16px 14px calc(94px + env(safe-area-inset-bottom, 0px));
+    margin:0 auto;
+    isolation:isolate;
   }
 
   .govo-topbar{
@@ -95,17 +124,28 @@ function govoCss() {
     align-items:center;
     justify-content:space-between;
     gap:8px;
-    padding:6px 2px 10px;
+    padding:7px 2px 15px;
   }
 
   .govo-icon-btn{
-    width:38px;height:38px;
-    border:1px solid #e8eee9;
-    border-radius:14px;
-    background:#fff;
+    width:42px;height:42px;
+    border:1px solid var(--govo-line);
+    border-radius:15px;
+    background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.060));
+    color:var(--govo-text);
     display:grid;
     place-items:center;
-    box-shadow:0 8px 22px rgba(15,23,42,.06);
+    box-shadow:0 16px 42px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.12);
+    backdrop-filter:blur(20px) saturate(1.08);
+  }
+  .govo-icon-btn:hover{border-color:var(--govo-line-strong);background:rgba(255,255,255,.14)}
+  .govo-icon-btn:focus-visible,
+  .govo-primary-btn:focus-visible,
+  .flow-btn:focus-visible,
+  .govo-service-card:focus-visible,
+  .govo-nav-item:focus-visible{
+    outline:3px solid rgba(173,255,216,.42);
+    outline-offset:3px;
   }
 
   .govo-logo{
@@ -113,7 +153,7 @@ function govoCss() {
     align-items:center;
     justify-content:center;
     gap:3px;
-    letter-spacing:-1px;
+    letter-spacing:0;
     font-weight:950;
     font-size:25px;
     line-height:1;
@@ -132,16 +172,17 @@ function govoCss() {
     left:0;
     height:3px;
     border-radius:99px;
-    background:var(--govo-primary);
+    background:#39e59b;
   }
   .govo-logo .speed:before{top:1px;width:28px}
   .govo-logo .speed:after{bottom:1px;width:20px}
   .govo-logo .go{
-    color:#050505;
+    color:#f7fff9;
   }
   .govo-logo .clock-o{
     width:27px;height:27px;
-    border:6px solid var(--govo-primary);
+    border:6px solid #39e59b;
+    background:#f7fff9;
     border-radius:50%;
     display:inline-block;
     position:relative;
@@ -168,15 +209,17 @@ function govoCss() {
 
   .govo-hero{
     position:relative;
-    border-radius:18px;
-    padding:16px;
-    min-height:174px;
+    border-radius:24px;
+    padding:20px;
+    min-height:196px;
     overflow:hidden;
     color:#fff;
     background:
-      radial-gradient(circle at 82% 28%, rgba(255,255,255,.28), transparent 22%),
-      linear-gradient(135deg,#032414 0%,#04582b 54%,#16a34a 100%);
-    box-shadow:var(--govo-shadow);
+      radial-gradient(circle at 82% 24%, rgba(88,242,173,.36), transparent 27%),
+      radial-gradient(circle at 16% 0%, rgba(232,198,109,.20), transparent 31%),
+      linear-gradient(135deg,#02100c 0%,#06372c 50%,#08724f 100%);
+    border:1px solid rgba(207,255,232,.24);
+    box-shadow:0 30px 86px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.13);
     animation:govoRise .42s ease both;
   }
   .govo-hero:before{
@@ -184,22 +227,22 @@ function govoCss() {
     position:absolute;
     width:155px;height:155px;
     right:-28px;top:-24px;
-    border:12px solid rgba(255,255,255,.48);
+    border:12px solid rgba(255,255,255,.24);
     border-radius:50%;
   }
   .govo-hero:after{
     content:"GOVO";
     position:absolute;
-    right:12px;bottom:28px;
+    right:12px;bottom:30px;
     width:138px;height:74px;
     border-radius:80px 80px 30px 30px;
-    background:linear-gradient(135deg,#18c45d,#087234);
+    background:linear-gradient(135deg,#39e59b,#087234);
     box-shadow:inset 0 -10px 0 rgba(0,0,0,.12), 0 18px 35px rgba(0,0,0,.20);
     display:flex;
     align-items:center;
     justify-content:center;
     font-weight:950;
-    color:rgba(255,255,255,.9);
+    color:#f8fff9;
     letter-spacing:.06em;
   }
 
@@ -210,8 +253,8 @@ function govoCss() {
     width:40px;
     height:40px;
     border-radius:50%;
-    background:#d9f99d;
-    border:5px solid #16a34a;
+    background:#ffe9aa;
+    border:5px solid #39e59b;
     z-index:3;
     box-shadow:0 12px 22px rgba(0,0,0,.18);
   }
@@ -224,7 +267,7 @@ function govoCss() {
     width:45px;
     height:24px;
     border-radius:18px;
-    background:#0b7a36;
+    background:#0b704f;
     transform:rotate(-6deg);
   }
   .govo-hero-content{
@@ -243,54 +286,60 @@ function govoCss() {
     margin:0;
     font-size:29px;
     line-height:.96;
-    letter-spacing:-1.3px;
+    letter-spacing:0;
     font-weight:950;
   }
   .govo-hero p{
     margin:10px 0 13px;
-    color:rgba(255,255,255,.88);
-    font-size:14px;
+    color:rgba(237,255,246,.94);
+    font-size:14.5px;
+    line-height:1.45;
   }
   .govo-primary-btn{
     border:0;
-    background:linear-gradient(135deg,#17b94f,#078733);
-    color:#fff;
-    border-radius:14px;
-    padding:10px 14px;
-    font-weight:850;
+    background:linear-gradient(135deg,#c8ffe4,#39e59b 48%,#0ca66c);
+    color:#02110a;
+    border-radius:15px;
+    padding:11px 15px;
+    font-weight:950;
     display:inline-flex;
     align-items:center;
     gap:8px;
-    box-shadow:0 12px 24px rgba(22,163,74,.25);
+    box-shadow:0 16px 38px rgba(12,166,108,.34), inset 0 1px 0 rgba(255,255,255,.52);
   }
   .govo-primary-btn:active{transform:scale(.98)}
 
   .govo-search{
-    margin:-20px 0 12px;
+    margin:0 0 14px;
     position:relative;
     z-index:5;
     display:flex;
     gap:8px;
     align-items:center;
-    background:#fff;
-    border:1px solid #e9eee9;
-    border-radius:18px;
-    box-shadow:0 14px 28px rgba(15,23,42,.10);
-    padding:8px 8px 8px 14px;
+    background:linear-gradient(180deg,rgba(18,82,64,.95),rgba(4,22,17,.90));
+    border:1px solid var(--govo-line-strong);
+    border-radius:20px;
+    box-shadow:0 24px 60px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.14);
+    padding:10px 9px 10px 15px;
+    backdrop-filter:blur(20px);
   }
+  .govo-search span{color:var(--govo-mint-2);font-weight:950}
   .govo-search input{
     flex:1;
     border:0;
     outline:0;
-    color:#111;
+    color:var(--govo-text);
+    background:transparent;
     min-width:0;
+    font-weight:750;
   }
+  .govo-search input::placeholder{color:#a9cdbd}
   .govo-mic{
     width:38px;height:38px;
     border:0;
     border-radius:50%;
-    background:var(--govo-primary);
-    color:#fff;
+    background:linear-gradient(135deg,#58f2ad,#0ca66c);
+    color:var(--govo-ink);
     display:grid;
     place-items:center;
     font-weight:900;
@@ -299,27 +348,32 @@ function govoCss() {
   .govo-grid{
     display:grid;
     grid-template-columns:repeat(4,1fr);
-    gap:8px;
+    gap:9px;
   }
   .govo-service-card{
-    min-height:72px;
-    border:1px solid #edf1ed;
-    background:#fff;
-    border-radius:16px;
-    box-shadow:0 10px 22px rgba(15,23,42,.045);
+    min-height:88px;
+    border:1px solid rgba(207,255,232,.30);
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.115),rgba(255,255,255,.030)),
+      linear-gradient(180deg,rgba(20,91,71,.90),rgba(5,29,23,.84));
+    color:var(--govo-text);
+    border-radius:20px;
+    box-shadow:0 24px 70px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.15);
+    backdrop-filter:blur(22px) saturate(1.08);
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:8px;
+    gap:9px;
     transition:transform var(--govo-fast), box-shadow var(--govo-fast);
   }
   .govo-service-card:hover{
     transform:translateY(-2px);
-    box-shadow:0 14px 28px rgba(15,23,42,.08);
+    box-shadow:0 24px 62px rgba(0,0,0,.30);
+    border-color:rgba(57,229,155,.36);
   }
   .govo-service-icon{
-    color:var(--govo-deep);
+    color:var(--govo-mint);
     font-size:25px;
     line-height:1;
   }
@@ -327,7 +381,7 @@ function govoCss() {
   .govo-svg-icon{
     width:26px;
     height:26px;
-    color:var(--govo-deep);
+    color:var(--govo-mint);
     display:grid;
     place-items:center;
   }
@@ -337,21 +391,24 @@ function govoCss() {
     height:100%;
   }
   .govo-service-label{
-    font-size:11px;
-    font-weight:800;
+    font-size:11.8px;
+    font-weight:850;
     text-align:center;
+    line-height:1.2;
   }
 
   .govo-banner{
     margin-top:12px;
-    border-radius:18px;
-    padding:15px;
-    min-height:102px;
+    border-radius:22px;
+    padding:18px;
+    min-height:112px;
     color:#fff;
     background:
-      radial-gradient(circle at 86% 18%,rgba(255,255,255,.22),transparent 18%),
-      linear-gradient(135deg,#052a17,#05622f);
-    box-shadow:var(--govo-shadow);
+      radial-gradient(circle at 86% 18%,rgba(57,229,155,.28),transparent 20%),
+      radial-gradient(circle at 12% 0%,rgba(232,198,109,.14),transparent 28%),
+      linear-gradient(135deg,#010c08,#063326 58%,#086548);
+    border:1px solid rgba(207,255,232,.28);
+    box-shadow:0 28px 72px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.11);
     position:relative;
     overflow:hidden;
   }
@@ -367,7 +424,7 @@ function govoCss() {
     box-shadow:0 18px 30px rgba(0,0,0,.16);
   }
   .govo-banner h3{margin:0 0 5px;font-size:18px}
-  .govo-banner p{margin:0 0 14px;color:rgba(255,255,255,.82);font-size:13px}
+  .govo-banner p{margin:0 0 14px;color:rgba(237,255,246,.94);font-size:13.5px;line-height:1.5;max-width:70%}
 
   .govo-trust{
     margin-top:12px;
@@ -377,9 +434,12 @@ function govoCss() {
     gap:8px;
   }
   .govo-trust-card{
-    border:1px solid #edf1ed;
-    border-radius:16px;
-    background:#fff;
+    border:1px solid rgba(207,255,232,.30);
+    border-radius:20px;
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.026)),
+      linear-gradient(180deg,rgba(18,79,63,.88),rgba(5,29,23,.80));
+    color:var(--govo-text);
     padding:9px 6px;
     text-align:center;
     min-height:72px;
@@ -400,7 +460,7 @@ function govoCss() {
   }
   .govo-trust-card span{
     display:block;
-    color:#64748b;
+    color:var(--govo-muted);
     font-size:9px;
     margin-top:2px;
     font-weight:700;
@@ -415,15 +475,15 @@ function govoCss() {
     width:100%;
     max-width:none;
     margin:0;
-    background:rgba(255,255,255,.97);
-    backdrop-filter:blur(14px);
-    border-top:1px solid #e9eee9;
+    background:linear-gradient(180deg,rgba(9,48,38,.97),rgba(1,10,7,.99));
+    backdrop-filter:blur(24px) saturate(1.08);
+    border-top:1px solid var(--govo-line);
     display:grid;
     grid-template-columns:repeat(5,1fr);
     align-items:end;
-    padding:7px 8px calc(9px + env(safe-area-inset-bottom, 0px));
+    padding:8px 9px calc(10px + env(safe-area-inset-bottom, 0px));
     z-index:50;
-    box-shadow:0 -12px 28px rgba(15,23,42,.06);
+    box-shadow:0 -18px 48px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.08);
   }
   .govo-nav-item{
     display:flex;
@@ -432,21 +492,65 @@ function govoCss() {
     gap:4px;
     font-size:10px;
     font-weight:800;
-    color:#111;
+    color:var(--govo-muted);
+    border-radius:14px;
+    min-height:48px;
+    justify-content:center;
   }
-  .govo-nav-item.active{color:var(--govo-primary)}
+  .govo-nav-item:hover{color:#f3fff8;background:rgba(255,255,255,.05)}
+  .govo-nav-item.active{color:var(--govo-mint-2)}
+  .govo-nav-item.active span{color:#f3fff8}
   .govo-nav-icon{font-size:19px}
   .govo-nav-go{
     width:54px;height:54px;
     margin-top:-25px;
     border-radius:50%;
-    background:radial-gradient(circle at 30% 20%,#25d366,#047a3d);
-    color:#fff;
+    background:radial-gradient(circle at 30% 20%,#adffd8,#39e59b 44%,#047a3d);
+    color:var(--govo-ink);
     display:grid;
     place-items:center;
     font-weight:950;
     font-size:20px;
-    box-shadow:0 18px 28px rgba(22,163,74,.35);
+    box-shadow:0 18px 32px rgba(34,230,138,.38), inset 0 1px 0 rgba(255,255,255,.55);
+  }
+
+  .flow-card,
+  .wallet-hero,
+  .map-box{
+    border-color:rgba(207,255,232,.24)!important;
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.022)),
+      linear-gradient(180deg,rgba(19,83,65,.82),rgba(4,25,20,.78))!important;
+    box-shadow:0 24px 68px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.12)!important;
+  }
+
+  .flow-card b,
+  .govo-banner h3,
+  .wallet-balance{
+    color:#fbfff8;
+  }
+
+  .flow-btn,
+  .govo-primary-btn{
+    letter-spacing:0;
+    box-shadow:0 18px 42px rgba(12,166,108,.38), inset 0 1px 0 rgba(255,255,255,.62);
+  }
+
+  .flow-btn.light{
+    background:rgba(255,255,255,.105);
+    border-color:rgba(207,255,232,.24);
+  }
+
+  .flow-chip{
+    background:rgba(255,255,255,.095);
+    border-color:rgba(207,255,232,.22);
+  }
+
+  .mini-note,
+  .flow-sub,
+  .govo-trust-card span,
+  .govo-banner p{
+    color:#cfeadd;
   }
 
   @keyframes govoRise{
@@ -458,16 +562,29 @@ function govoCss() {
 
 
   @media(max-width:390px){
-    .govo-phone{padding:9px 9px calc(76px + env(safe-area-inset-bottom, 0px))}
-    .govo-hero{min-height:166px;padding:15px}
+    .govo-phone{padding:10px 10px calc(80px + env(safe-area-inset-bottom, 0px))}
+    .govo-hero{min-height:178px;padding:17px;border-radius:22px}
     .govo-hero h1{font-size:27px}
     .govo-grid{gap:8px}
-    .govo-service-card{min-height:68px}
+    .govo-service-card{min-height:76px}
     .govo-service-label{font-size:10px}
     .govo-banner{min-height:96px}
     .govo-trust{gap:7px}
     .govo-trust-card b{font-size:9.5px}
     .govo-trust-card span{font-size:8.5px}
+  }
+
+  @media(min-width:760px){
+    .govo-phone{padding-top:22px}
+    .govo-bottom-nav{
+      left:50%;
+      right:auto;
+      transform:translateX(-50%);
+      width:min(480px,100%);
+      border-left:1px solid var(--govo-line);
+      border-right:1px solid var(--govo-line);
+      border-radius:24px 24px 0 0;
+    }
   }
 
   @media(max-width:360px){

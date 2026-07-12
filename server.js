@@ -145,78 +145,85 @@ function govoRescueShell(title, active, body){
 <title>${title} — GOVO Express</title>
 <style id="govo-rescue-shell-v2">
 :root{
-  --bg:#04120f;--bg2:#071c17;--card:#0e2a23;--card2:#12382f;
-  --line:rgba(255,255,255,.13);--text:#f4fff9;--muted:#a9c8bd;
-  --green:#22e68a;--green2:#0fbf70;--gold:#f6cf68;--red:#ff6b6b;
+  --bg:#000503;--bg2:#031811;--card:rgba(8,45,36,.84);--card2:rgba(13,70,54,.92);
+  --line:rgba(207,255,232,.34);--text:#f8fff9;--muted:#d8f4e6;
+  --green:#58f2ad;--green2:#0ca66c;--gold:#e8c66d;--red:#ff6b6b;
+  --glass:rgba(255,255,255,.118);--shadow:0 34px 100px rgba(0,0,0,.52);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:
-radial-gradient(circle at 12% -10%,rgba(34,230,138,.22),transparent 34%),
-radial-gradient(circle at 90% 0%,rgba(246,207,104,.12),transparent 28%),
-linear-gradient(160deg,#010504,#04120f 46%,#08261f);color:var(--text)}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.35;background:
+radial-gradient(circle at 13% -8%,rgba(88,242,173,.28),transparent 31%),
+radial-gradient(circle at 88% 4%,rgba(232,198,109,.17),transparent 27%),
+radial-gradient(circle at 50% 104%,rgba(20,125,91,.30),transparent 36%),
+linear-gradient(160deg,#000302,#02100c 44%,#043326 100%);color:var(--text)}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(rgba(255,255,255,.036) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.026) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.70),transparent 76%)}
 a{text-decoration:none;color:inherit}
 button,input,select,textarea{font:inherit}
-.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 96px}
-.top{position:sticky;top:0;z-index:30;background:rgba(4,18,15,.86);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 96px;position:relative;z-index:1}
+.top{position:sticky;top:0;z-index:30;background:rgba(2,15,11,.90);backdrop-filter:blur(26px) saturate(1.08);border-bottom:1px solid var(--line);box-shadow:0 20px 58px rgba(0,0,0,.38),inset 0 -1px 0 rgba(255,255,255,.08)}
 .topin{max-width:1120px;margin:auto;padding:12px 14px;display:flex;align-items:center;gap:10px}
-.logo{width:46px;height:46px;border-radius:17px;background:linear-gradient(135deg,var(--green),#075c39);display:grid;place-items:center;font-weight:950;color:#001b10;box-shadow:0 10px 32px rgba(34,230,138,.24)}
+.logo{width:46px;height:46px;border-radius:17px;background:linear-gradient(135deg,#f7e4a0,#58f2ad 42%,#075c39);display:grid;place-items:center;font-weight:950;color:#001b10;box-shadow:0 16px 42px rgba(57,229,155,.38),inset 0 1px 0 rgba(255,255,255,.58)}
 .brand{flex:1;min-width:0}
 .brand b{display:block;font-size:18px;letter-spacing:.2px}
 .brand small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .menu{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.pill,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:10px 14px;background:rgba(255,255,255,.065);font-weight:850}
-.btn.primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#02110a;border:0}
-.btn.gold{background:rgba(246,207,104,.14);border-color:rgba(246,207,104,.38);color:#ffe29a}
+.pill,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:10px 14px;background:var(--glass);font-weight:900;box-shadow:0 13px 34px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.12);backdrop-filter:blur(18px)}
+.pill:hover,.btn:hover{border-color:rgba(88,242,173,.50);background:rgba(255,255,255,.14)}
+.btn.primary{background:linear-gradient(135deg,#e4fff0,var(--green) 46%,var(--green2));color:#02110a;border:0;box-shadow:0 18px 44px rgba(12,166,108,.38),inset 0 1px 0 rgba(255,255,255,.66)}
+.btn.gold{background:rgba(232,198,109,.16);border-color:rgba(232,198,109,.42);color:#ffe9aa}
 .btn.block{width:100%}
 .drawer{position:relative}
 .drawer summary{list-style:none;cursor:pointer;width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.06);font-size:22px}
 .drawer summary::-webkit-details-marker{display:none}
-.drawerbox{position:absolute;right:0;top:52px;width:min(330px,92vw);background:#071c17;border:1px solid var(--line);border-radius:24px;padding:14px;box-shadow:0 28px 90px rgba(0,0,0,.48)}
+.drawerbox{position:absolute;right:0;top:52px;width:min(330px,92vw);background:rgba(5,27,22,.96);backdrop-filter:blur(22px);border:1px solid var(--line);border-radius:24px;padding:14px;box-shadow:0 28px 90px rgba(0,0,0,.48)}
 .drawerbox a{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:16px;color:#eafff5;font-weight:850}
 .drawerbox a:hover{background:rgba(34,230,138,.10)}
 .drawerfoot{border-top:1px solid var(--line);margin-top:8px;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .toggle{border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center;color:var(--muted);font-size:13px;font-weight:850}
-.hero{padding:30px 0 18px}
-.kicker{display:inline-flex;padding:8px 12px;border:1px solid rgba(34,230,138,.30);border-radius:999px;color:#bdf6da;background:rgba(34,230,138,.08);font-weight:900}
-h1{font-size:clamp(33px,7vw,70px);line-height:.95;margin:14px 0 12px;letter-spacing:-2.2px}
-.lead{font-size:17px;line-height:1.62;color:var(--muted);max-width:790px}
+.hero{position:relative;padding:40px 0 25px}
+.hero:after{content:"";position:absolute;right:0;top:32px;width:min(360px,40vw);height:180px;border-radius:32px;background:linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,.035)),linear-gradient(145deg,rgba(17,106,80,.76),rgba(2,20,15,.62));border:1px solid rgba(207,255,232,.22);box-shadow:0 26px 82px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.13);backdrop-filter:blur(22px);pointer-events:none;opacity:.72}
+.hero > *{position:relative;z-index:1}
+.kicker{display:inline-flex;padding:8px 12px;border:1px solid rgba(57,229,155,.42);border-radius:999px;color:#dcffef;background:rgba(57,229,155,.12);font-weight:900;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+h1{font-size:clamp(33px,7vw,68px);line-height:1;margin:14px 0 12px;letter-spacing:0;max-width:920px;color:#fbfff8}
+.lead{font-size:17px;line-height:1.68;color:var(--muted);max-width:790px;font-weight:650}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
 .grid.three{grid-template-columns:repeat(3,1fr)}
-.card{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));border:1px solid var(--line);border-radius:24px;padding:16px;box-shadow:0 22px 70px rgba(0,0,0,.22)}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.125),rgba(255,255,255,.032)),linear-gradient(180deg,rgba(20,91,71,.90),rgba(5,29,23,.84));border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.16);backdrop-filter:blur(24px) saturate(1.08)}
 .card.link{transition:.16s ease}
-.card.link:hover{transform:translateY(-2px);border-color:rgba(34,230,138,.34)}
+.card.link:hover{transform:translateY(-2px);border-color:rgba(88,242,173,.56);background:linear-gradient(180deg,rgba(33,115,91,.92),rgba(7,37,29,.84))}
 .card h3{margin:8px 0 6px;font-size:18px}
 .card p{margin:0;color:var(--muted);line-height:1.45}
 .icon{font-size:31px}
-.tag{display:inline-block;margin-top:12px;padding:6px 10px;border-radius:999px;background:rgba(34,230,138,.10);color:#bdf6da;font-size:12px;font-weight:950}
+.tag{display:inline-block;margin-top:12px;padding:6px 10px;border-radius:999px;background:rgba(57,229,155,.12);color:#cdfbe4;font-size:12px;font-weight:950}
 .section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:26px}
 .section-title h2{margin:0;font-size:25px}
 .form{display:grid;gap:10px;max-width:720px}
-input,select,textarea{width:100%;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.065);color:var(--text);padding:13px 14px;font-size:15px;outline:none}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:16px;background:rgba(1,12,9,.62);color:var(--text);padding:13px 14px;font-size:15px;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+input:focus,select:focus,textarea:focus{border-color:rgba(88,242,173,.56);box-shadow:0 0 0 4px rgba(88,242,173,.12)}
 select option{background:#08231d;color:#fff}
 textarea{min-height:104px}
 label{font-weight:850;color:#dbfff0}
-.notice{border:1px dashed rgba(246,207,104,.42);background:rgba(246,207,104,.09);color:#ffe7a6;border-radius:20px;padding:14px;margin:14px 0;line-height:1.5}
+.notice{border:1px solid rgba(232,198,109,.38);background:linear-gradient(180deg,rgba(232,198,109,.14),rgba(232,198,109,.08));color:#ffe7a6;border-radius:20px;padding:14px;margin:14px 0;line-height:1.5;max-width:760px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
 .flow{counter-reset:step}
 .step{position:relative;padding-left:54px}
 .step:before{counter-increment:step;content:counter(step);position:absolute;left:16px;top:16px;width:28px;height:28px;border-radius:10px;display:grid;place-items:center;background:rgba(34,230,138,.15);color:#bdf6da;font-weight:950;border:1px solid rgba(34,230,138,.25)}
 .area{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.area span{padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-weight:850;font-size:13px}
-.bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(5,18,15,.94);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+.area span{padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:#e7fff3;background:rgba(255,255,255,.08);font-weight:850;font-size:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(2,12,10,.94);backdrop-filter:blur(24px);border-top:1px solid var(--line);box-shadow:0 -18px 48px rgba(0,0,0,.32)}
 .bottomin{max-width:760px;margin:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 10px}
 .nav{padding:9px 6px;border-radius:16px;text-align:center;color:var(--muted);font-size:12px;font-weight:850}
 .nav b{display:block;font-size:18px}
-.nav.active{background:rgba(34,230,138,.12);color:#dffff0}
+.nav.active{background:rgba(57,229,155,.13);color:#e7fff3}
 @media(max-width:900px){.grid,.grid.three{grid-template-columns:repeat(2,1fr)}.menu .pill{display:none}}
-@media(max-width:540px){.grid,.grid.three{grid-template-columns:1fr}h1{font-size:39px}.card{border-radius:20px}.wrap{padding-left:12px;padding-right:12px}.actions .btn{flex:1}.drawerbox{right:-4px}}
+@media(max-width:540px){.grid,.grid.three{grid-template-columns:1fr}.hero{padding-top:30px}.hero:after{top:auto;right:-60px;bottom:12px;width:210px;height:132px;opacity:.36}h1{font-size:39px}.card{border-radius:20px}.wrap{padding-left:12px;padding-right:12px}.actions .btn{flex:1}.drawerbox{right:-4px}}
 </style>
 </head>
 <body>
 <header class="top"><div class="topin">
   <a class="logo" href="/app">G</a>
-  <div class="brand"><b>GOVO Express</b><small>Premium local delivery & service OS</small></div>
+  <div class="brand"><b>GOVO Express</b><small>Premium local delivery & service</small></div>
   <nav class="menu">
     <a class="pill" href="/shops">Shops</a>
     <a class="pill" href="/services">Services</a>
@@ -270,13 +277,13 @@ function govoHomePage(){
     <section class="hero">
       <span class="kicker">🚀 Meherpur local super app shell</span>
       <h1>Delivery, shops, services — এক জায়গায় GOVO.</h1>
-      <p class="lead">GOVO Express হলো local premium trust delivery operating system. Customer request করবে, merchant/rider join করবে, admin lead receive করবে.</p>
+      <p class="lead">GOVO Express brings local delivery, daily shopping, and trusted service requests into one premium, easy customer flow.</p>
       <div class="actions">
         <a class="btn primary" href="/shops">🏪 দোকান দেখুন</a>
         <a class="btn gold" href="/services">🛠️ সার্ভিস নিন</a>
         <a class="btn" href="/order">📦 Delivery Book</a>
       </div>
-      <div class="notice">✅ Rescue shell active: customer button flow restored. Menu serial-wise, language/theme UI, shop/service/order CTA connected.</div>
+      <div class="notice">Fast local support for Meherpur, Gangni, Bamundi, Mujibnagar, and nearby areas.</div>
       ${govoAreaChips()}
     </section>
 
@@ -573,19 +580,7 @@ const GOVO_FINAL_UI_POLISH_V1_CSS = `
   }
 
   .govo-final-polish-badge{
-    position:fixed;
-    right:12px;
-    bottom:12px;
-    z-index:2147483000;
-    pointer-events:none;
-    opacity:.82;
-    font:700 11px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;
-    color:#fffaf0;
-    background:linear-gradient(135deg,rgba(7,63,50,.92),rgba(11,90,70,.92));
-    border:1px solid rgba(216,180,106,.42);
-    border-radius:999px;
-    padding:7px 10px;
-    box-shadow:0 10px 28px rgba(0,0,0,.25);
+    display:none;
   }
 
   @media (max-width:640px){
@@ -607,7 +602,7 @@ const GOVO_FINAL_UI_POLISH_V1_CSS = `
     h1{
       font-size:clamp(26px,8vw,42px)!important;
       line-height:1.05!important;
-      letter-spacing:-.04em;
+      letter-spacing:0;
     }
 
     h2{
@@ -758,7 +753,7 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
 
   .govo-premium-brand strong{
     font-size:19px;
-    letter-spacing:-.04em;
+    letter-spacing:0;
   }
 
   .govo-premium-brand span{
@@ -774,8 +769,8 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
     height:44px;
     border:0;
     border-radius:16px;
-    color:#073f32;
-    background:#fffaf0;
+    color:#02110a;
+    background:linear-gradient(135deg,#e8c66d,#39e59b);
     font-weight:1000;
     font-size:22px;
     box-shadow:0 8px 22px rgba(0,0,0,.18);
@@ -788,9 +783,10 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
     z-index:2147481999;
     width:min(330px,calc(100vw - 20px));
     border-radius:24px;
-    background:#fffaf0;
-    color:#10231d;
-    border:1px solid rgba(216,180,106,.55);
+    background:rgba(5,27,22,.96);
+    color:#f7fff9;
+    border:1px solid rgba(205,245,226,.16);
+    backdrop-filter:blur(22px);
     box-shadow:0 26px 75px rgba(0,0,0,.34);
     transform:translateY(-10px) scale(.98);
     opacity:0;
@@ -807,7 +803,7 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
 
   .govo-premium-drawer-head{
     padding:16px;
-    background:linear-gradient(135deg,#073f32,#0b5a46);
+    background:linear-gradient(135deg,#02100c,#073f32 64%,#0b704f);
     color:#fffaf0;
   }
 
@@ -817,7 +813,7 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
   }
 
   .govo-premium-drawer-head small{
-    color:#ead7a2;
+    color:#ffe9aa;
   }
 
   .govo-premium-drawer-nav{
@@ -828,9 +824,9 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
 
   .govo-premium-drawer-nav a{
     text-decoration:none;
-    color:#10231d!important;
-    background:#f4efe3;
-    border:1px solid rgba(7,63,50,.08);
+    color:#f7fff9!important;
+    background:rgba(255,255,255,.075);
+    border:1px solid rgba(205,245,226,.16);
     border-radius:16px;
     padding:13px 14px;
     font-weight:900;
@@ -840,13 +836,13 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
   }
 
   .govo-premium-drawer-nav a.active{
-    background:#073f32;
-    color:#fffaf0!important;
+    background:rgba(57,229,155,.14);
+    color:#cdfbe4!important;
   }
 
   .govo-premium-drawer-foot{
     padding:12px 16px 16px;
-    color:#66756e;
+    color:#b7d7ca;
     font-size:12px;
   }
 
@@ -863,15 +859,15 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
     padding:8px;
     box-sizing:border-box;
     border-radius:24px;
-    background:rgba(255,250,240,.94);
-    border:1px solid rgba(216,180,106,.45);
+    background:rgba(2,12,10,.90);
+    border:1px solid rgba(205,245,226,.16);
     box-shadow:0 16px 48px rgba(0,0,0,.28);
     backdrop-filter:blur(16px);
   }
 
   .govo-premium-bottomnav a{
     text-decoration:none;
-    color:#073f32!important;
+    color:#b7d7ca!important;
     border-radius:17px;
     display:flex;
     flex-direction:column;
@@ -889,8 +885,8 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
   }
 
   .govo-premium-bottomnav a.active{
-    background:#073f32;
-    color:#fffaf0!important;
+    background:rgba(57,229,155,.14);
+    color:#cdfbe4!important;
   }
 
   .govo-premium-flow-v2 main,
@@ -954,8 +950,8 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
 
 <aside class="govo-premium-drawer" id="govoPremiumDrawer" aria-label="GOVO Premium Menu">
   <div class="govo-premium-drawer-head">
-    <b>GOVO Control Menu</b>
-    <small>Fast service, local trust, premium flow</small>
+    <b>GOVO Service Menu</b>
+    <small>Fast service, local trust, premium support</small>
   </div>
   <nav class="govo-premium-drawer-nav">
     <a href="/" data-govo-path="/">Home <span>›</span></a>
@@ -966,7 +962,7 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
     <a href="/services" data-govo-path="/services">Services <span>›</span></a>
     <a href="/support" data-govo-path="/support">Support <span>›</span></a>
   </nav>
-  <div class="govo-premium-drawer-foot">Bangla-first · Premium local service operating system</div>
+  <div class="govo-premium-drawer-foot">Bangla-first · Premium local delivery and service</div>
 </aside>
 
 <nav class="govo-premium-bottomnav" aria-label="GOVO bottom navigation">
@@ -1074,7 +1070,7 @@ const GOVO_PHASE9C_RESTORE_BUTTON_FLOW_CSS = `
     margin:8px 0 0;
     font-size:clamp(23px,5.8vw,38px);
     line-height:1.08;
-    letter-spacing:-.045em;
+    letter-spacing:0;
     color:#101713;
   }
 
@@ -1124,7 +1120,7 @@ const GOVO_PHASE9C_RESTORE_BUTTON_FLOW_CSS = `
     color:#101713;
     font-size:18px;
     font-weight:1000;
-    letter-spacing:-.02em;
+    letter-spacing:0;
   }
 
   .govo9c-section-title small{
@@ -2025,7 +2021,7 @@ function homeStylePublicChromeV2() {
     text-decoration:none !important;
     color:#f8fff8 !important;
     font-weight:950 !important;
-    letter-spacing:-.09em !important;
+    letter-spacing:0 !important;
     font-size:clamp(52px, 13vw, 76px) !important;
     line-height:.82 !important;
     white-space:nowrap !important;
@@ -2177,7 +2173,7 @@ function homeStylePublicChromeV2() {
     }
 
     body.public h1{
-      letter-spacing:-.045em !important;
+      letter-spacing:0 !important;
       line-height:1.08 !important;
     }
   }
@@ -2345,7 +2341,7 @@ body.public .govo-clean-logo{
   text-decoration:none !important;
   color:#f8fff8 !important;
   font-weight:950 !important;
-  letter-spacing:-.09em !important;
+  letter-spacing:0 !important;
   font-size:clamp(64px,9vw,98px) !important;
   line-height:.78 !important;
   white-space:nowrap !important;
@@ -2481,7 +2477,7 @@ body.public .rider-card{
 
 body.public h1{
   color:#22c55e !important;
-  letter-spacing:-.055em !important;
+  letter-spacing:0 !important;
   line-height:1.05 !important;
   font-weight:950 !important;
   text-shadow:0 0 26px rgba(34,197,94,.18) !important;
@@ -2489,7 +2485,7 @@ body.public h1{
 
 body.public h2,
 body.public h3{
-  letter-spacing:-.035em !important;
+  letter-spacing:0 !important;
   line-height:1.12 !important;
 }
 
@@ -2718,7 +2714,7 @@ function page(title, body, active = '') {
       text-decoration:none !important;
       color:#f8fff8 !important;
       font-weight:950 !important;
-      letter-spacing:-.09em !important;
+      letter-spacing:0 !important;
       font-size:clamp(66px,9vw,104px) !important;
       line-height:.78 !important;
       white-space:nowrap !important;
@@ -2781,7 +2777,7 @@ function page(title, body, active = '') {
     }
     body.public h1{
       color:#22c55e !important;
-      letter-spacing:-.055em !important;
+      letter-spacing:0 !important;
       line-height:1.05 !important;
       font-weight:950 !important;
       text-shadow:0 0 26px rgba(34,197,94,.18) !important;
@@ -3220,7 +3216,7 @@ function govoDirectPublicCss() {
       margin:15px 0 10px;
       font-size:clamp(34px, 6vw, 66px);
       line-height:.95;
-      letter-spacing:-.06em;
+      letter-spacing:0;
       font-weight:950;
       color:#f3fff9;
     }
@@ -3279,7 +3275,7 @@ function govoDirectPublicCss() {
     .govo-premium-panel h2{
       margin:0 0 12px;
       font-size:24px;
-      letter-spacing:-.03em;
+      letter-spacing:0;
       color:#f3fff9;
     }
     .govo-section-head{
@@ -3659,7 +3655,7 @@ app.post('/rider/forgot-password', async (req, res, next) => {
 
 app.use('/admin', (req, res, next) => {
   res.set('X-Robots-Tag', 'noindex, nofollow');
-  const openPaths = ['/', '/login', '/logout'];
+  const openPaths = ['/', '/login', '/logout', '/not-found'];
   if (openPaths.includes(req.path)) return next();
   if (hasAdminCookie(req)) return next();
   if (hasValidAdminPin(req)) {
@@ -7822,6 +7818,114 @@ app.post('/admin/dispatch/assign', express.urlencoded({ extended: false, limit: 
 
 
 
+
+
+function govoRoleNotFound(role, label) {
+  const home = role === 'admin' ? '/login' : '/';
+  const dashboard = '/dashboard';
+  const support = role === 'admin' ? '/admin/support' : '/support';
+  return page(`${label} Page Not Found`, `<section class="card app-hero"><span class="pill">${esc(label)}</span><h1>Page not found</h1><p style="color:var(--muted);font-weight:900">Requested ${esc(label.toLowerCase())} page is not available.</p><div class="actions"><a class="btn" href="${home}">Home</a><a class="btn secondary" href="${dashboard}">Dashboard</a><a class="btn secondary" href="${support}">Support</a></div></section>`, role);
+}
+
+function merchantOnboardingPage() {
+  return page('GOVO Merchant Onboarding', `
+    ${govoDirectPublicCss()}
+    <main class="govo-public-page">
+      <section class="govo-premium-hero">
+        <span class="govo-kicker">Merchant Network</span>
+        <h1 class="govo-display">Grow with GOVO<span class="dot">.</span></h1>
+        <p class="govo-lead">Register your shop. GOVO admin approve korle customer app-e show korbe.</p>
+        <div class="govo-actions">
+          <a class="govo-btn" href="/dashboard">Merchant Login</a>
+          <a class="govo-btn secondary" href="https://app.govoexpress.com/shops">View Shops</a>
+        </div>
+      </section>
+      <section class="govo-grid">
+        <div class="govo-premium-panel">
+          <div class="govo-section-head">
+            <h2>GOVO Merchant Registration</h2>
+            <span class="pill">Apply</span>
+          </div>
+          <p class="govo-form-note">Shop info din. Approval er por app-e customer order korte parbe.</p>
+          <form method="POST" action="/merchant" class="govo-form-grid">
+            <label>Shop Name <input name="shop_name" required placeholder="Shop name"></label>
+            <label>Owner Name <input name="owner_name" required placeholder="Owner name"></label>
+            <label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label>
+            <label>Location <input name="location" required placeholder="Meherpur / Gangni"></label>
+            <label>Category <select name="category"><option>Restaurant</option><option>Grocery</option><option>Pharmacy</option><option>Fashion</option><option>Electronics</option><option>Service Provider</option><option>Other</option></select></label>
+            <label>Delivery Needed? <select name="delivery_needed"><option>Yes</option><option>No</option><option>Later</option></select></label>
+            <div class="govo-actions full"><button type="submit">Submit Merchant Info</button><a class="govo-btn secondary" href="/dashboard">Already registered?</a></div>
+          </form>
+        </div>
+      </section>
+    </main>
+  `, 'merchant');
+}
+
+app.get('/merchant/login', (req, res) => {
+  res.send(merchantLoginPage(String(req.query.phone || '').trim()));
+});
+
+app.get('/merchant/onboarding', (req, res) => {
+  res.send(merchantOnboardingPage());
+});
+
+app.get('/merchant/support', (req, res) => {
+  res.send(supportForm({ ...(req.query || {}), related_type: 'merchant' }));
+});
+
+app.get('/merchant/not-found', (req, res) => {
+  res.status(404).send(govoRoleNotFound('merchant', 'Merchant'));
+});
+
+app.get('/rider/login', (req, res) => {
+  res.send(riderLoginPage(String(req.query.phone || '').trim()));
+});
+
+app.get('/rider/onboarding', (req, res) => {
+  res.send(page('Rider Onboarding', `<section class="card app-hero"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="/login">Rider Login</a></div></section>`, 'rider'));
+});
+
+app.get(['/rider/jobs', '/rider/active', '/rider/history'], async (req, res, next) => {
+  try {
+    const riderSessionId = readPortalSession(req, 'rider');
+    if (!riderSessionId) return res.send(riderLoginPage(String(req.query.phone || '').trim()));
+    const rider = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE id=$1 LIMIT 1`, [riderSessionId]);
+    const rd = rider.rows[0];
+    if (!rd) {
+      clearPortalSession(req, res, 'rider');
+      return res.status(401).send(riderLoginPage('', 'Session expired. Please login again.'));
+    }
+    const phone = String(rd.phone || '').trim();
+    const allOrders = await pool.query(`SELECT * FROM govo_orders WHERE rider_id=$1 OR assigned_rider_id=$1 OR rider_phone=$2 OR assigned_rider_phone=$2 ORDER BY id DESC LIMIT 100`, [rd.id, phone]);
+    const cleanPath = String(req.path || '').split('/').pop();
+    const titleMap = { jobs: 'Rider Jobs', active: 'Active Assignment', history: 'Rider History' };
+    const statusMap = { jobs: ['assigned'], active: ['assigned','on_the_way','working','picked_up'], history: ['completed','paid','feedback','cancelled','delivered'] };
+    const selected = (statusMap[cleanPath] || []).map((s) => s.toLowerCase());
+    const orders = allOrders.rows.filter((x) => !selected.length || selected.includes(String(x.status || '').toLowerCase()));
+    const cards = orders.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery</b><span>${esc(x.drop_location)}</span></div><div><b>Tracking</b><span>${esc(x.order_code || orderCodeFromId(x.id))}</span></div></div></div>`).join('');
+    res.send(page(titleMap[cleanPath] || 'Rider Jobs', `<section class="card app-hero"><h1>${esc(titleMap[cleanPath] || 'Rider Jobs')}</h1><p class="form-hint">Rider: ${esc(rd.rider_name || 'Rider')} (${esc(rd.status || 'pending')})</p><div class="actions"><a class="btn secondary" href="/dashboard">Dashboard</a><a class="btn secondary" href="/jobs">Jobs</a><a class="btn secondary" href="/active">Active</a><a class="btn secondary" href="/history">History</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider records found</h2><p style="color:var(--muted);font-weight:900">Assigned work will appear here.</p></div>'}</section>`, 'rider'));
+  } catch (e) { next(e); }
+});
+
+app.get('/rider/support', (req, res) => {
+  res.send(supportForm({ ...(req.query || {}), related_type: 'rider' }));
+});
+
+app.get('/rider/not-found', (req, res) => {
+  res.status(404).send(govoRoleNotFound('rider', 'Rider'));
+});
+
+app.get('/admin/dashboard', (req, res) => res.redirect('/admin/os'));
+app.get('/admin/merchants', (req, res) => res.redirect('/admin/leads'));
+app.get('/admin/assignments', (req, res) => res.redirect('/admin/dispatch'));
+app.get('/admin/payments', (req, res) => res.redirect('/admin/finance'));
+app.get('/admin/feedback', (req, res) => res.redirect('/admin/reviews'));
+app.get('/admin/not-found', (req, res) => {
+  res.status(404).send(govoRoleNotFound('admin', 'Admin'));
+});
+
+require("./govo_flow_api_v15")(app, { pool, sendTelegram, requireAdmin });
 
 app.use((err, req, res, next) => {
   console.error('GOVO error:', err);
