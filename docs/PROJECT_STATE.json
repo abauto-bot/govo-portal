@@ -44,12 +44,20 @@
     "Admin role-host mapping",
     "Nginx validation passed after role mapping",
     "Customer route flow repaired for main pages",
-    "Current stable progress backed up locally and to Git branch"
+    "Current stable progress backed up locally and to Git branch",
+    "Docker runtime packaging repaired and rider submission hotfix deployed to production",
+    "Shops/Services flow API JSON restored in production via surgical govo_flow_api_v15 hotfix (2026-07-18)"
   ],
   "current_git_backup": {
     "branch": "backup/govo-progress-20260712-224627",
     "commit": "6d24028",
     "local_backup": "/home/abu/govo-backups/govo-progress-20260712-224627"
+  },
+  "latest_hotfix": {
+    "date": "2026-07-18",
+    "scope": "govo_portal container only: copied govo_flow_api_v15.js into /app and registered it in /app/server.js (1-line insert, same as repo server.js:7928)",
+    "backup": "/home/abu/govo-backups/flow-api-hotfix-20260718/server.live.before-flow.js",
+    "rollback_image": "govo_portal:pre-flow-hotfix-20260718"
   },
   "pending": [
     {
@@ -95,5 +103,5 @@
     "Payment data",
     "Real notification delivery"
   ],
-  "last_updated": "2026-07-13"
+  "last_updated": "2026-07-18"
 }
