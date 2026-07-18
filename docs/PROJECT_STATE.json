@@ -46,7 +46,10 @@
     "Customer route flow repaired for main pages",
     "Current stable progress backed up locally and to Git branch",
     "Docker runtime packaging repaired and rider submission hotfix deployed to production",
-    "Shops/Services flow API JSON restored in production via surgical govo_flow_api_v15 hotfix (2026-07-18)"
+    "Shops/Services flow API JSON restored in production via surgical govo_flow_api_v15 hotfix (2026-07-18)",
+    "Customer app v16 finalized: en/bn/banglish i18n, dark/light/system themes, one-tap/voice/image unified orders (2026-07-18)",
+    "Public homepage readability fixed and broken links repaired (2026-07-18)",
+    "Unified request API v16 deployed: single /api/govo-flow/requests for all sources with voice/image upload (2026-07-18)"
   ],
   "current_git_backup": {
     "branch": "backup/govo-progress-20260712-224627",
@@ -55,8 +58,8 @@
   },
   "latest_hotfix": {
     "date": "2026-07-18",
-    "scope": "govo_portal container only: copied govo_flow_api_v15.js into /app and registered it in /app/server.js (1-line insert, same as repo server.js:7928)",
-    "backup": "/home/abu/govo-backups/flow-api-hotfix-20260718/server.live.before-flow.js",
+    "scope": "v16 finalization: govo_portal container runs govo_flow_api_v16 (1-line server.js registration swap); customer app /var/www/govo_phase14c3_premium_app.html replaced by govo_app_v16.html; public homepage and unified skin readability fix deployed; govo_orders gained additive columns source/voice_file/image_files",
+    "backup": "/home/abu/govo-backups/finalize-v16-20260718-152318",
     "rollback_image": "govo_portal:pre-flow-hotfix-20260718"
   },
   "pending": [

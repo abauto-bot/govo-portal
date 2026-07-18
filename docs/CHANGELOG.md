@@ -6,6 +6,42 @@ Do not include secrets, tokens, passwords or private customer data.
 
 ---
 
+## 2026-07-18 — GOVO v16: multilingual customer UX + unified request flows finalized
+
+### Added
+
+- Customer app v16 (`govo_app_v16.html`): centralized i18n with English (default), বাংলা and Banglish (183 keys each, zero gaps, English fallback), persisted via localStorage across routes and refreshes.
+- Centralized theme tokens: Dark (brand default), Light, System with persistence; locked dark-green identity preserved as the dark theme.
+- One-tap order (3-step wizard with review/confirm), Voice order (MediaRecorder, 60s cap, replay/delete/re-record, permission-denied guidance), Image order (camera/gallery, canvas compression, max 3, preview/remove).
+- Unified backend `POST /api/govo-flow/requests` (`govo_flow_api_v16.js`): JSON or multipart; every source (`standard_form`, `one_tap`, `voice`, `image`, `shop`, `service`) enters the same `govo_orders` pipeline at `phone_confirming`. MIME/size validation, orphaned-upload cleanup on failure.
+- `GET /api/govo-flow/order-config` public client config (areas, categories, limits).
+- Additive schema: `govo_orders.source`, `govo_orders.voice_file`, `govo_orders.image_files` (no data touched).
+
+### Fixed
+
+- Public homepage: injected skin no longer forces dark headings onto dark hero/contact surfaces (scoped white-heading rules + controlled overlay); hero rewritten to English-first hierarchy (badge/heading/supporting text/CTAs); all mixed Banglish copy replaced with clean English.
+- Broken links: `/merchant` `/rider` `/more` `/delivery` `/track` `/doctor` `/agri` `/ai` now route to correct hosts and real app routes.
+- Customer app: previously dead language/theme toggles are functional; `/service-request` 404 trap removed; menu links go to correct role hosts.
+
+### Verified
+
+- Isolated test lane on 127.0.0.1:18091: JSON + multipart unified requests, validation errors (400 JSON), 8MB oversize rejection, wrong-MIME rejection, upload serving, tracking with media, shops/services regression — all passed; test rows removed.
+- Production HTTPS: same checks passed (SYSTEM_TEST rows cleaned); all app routes 200; merchant/rider 200; admin 401 auth gate intact.
+
+### Backup / Rollback
+
+- Full backup: `/home/abu/govo-backups/finalize-v16-20260718-152318` (www, nginx confs, container server.js, .env, pre-schema DB dump)
+- Container rollback image: `govo_portal:pre-flow-hotfix-20260718`
+- Git checkpoint before work: `5a420e4`
+
+### Remaining limitations
+
+- Voice transcription not enabled (optional per spec; voice works as audio attachment).
+- Uploaded request media is stored on the container filesystem (same pre-existing behavior as product images); move to a volume or object storage later.
+- Merchant/rider/admin panels not yet migrated to the v16 i18n/theme system (customer app + public site done).
+
+---
+
 ## 2026-07-18 — Shops/Services flow API JSON restored
 
 ### Diagnosis

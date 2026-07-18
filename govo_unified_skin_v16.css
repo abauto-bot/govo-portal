@@ -1,0 +1,203 @@
+/* GOVO14F_UNIFIED_UI_SKIN */
+:root{
+  --govo-bg:#effcf4;
+  --govo-bg2:#ffffff;
+  --govo-deep:#062819;
+  --govo-deep2:#073a24;
+  --govo-green:#13d86d;
+  --govo-green2:#079846;
+  --govo-text:#071811;
+  --govo-muted:#607166;
+  --govo-line:rgba(6,40,25,.12);
+  --govo-shadow:0 22px 60px rgba(0,80,40,.16);
+  --govo-radius:28px;
+}
+html{background:var(--govo-bg)!important}
+body{
+  background:
+    radial-gradient(circle at 90% 5%,rgba(20,216,109,.22),transparent 34%),
+    linear-gradient(180deg,#effcf4 0%,#ffffff 46%,#f6fff9 100%)!important;
+  color:var(--govo-text)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;
+  letter-spacing:-.01em;
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.72),rgba(255,255,255,0) 30%),
+    radial-gradient(circle at 12% 12%,rgba(19,216,109,.10),transparent 24%);
+  z-index:-1;
+}
+a{color:inherit}
+button,a[href],input,select,textarea{font-family:inherit!important}
+h1,h2,h3{
+  color:var(--govo-text)!important;
+  letter-spacing:-.045em!important;
+  font-weight:950!important;
+}
+p,span,small,div,label{font-weight:600}
+input,select,textarea{
+  border-radius:20px!important;
+  border:1px solid var(--govo-line)!important;
+  background:rgba(255,255,255,.92)!important;
+  color:var(--govo-text)!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.05)!important;
+}
+button,
+input[type="submit"],
+a.btn,
+.btn,
+.cta,
+[class*="button"],
+[class*="Button"]{
+  border-radius:22px!important;
+  background:linear-gradient(135deg,var(--govo-green),var(--govo-green2))!important;
+  color:#fff!important;
+  border:0!important;
+  font-weight:950!important;
+  box-shadow:0 18px 42px rgba(8,160,80,.28)!important;
+}
+.card,
+.panel,
+.box,
+section,
+form,
+[class*="card"],
+[class*="Card"],
+[class*="panel"],
+[class*="Panel"]{
+  border-radius:var(--govo-radius)!important;
+}
+form{
+  background:rgba(255,255,255,.86)!important;
+  border:1px solid rgba(6,40,25,.10)!important;
+  box-shadow:var(--govo-shadow)!important;
+}
+.govo14f-shell{
+  max-width:860px;
+  margin:0 auto;
+}
+.govo14f-topbar{
+  position:sticky;
+  top:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:14px 18px;
+  margin:-8px -8px 18px;
+  background:rgba(239,252,244,.88);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(6,40,25,.08);
+}
+.govo14f-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.govo14f-logo{
+  width:52px;
+  height:52px;
+  border-radius:18px;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(135deg,#22f07d,#079846);
+  color:#062819;
+  font-size:22px;
+  font-weight:1000;
+  box-shadow:0 16px 36px rgba(8,160,80,.22);
+}
+.govo14f-title{
+  line-height:1.05;
+}
+.govo14f-title b{
+  display:block;
+  font-size:22px;
+  font-weight:1000;
+  color:#071811;
+}
+.govo14f-title small{
+  display:block;
+  margin-top:4px;
+  font-size:13px;
+  color:#64766b;
+  font-weight:850;
+}
+.govo14f-pill{
+  border-radius:999px;
+  padding:11px 14px;
+  background:#fff;
+  border:1px solid rgba(6,40,25,.10);
+  color:#062819;
+  font-weight:950;
+  box-shadow:0 12px 24px rgba(0,0,0,.06);
+}
+.govo14f-hero{
+  margin:0 14px 18px;
+  padding:24px;
+  border-radius:34px;
+  color:#fff;
+  background:
+    radial-gradient(circle at 82% 20%,rgba(35,238,126,.35),transparent 32%),
+    linear-gradient(135deg,#052819,#08783d);
+  box-shadow:0 28px 80px rgba(0,90,45,.23);
+}
+.govo14f-hero .tag{
+  display:inline-flex;
+  padding:9px 13px;
+  border-radius:999px;
+  background:rgba(255,255,255,.13);
+  border:1px solid rgba(255,255,255,.22);
+  font-weight:950;
+}
+.govo14f-hero h1{
+  margin:15px 0 8px;
+  color:#fff!important;
+  font-size:clamp(34px,8vw,54px)!important;
+  line-height:.98!important;
+}
+.govo14f-hero p{
+  color:#dff8e9!important;
+  font-size:17px!important;
+  line-height:1.55!important;
+}
+.govo14f-nav{
+  display:flex;
+  gap:10px;
+  overflow:auto;
+  padding:0 14px 16px;
+}
+.govo14f-nav a{
+  flex:0 0 auto;
+  text-decoration:none;
+  border-radius:999px;
+  padding:11px 14px;
+  background:#fff;
+  border:1px solid rgba(6,40,25,.10);
+  box-shadow:0 10px 24px rgba(0,0,0,.05);
+  font-weight:950;
+}
+.govo14f-footer-space{height:78px}
+
+/* GOVO readability fix 2026-07-18: dark brand surfaces keep light, high-contrast text.
+   The global h1/h2/h3 override above must not darken headings inside hero/dark/contact blocks. */
+.hero h1,.hero h2,.hero h3,
+.dark h1,.dark h2,.dark h3,
+.contact h1,.contact h2,.contact h3{color:#ffffff!important}
+.hero p,.dark p{color:rgba(255,255,255,.82)!important}
+.contact p{color:rgba(255,255,255,.78)!important}
+.hero{box-shadow:inset 0 0 0 1000px rgba(2,26,15,.28),0 26px 62px rgba(4,49,26,.18)!important}
+.hero .badge{color:#fff!important}
+
+@media(max-width:600px){
+  body{font-size:15px!important}
+  .govo14f-topbar{margin:0 0 12px;padding:13px 14px}
+  .govo14f-logo{width:48px;height:48px}
+  .govo14f-title b{font-size:20px}
+  .govo14f-pill{font-size:13px;padding:10px 12px}
+  .govo14f-hero{margin:0 12px 16px;padding:22px}
+}

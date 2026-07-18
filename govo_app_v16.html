@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Home — GOVO Express</title>
+<style id="govo-v16-tokens">
+:root{
+  --bg:#04120f;--bg2:#071c17;--card:#0e2a23;--card2:#12382f;
+  --line:rgba(255,255,255,.13);--text:#f4fff9;--muted:#a9c8bd;
+  --green:#22e68a;--green2:#0fbf70;--gold:#f6cf68;--red:#ff6b6b;
+  --on-primary:#02110a;--field:rgba(255,255,255,.065);--option:#08231d;
+  --bar:rgba(4,18,15,.88);--bar2:rgba(5,18,15,.94);
+  --cardbg:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));
+  --pagebg:radial-gradient(circle at 12% -10%,rgba(34,230,138,.22),transparent 34%),radial-gradient(circle at 90% 0%,rgba(246,207,104,.10),transparent 28%),linear-gradient(160deg,#010504,#04120f 46%,#08261f);
+  --focus:#4ef0a4;--shadow:0 22px 70px rgba(0,0,0,.22);
+}
+[data-theme="light"]{
+  --bg:#eef6f1;--bg2:#ffffff;--card:#ffffff;--card2:#eef6f1;
+  --line:rgba(6,40,25,.15);--text:#07281a;--muted:#47604f;
+  --green:#0aa95c;--green2:#07874a;--gold:#8a6d1d;--red:#c0392b;
+  --on-primary:#ffffff;--field:#ffffff;--option:#ffffff;
+  --bar:rgba(255,255,255,.92);--bar2:rgba(255,255,255,.96);
+  --cardbg:#ffffff;
+  --pagebg:radial-gradient(circle at 12% -10%,rgba(10,169,92,.14),transparent 34%),radial-gradient(circle at 90% 0%,rgba(10,169,92,.08),transparent 28%),linear-gradient(160deg,#f4faf6,#eef6f1 46%,#e4f1e9);
+  --focus:#07874a;--shadow:0 14px 40px rgba(6,40,25,.10);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--pagebg);background-attachment:fixed;color:var(--text);font-size:16px}
+a{text-decoration:none;color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:8px}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 110px}
+.top{position:sticky;top:0;z-index:30;background:var(--bar);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.topin{max-width:1120px;margin:auto;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.logo{width:46px;height:46px;border-radius:17px;display:grid;place-items:center;flex:0 0 auto;overflow:hidden;background:linear-gradient(135deg,var(--green),#075c39);box-shadow:0 10px 32px rgba(34,230,138,.24)}
+.logo svg,.logo img{width:100%;height:100%;object-fit:contain;display:block}
+.brand{flex:1;min-width:0}
+.brand b{display:block;font-size:18px;letter-spacing:.2px}
+.brand small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.menu{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:10px 14px;background:var(--field);font-weight:850;cursor:pointer;min-height:44px}
+.btn.primary{background:linear-gradient(135deg,var(--green),var(--green2));color:var(--on-primary);border:0}
+.btn.gold{background:rgba(246,207,104,.14);border-color:rgba(246,207,104,.38);color:var(--gold)}
+[data-theme="light"] .btn.gold{background:rgba(138,109,29,.10);border-color:rgba(138,109,29,.35);color:var(--gold)}
+.btn.danger{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.4);color:var(--red)}
+.btn.block{width:100%}
+.btn[disabled],button[disabled]{opacity:.55;cursor:not-allowed}
+.drawer{position:relative}
+.drawer summary{list-style:none;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--line);border-radius:15px;background:var(--field);font-size:22px}
+.drawer summary::-webkit-details-marker{display:none}
+.drawerbox{position:absolute;right:0;top:54px;width:min(340px,94vw);background:var(--bg2);border:1px solid var(--line);border-radius:24px;padding:14px;box-shadow:0 28px 90px rgba(0,0,0,.48);max-height:80vh;overflow:auto}
+.drawerbox a{display:flex;justify-content:space-between;gap:10px;padding:13px 12px;border-radius:16px;color:var(--text);font-weight:850;min-height:44px;align-items:center}
+.drawerbox a:hover{background:rgba(34,230,138,.10)}
+.drawer-label{margin:10px 4px 6px;color:var(--muted);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.6px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{border:1px solid var(--line);border-radius:13px;padding:11px 6px;background:var(--field);color:var(--text);font-weight:850;font-size:13px;cursor:pointer;min-height:44px}
+.seg button[aria-pressed="true"]{background:rgba(34,230,138,.16);border-color:var(--green);color:var(--text)}
+.hero{padding:26px 0 14px}
+.kicker{display:inline-flex;padding:8px 12px;border:1px solid rgba(34,230,138,.30);border-radius:999px;color:#bdf6da;background:rgba(34,230,138,.08);font-weight:900}
+[data-theme="light"] .kicker{color:#065f36;background:rgba(10,169,92,.10);border-color:rgba(10,169,92,.35)}
+h1{font-size:clamp(30px,6.4vw,62px);line-height:1;margin:14px 0 12px;letter-spacing:-1.8px}
+.lead{font-size:17px;line-height:1.6;color:var(--muted);max-width:790px;margin:0}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.grid.three{grid-template-columns:repeat(3,1fr)}
+.grid.two{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--cardbg);border:1px solid var(--line);border-radius:24px;padding:16px;box-shadow:var(--shadow)}
+.card.link{transition:.16s ease;display:block;color:inherit}
+.card.link:hover{transform:translateY(-2px);border-color:rgba(34,230,138,.34)}
+.card h3{margin:8px 0 6px;font-size:18px}
+.card p{margin:0;color:var(--muted);line-height:1.45}
+.icon{font-size:31px}
+.tag{display:inline-block;margin-top:12px;padding:6px 10px;border-radius:999px;background:rgba(34,230,138,.10);color:#bdf6da;font-size:12px;font-weight:950}
+[data-theme="light"] .tag{color:#065f36;background:rgba(10,169,92,.12)}
+.section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:26px}
+.section-title h2{margin:0;font-size:25px}
+.form{display:grid;gap:10px;max-width:760px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:16px;background:var(--field);color:var(--text);padding:13px 14px;font-size:15px;outline:none;min-height:46px}
+select option{background:var(--option);color:var(--text)}
+[data-theme="light"] select option{color:#07281a}
+textarea{min-height:104px}
+label{font-weight:850;color:var(--text)}
+.hint{color:var(--muted);font-size:13px;margin:-4px 0 0}
+.notice{border:1px dashed rgba(246,207,104,.42);background:rgba(246,207,104,.09);color:var(--gold);border-radius:20px;padding:14px;margin:14px 0;line-height:1.5}
+.errorbox{border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.10);color:var(--red);border-radius:20px;padding:14px;margin:14px 0;line-height:1.5}
+.offline{position:sticky;top:66px;z-index:20;margin:0 auto 10px;max-width:1120px;border:1px solid rgba(246,207,104,.5);background:rgba(80,60,4,.92);color:#ffe7a6;border-radius:14px;padding:10px 14px;font-weight:850;display:none}
+.offline.show{display:block}
+.area{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.area span{padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-weight:850;font-size:13px}
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--bar2);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
+.bottomin{max-width:760px;margin:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 10px}
+.nav{padding:9px 6px;border-radius:16px;text-align:center;color:var(--muted);font-size:12px;font-weight:850;min-height:52px}
+.nav b{display:block;font-size:18px}
+.nav.active{background:rgba(34,230,138,.12);color:var(--text)}
+.skel{border-radius:24px;border:1px solid var(--line);background:var(--cardbg);min-height:120px;position:relative;overflow:hidden}
+.skel:after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.10) 50%,transparent 70%);animation:sk 1.2s infinite}
+@keyframes sk{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.steps{display:flex;gap:6px;margin:14px 0}
+.steps i{flex:1;height:5px;border-radius:99px;background:var(--field);border:1px solid var(--line)}
+.steps i.on{background:var(--green);border-color:var(--green)}
+.typick{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.typick button{border:1px solid var(--line);border-radius:20px;background:var(--cardbg);padding:16px 12px;text-align:left;cursor:pointer;color:var(--text);min-height:88px}
+.typick button[aria-pressed="true"]{border-color:var(--green);box-shadow:0 0 0 2px rgba(34,230,138,.25) inset}
+.typick .icon{font-size:26px}
+.typick b{display:block;margin:6px 0 3px;font-size:16px}
+.typick small{color:var(--muted)}
+.recbox{display:grid;gap:10px;justify-items:start}
+.recdot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--red);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.thumb{position:relative;width:92px;height:92px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-weight:900;cursor:pointer}
+.review{display:grid;gap:8px}
+.review div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--line);padding:8px 0}
+.review span{color:var(--muted)}
+.success-id{font-size:24px;font-weight:950;letter-spacing:.4px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.flow{counter-reset:step}
+.step{position:relative;padding-left:54px}
+.step:before{counter-increment:step;content:counter(step);position:absolute;left:16px;top:16px;width:28px;height:28px;border-radius:10px;display:grid;place-items:center;background:rgba(34,230,138,.15);color:#bdf6da;font-weight:950;border:1px solid rgba(34,230,138,.25)}
+[data-theme="light"] .step:before{color:#065f36}
+@media(max-width:900px){.grid,.grid.three{grid-template-columns:repeat(2,1fr)}.menu .pill{display:none}}
+@media(max-width:540px){.grid,.grid.three,.grid.two{grid-template-columns:1fr}h1{font-size:34px}.card{border-radius:20px}.wrap{padding-left:12px;padding-right:12px}.actions .btn{flex:1}.drawerbox{right:-4px}.typick{grid-template-columns:1fr 1fr}}
+</style>
+<meta name="govo-phase" content="v16 unified multilingual customer app"/>
+</head>
+<body>
+<header class="top"><div class="topin">
+  <a class="logo" href="/" aria-label="GOVO Express home" data-logo></a>
+  <div class="brand"><b>GOVO Express</b><small data-i="tagline">Local delivery & services</small></div>
+  <nav class="menu" aria-label="Main">
+    <a class="pill" href="/shops" data-i="navShops">Shops</a>
+    <a class="pill" href="/services" data-i="navServices">Services</a>
+    <details class="drawer" id="drawer">
+      <summary aria-label="Menu">☰</summary>
+      <div class="drawerbox" id="drawerbox"></div>
+    </details>
+  </nav>
+</div></header>
+<div class="offline" id="offline" role="status"></div>
+<main class="wrap" id="main"></main>
+<nav class="bottom" aria-label="Bottom"><div class="bottomin" id="bottomnav"></div></nav>
+<div class="sr" aria-live="polite" id="sr"></div>
+<script>
+(function(){
+'use strict';
+/* ================= BRAND / ICONS ================= */
+var BRAND={
+  name:'GOVO Express',
+  supportPhone:'', // set public hotline when approved; empty hides call button
+  logoSvg:'<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GOVO"><defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3cf59a"/><stop offset="1" stop-color="#077a40"/></linearGradient></defs><rect x="4" y="4" width="88" height="88" rx="26" fill="url(#gg)"/><text x="48" y="66" font-size="52" font-weight="900" font-family="Inter,Arial,sans-serif" text-anchor="middle" fill="#04120f">G</text></svg>'
+};
+var ICONS={home:'🏠',shops:'🏪',services:'🛠️',order:'📦',help:'☎️',voice:'🎙️',image:'📷',oneTap:'⚡',delivery:'🚚',medicine:'💊',parcel:'📮',other:'✨',track:'📍',support:'☎️',search:'🔎',back:'←',merchant:'🏪',rider:'🛵'};
+/* ================= I18N ================= */
+var I18N={
+en:{tagline:'Local delivery & services',navHome:'Home',navShops:'Shops',navServices:'Services',navOrder:'Order',navHelp:'Help',
+menuHome:'Home',menuShops:'Shop Menu',menuServices:'Service Menu',menuOrder:'Delivery Book',menuMerchant:'Merchant Join',menuRider:'Rider Join',menuSupport:'Support',menuLanguage:'Language',menuTheme:'Theme',
+themeDark:'Dark',themeLight:'Light',themeSystem:'System',
+badge:'Starting in Meherpur',heroTitle:'Delivery, shops and local services in one place.',heroSub:'Order delivery, discover local shops, request services and get support through one simple platform.',
+ctaShops:'Shops',ctaServices:'Services',ctaDelivery:'Delivery',ctaVoice:'Voice Order',ctaImage:'Image Order',
+oneTapTitle:'One-tap Order',oneTapSub:'Fastest way — tap, confirm, done.',oneTapBtn:'Start one-tap order',
+popularShops:'Popular Shops',localServices:'Local Services',viewAll:'View all',recentTitle:'Your recent request',supportTitle:'Need help?',supportSub:'GOVO support is one tap away.',
+loading:'Loading…',loadingData:'Loading verified GOVO data…',retry:'Retry',offlineMsg:'You are offline. Please check your internet and try again.',
+errorLoad:'We could not load this page. Please try again.',emptyShops:'No shops found',emptyShopsSub:'No approved shop matched this filter.',emptyServices:'No services found',
+back:'Back',next:'Next',submit:'Submit',submitting:'Submitting…',confirm:'Confirm',cancel:'Cancel',close:'Close',search:'Search',optional:'optional',
+shopsTitle:'Available GOVO shops',shopsSub:'Search approved local shops from GOVO operations data.',findShops:'Find shops',shopSearchPh:'Search shop or category',allCategories:'All categories',openNow:'Open / available',statusUnavailable:'Status unavailable',shopInfo:'Shop information',requestFromShop:'Request from shop',itemsProducts:'Items / products',noItems:'No listed items',noItemsSub:'This shop has no public items yet. You can still send a request.',
+servicesTitle:'Local services in one place',servicesSub:'Use GOVO service categories and approved providers.',findServices:'Find services',serviceSearchPh:'Search service',available:'Available',request:'Request',serviceRequest:'Service request',
+orderTitle:'Unified GOVO request',orderSub:'Create a delivery, shop or service request in one form.',requestType:'Request type',yourName:'Your name',namePh:'Your name',phone:'Phone',phonePh:'01XXXXXXXXX',area:'Area',address:'Address',addressPh:'Delivery / service address',details:'Request details',detailsPh:'What do you need?',note:'Note',notePh:'Extra note (optional)',shopProvider:'Shop / provider (optional)',preferredTime:'Preferred time',preferredTimePh:'Today evening / tomorrow morning',submitRequest:'Submit request',
+invalidPhone:'Enter a valid Bangladeshi phone number (01XXXXXXXXX).',missingFields:'Please fill name, phone and address.',missingDetails:'Please describe your request, or add a voice note or photo.',
+otStep1:'What do you need?',otStep2:'Confirm phone & location',otStep3:'Review & confirm',
+otDelivery:'Delivery',otDeliverySub:'Pickup & drop anything',otShopItem:'Shop item',otShopItemSub:'Grocery, food, daily needs',otHomeService:'Home service',otHomeServiceSub:'Repair & home work',otMedicine:'Medicine',otMedicineSub:'Pharmacy items',otParcel:'Parcel',otParcelSub:'Documents & small parcels',otOther:'Other',otOtherSub:'Anything else',
+reviewSource:'Source',reviewType:'Type',reviewPhone:'Phone',reviewArea:'Area',reviewAddress:'Address',reviewDetails:'Details',confirmSubmit:'Confirm & submit',
+successTitle:'Request received!',successSub:'GOVO admin received your request. Status starts at Phone Confirming.',requestId:'Request ID',submittedAt:'Submitted',currentStatus:'Current status',trackRequest:'Track request',getSupport:'Get support',newRequest:'New request',
+voiceTitle:'Voice Order',voiceSub:'Tell us what you need',micStart:'Start recording',micStop:'Stop',recording:'Recording',replay:'Replay',delete:'Delete',reRecord:'Re-record',voiceReady:'Voice note ready',voiceMax:'Maximum 60 seconds.',micDenied:'Microphone permission denied',micDeniedSub:'Please allow microphone access in your browser settings, or write your request as text instead.',micUnsupported:'Voice recording is not supported on this device. Please write your request as text.',attachVoice:'Attach voice note (optional)',
+imageTitle:'Image Order',imageSub:'Take a photo or choose from gallery — we will take care of the rest.',takePhoto:'Take photo',fromGallery:'Choose from gallery',addMore:'Add another image',removeImage:'Remove',imageLimit:'Maximum 3 images.',imageTooBig:'Image is too large even after compression.',imagesReady:'photos ready',attachImages:'Attach photos (optional)',
+supportTitle:'GOVO Support',supportSub:'Order question, complaint or follow-up — send it here.',callSupport:'Call support',orderHelp:'Order help',orderHelpSub:'New delivery or service request.',trackHelp:'Track request',trackHelpSub:'See status and timeline.',subject:'Subject',subjectPh:'Complaint / follow-up / question',message:'Message',messagePh:'Write your message',submitTicket:'Submit support ticket',
+ordersTitle:'Your requests',ordersSub:'Enter your phone number to see your requests.',findBtn:'Find requests',noOrders:'No requests found for this phone.',trackingTitle:'Request tracking',timeline:'Timeline',detailsCol:'Details',noTimeline:'No timeline entries yet.',
+status_phone_confirming:'Phone Confirming',status_confirmed:'Confirmed',status_assigned:'Assigned',status_on_the_way:'On the way',status_working:'Working',status_completed:'Completed',status_paid:'Paid',status_feedback:'Feedback',status_cancelled:'Cancelled',
+notFoundTitle:'Page not found',notFoundSub:'This GOVO page is not available.',searchTitle:'Search',searchSub:'Search shops and services from one place.',searchPh:'Search shops / services',noResults:'No results found.',
+profile:'Profile',notifications:'Notifications',notifEmpty:'Notifications will appear here when available.',profileEmpty:'Your saved details will appear here after your first request.'},
+bn:{tagline:'লোকাল ডেলিভারি ও সেবা',navHome:'হোম',navShops:'দোকান',navServices:'সেবা',navOrder:'অর্ডার',navHelp:'সাহায্য',
+menuHome:'হোম',menuShops:'দোকান মেনু',menuServices:'সেবা মেনু',menuOrder:'ডেলিভারি বুক',menuMerchant:'মার্চেন্ট জয়েন',menuRider:'রাইডার জয়েন',menuSupport:'সাপোর্ট',menuLanguage:'ভাষা',menuTheme:'থিম',
+themeDark:'ডার্ক',themeLight:'লাইট',themeSystem:'সিস্টেম',
+badge:'মেহেরপুর থেকে শুরু',heroTitle:'ডেলিভারি, দোকান ও লোকাল সেবা — সব এক জায়গায়।',heroSub:'ডেলিভারি অর্ডার করুন, লোকাল দোকান খুঁজুন, সেবা রিকোয়েস্ট করুন এবং সাপোর্ট পান — একটি সহজ প্ল্যাটফর্মে।',
+ctaShops:'দোকান',ctaServices:'সেবা',ctaDelivery:'ডেলিভারি',ctaVoice:'ভয়েস অর্ডার',ctaImage:'ছবি অর্ডার',
+oneTapTitle:'এক-ট্যাপ অর্ডার',oneTapSub:'সবচেয়ে সহজ — ট্যাপ করুন, কনফার্ম করুন, শেষ।',oneTapBtn:'এক-ট্যাপ অর্ডার শুরু করুন',
+popularShops:'জনপ্রিয় দোকান',localServices:'লোকাল সেবা',viewAll:'সব দেখুন',recentTitle:'আপনার সাম্প্রতিক রিকোয়েস্ট',supportTitle:'সাহায্য দরকার?',supportSub:'GOVO সাপোর্ট এক ট্যাপে।',
+loading:'লোড হচ্ছে…',loadingData:'যাচাইকৃত GOVO ডাটা লোড হচ্ছে…',retry:'আবার চেষ্টা করুন',offlineMsg:'আপনি অফলাইনে আছেন। ইন্টারনেট চেক করে আবার চেষ্টা করুন।',
+errorLoad:'পেজটি লোড করা যায়নি। আবার চেষ্টা করুন।',emptyShops:'কোনো দোকান পাওয়া যায়নি',emptyShopsSub:'এই ফিল্টারে কোনো অনুমোদিত দোকান নেই।',emptyServices:'কোনো সেবা পাওয়া যায়নি',
+back:'পেছনে',next:'এগিয়ে',submit:'জমা দিন',submitting:'জমা হচ্ছে…',confirm:'কনফার্ম',cancel:'বাতিল',close:'বন্ধ',search:'খুঁজুন',optional:'ঐচ্ছিক',
+shopsTitle:'উপলব্ধ GOVO দোকানসমূহ',shopsSub:'GOVO অপারেশন ডাটা থেকে অনুমোদিত লোকাল দোকান খুঁজুন।',findShops:'দোকান খুঁজুন',shopSearchPh:'দোকান বা ক্যাটাগরি খুঁজুন',allCategories:'সব ক্যাটাগরি',openNow:'খোলা / উপলব্ধ',statusUnavailable:'স্ট্যাটাস জানা নেই',shopInfo:'দোকানের তথ্য',requestFromShop:'এই দোকান থেকে রিকোয়েস্ট',itemsProducts:'আইটেম / পণ্য',noItems:'কোনো আইটেম নেই',noItemsSub:'এই দোকানের এখনো পাবলিক আইটেম নেই। তবুও রিকোয়েস্ট পাঠাতে পারেন।',
+servicesTitle:'লোকাল সেবা এক জায়গায়',servicesSub:'GOVO সেবা ক্যাটাগরি ও অনুমোদিত প্রোভাইডার ব্যবহার করুন।',findServices:'সেবা খুঁজুন',serviceSearchPh:'সেবা খুঁজুন',available:'উপলব্ধ',request:'রিকোয়েস্ট',serviceRequest:'সেবা রিকোয়েস্ট',
+orderTitle:'একীভূত GOVO রিকোয়েস্ট',orderSub:'একটি ফর্মে ডেলিভারি, দোকান বা সেবা রিকোয়েস্ট করুন।',requestType:'রিকোয়েস্টের ধরন',yourName:'আপনার নাম',namePh:'আপনার নাম',phone:'ফোন',phonePh:'01XXXXXXXXX',area:'এলাকা',address:'ঠিকানা',addressPh:'ডেলিভারি / সেবার ঠিকানা',details:'রিকোয়েস্টের বিবরণ',detailsPh:'আপনার কী প্রয়োজন?',note:'নোট',notePh:'অতিরিক্ত নোট (ঐচ্ছিক)',shopProvider:'দোকান / প্রোভাইডার (ঐচ্ছিক)',preferredTime:'পছন্দের সময়',preferredTimePh:'আজ সন্ধ্যা / কাল সকাল',submitRequest:'রিকোয়েস্ট জমা দিন',
+invalidPhone:'সঠিক বাংলাদেশি ফোন নম্বর দিন (01XXXXXXXXX)।',missingFields:'নাম, ফোন ও ঠিকানা পূরণ করুন।',missingDetails:'রিকোয়েস্টটি লিখুন, অথবা ভয়েস নোট বা ছবি যোগ করুন।',
+otStep1:'আপনার কী প্রয়োজন?',otStep2:'ফোন ও ঠিকানা কনফার্ম করুন',otStep3:'দেখে কনফার্ম করুন',
+otDelivery:'ডেলিভারি',otDeliverySub:'যেকোনো কিছু পিকআপ ও ড্রপ',otShopItem:'দোকানের আইটেম',otShopItemSub:'মুদি, খাবার, দৈনন্দিন প্রয়োজন',otHomeService:'হোম সার্ভিস',otHomeServiceSub:'মেরামত ও ঘরের কাজ',otMedicine:'ওষুধ',otMedicineSub:'ফার্মেসির আইটেম',otParcel:'পার্সেল',otParcelSub:'কাগজপত্র ও ছোট পার্সেল',otOther:'অন্যান্য',otOtherSub:'অন্য যেকোনো কিছু',
+reviewSource:'উৎস',reviewType:'ধরন',reviewPhone:'ফোন',reviewArea:'এলাকা',reviewAddress:'ঠিকানা',reviewDetails:'বিবরণ',confirmSubmit:'কনফার্ম করে জমা দিন',
+successTitle:'রিকোয়েস্ট পৌঁছেছে!',successSub:'GOVO অ্যাডমিন আপনার রিকোয়েস্ট পেয়েছে। স্ট্যাটাস: ফোন কনফার্মিং।',requestId:'রিকোয়েস্ট আইডি',submittedAt:'জমার সময়',currentStatus:'বর্তমান স্ট্যাটাস',trackRequest:'ট্র্যাক করুন',getSupport:'সাপোর্ট নিন',newRequest:'নতুন রিকোয়েস্ট',
+voiceTitle:'ভয়েস অর্ডার',voiceSub:'আপনার প্রয়োজনটি বলুন',micStart:'রেকর্ড শুরু',micStop:'স্টপ',recording:'রেকর্ড হচ্ছে',replay:'শুনুন',delete:'মুছুন',reRecord:'আবার রেকর্ড',voiceReady:'ভয়েস নোট প্রস্তুত',voiceMax:'সর্বোচ্চ ৬০ সেকেন্ড।',micDenied:'মাইক্রোফোনের অনুমতি নেই',micDeniedSub:'ব্রাউজার সেটিংসে মাইক্রোফোনের অনুমতি দিন, অথবা লিখে রিকোয়েস্ট পাঠান।',micUnsupported:'এই ডিভাইসে ভয়েস রেকর্ড সমর্থিত নয়। লিখে রিকোয়েস্ট পাঠান।',attachVoice:'ভয়েস নোট যোগ করুন (ঐচ্ছিক)',
+imageTitle:'ছবি অর্ডার',imageSub:'ছবি তুলুন বা গ্যালারি থেকে দিন — বাকিটা আমরা সামলাবো।',takePhoto:'ছবি তুলুন',fromGallery:'গ্যালারি থেকে নিন',addMore:'আরেকটি ছবি যোগ করুন',removeImage:'মুছুন',imageLimit:'সর্বোচ্চ ৩টি ছবি।',imageTooBig:'ছবিটি কমপ্রেস করার পরও বড়।',imagesReady:'ছবি প্রস্তুত',attachImages:'ছবি যোগ করুন (ঐচ্ছিক)',
+supportTitle:'GOVO সাপোর্ট',supportSub:'অর্ডার প্রশ্ন, অভিযোগ বা ফলো-আপ — এখানে পাঠান।',callSupport:'কল করুন',orderHelp:'অর্ডার সাহায্য',orderHelpSub:'নতুন ডেলিভারি বা সেবা রিকোয়েস্ট।',trackHelp:'ট্র্যাক করুন',trackHelpSub:'স্ট্যাটাস ও টাইমলাইন দেখুন।',subject:'বিষয়',subjectPh:'অভিযোগ / ফলো-আপ / প্রশ্ন',message:'বার্তা',messagePh:'আপনার বার্তা লিখুন',submitTicket:'সাপোর্ট টিকিট জমা দিন',
+ordersTitle:'আপনার রিকোয়েস্টসমূহ',ordersSub:'ফোন নম্বর দিয়ে আপনার রিকোয়েস্ট দেখুন।',findBtn:'রিকোয়েস্ট খুঁজুন',noOrders:'এই ফোনে কোনো রিকোয়েস্ট পাওয়া যায়নি।',trackingTitle:'রিকোয়েস্ট ট্র্যাকিং',timeline:'টাইমলাইন',detailsCol:'বিবরণ',noTimeline:'এখনো টাইমলাইন নেই।',
+status_phone_confirming:'ফোন কনফার্মিং',status_confirmed:'কনফার্মড',status_assigned:'অ্যাসাইনড',status_on_the_way:'রাস্তায় আছে',status_working:'কাজ চলছে',status_completed:'সম্পন্ন',status_paid:'পেইড',status_feedback:'ফিডব্যাক',status_cancelled:'বাতিল',
+notFoundTitle:'পেজ পাওয়া যায়নি',notFoundSub:'এই GOVO পেজটি এখন উপলব্ধ নয়।',searchTitle:'খুঁজুন',searchSub:'এক জায়গা থেকে দোকান ও সেবা খুঁজুন।',searchPh:'দোকান / সেবা খুঁজুন',noResults:'কিছু পাওয়া যায়নি।',
+profile:'প্রোফাইল',notifications:'নোটিফিকেশন',notifEmpty:'নোটিফিকেশন এলে এখানে দেখা যাবে।',profileEmpty:'প্রথম রিকোয়েস্টের পর আপনার সংরক্ষিত তথ্য এখানে থাকবে।'},
+bl:{tagline:'Local delivery ar service',navHome:'Home',navShops:'Dokaan',navServices:'Service',navOrder:'Order',navHelp:'Help',
+menuHome:'Home',menuShops:'Dokaan Menu',menuServices:'Service Menu',menuOrder:'Delivery Book',menuMerchant:'Merchant Join',menuRider:'Rider Join',menuSupport:'Support',menuLanguage:'Language',menuTheme:'Theme',
+themeDark:'Dark',themeLight:'Light',themeSystem:'System',
+badge:'Meherpur theke shuru',heroTitle:'Delivery, dokaan ar local service — sob ek jaygay.',heroSub:'Delivery order korun, local dokaan khunjun, service request korun ar support pan — ekta simple platform e.',
+ctaShops:'Dokaan',ctaServices:'Service',ctaDelivery:'Delivery',ctaVoice:'Voice Order',ctaImage:'Photo Order',
+oneTapTitle:'One-tap Order',oneTapSub:'Sohoj upay — tap korun, confirm korun, sesh.',oneTapBtn:'One-tap order shuru korun',
+popularShops:'Popular Dokaan',localServices:'Local Service',viewAll:'Sob dekhun',recentTitle:'Apnar recent request',supportTitle:'Help lagbe?',supportSub:'GOVO support ek tap e.',
+loading:'Load hocche…',loadingData:'GOVO data load hocche…',retry:'Abar try korun',offlineMsg:'Apni offline achen. Internet check kore abar try korun.',
+errorLoad:'Page load hoyni. Abar try korun.',emptyShops:'Kono dokaan paini',emptyShopsSub:'Ei filter e kono approved dokaan nei.',emptyServices:'Kono service paini',
+back:'Back',next:'Next',submit:'Submit',submitting:'Submit hocche…',confirm:'Confirm',cancel:'Cancel',close:'Close',search:'Search',optional:'optional',
+shopsTitle:'Available GOVO dokaan',shopsSub:'GOVO data theke approved local dokaan khunjun.',findShops:'Dokaan khunjun',shopSearchPh:'Dokaan ba category khunjun',allCategories:'Sob category',openNow:'Khola / available',statusUnavailable:'Status jana nei',shopInfo:'Dokaan er info',requestFromShop:'Ei dokaan theke request',itemsProducts:'Item / product',noItems:'Kono item nei',noItemsSub:'Ei dokaan er public item eno nei. Tobeo request pathate paren.',
+servicesTitle:'Local service ek jaygay',servicesSub:'GOVO service category ar approved provider use korun.',findServices:'Service khunjun',serviceSearchPh:'Service khunjun',available:'Available',request:'Request',serviceRequest:'Service request',
+orderTitle:'Unified GOVO request',orderSub:'Ekta form e delivery, dokaan ba service request korun.',requestType:'Request type',yourName:'Apnar naam',namePh:'Apnar naam',phone:'Phone',phonePh:'01XXXXXXXXX',area:'Area',address:'Thikana',addressPh:'Delivery / service thikana',details:'Request details',detailsPh:'Apnar ki dorkar?',note:'Note',notePh:'Extra note (optional)',shopProvider:'Dokaan / provider (optional)',preferredTime:'Preferred time',preferredTimePh:'Aaj sondha / kal sokal',submitRequest:'Request submit korun',
+invalidPhone:'Thik Bangladeshi phone number din (01XXXXXXXXX).',missingFields:'Naam, phone ar thikana din.',missingDetails:'Request ta likhun, ba voice note ba photo add korun.',
+otStep1:'Apnar ki dorkar?',otStep2:'Phone ar thikana confirm korun',otStep3:'Dekhe confirm korun',
+otDelivery:'Delivery',otDeliverySub:'Jekono kichu pickup ar drop',otShopItem:'Dokaan item',otShopItemSub:'Mudi, khabar, daily needs',otHomeService:'Home service',otHomeServiceSub:'Meramot ar ghorer kaj',otMedicine:'Oshudh',otMedicineSub:'Pharmacy item',otParcel:'Parcel',otParcelSub:'Kagojpotro ar choto parcel',otOther:'Onnano',otOtherSub:'Onno jekono kichu',
+reviewSource:'Source',reviewType:'Type',reviewPhone:'Phone',reviewArea:'Area',reviewAddress:'Thikana',reviewDetails:'Details',confirmSubmit:'Confirm kore submit korun',
+successTitle:'Request pouche geche!',successSub:'GOVO admin apnar request peyeche. Status: Phone Confirming.',requestId:'Request ID',submittedAt:'Submit time',currentStatus:'Current status',trackRequest:'Track korun',getSupport:'Support nin',newRequest:'New request',
+voiceTitle:'Voice Order',voiceSub:'Apnar ki dorkar bole din',micStart:'Record shuru',micStop:'Stop',recording:'Record hocche',replay:'Shunun',delete:'Delete',reRecord:'Abara record',voiceReady:'Voice note ready',voiceMax:'Highest 60 second.',micDenied:'Microphone permission nei',micDeniedSub:'Browser settings e microphone allow korun, ba lekhe request pathan.',micUnsupported:'Ei device e voice record support kore na. Lekhe request pathan.',attachVoice:'Voice note add korun (optional)',
+imageTitle:'Photo Order',imageSub:'Photo tulun ba gallery theke din — baki ta amra samlabo.',takePhoto:'Photo tulun',fromGallery:'Gallery theke nin',addMore:'Aro ekta photo add korun',removeImage:'Remove',imageLimit:'Highest 3 ta photo.',imageTooBig:'Photo ta compress er poreo boro.',imagesReady:'photo ready',attachImages:'Photo add korun (optional)',
+supportTitle:'GOVO Support',supportSub:'Order question, complaint ba follow-up — ekhane pathan.',callSupport:'Call korun',orderHelp:'Order help',orderHelpSub:'New delivery ba service request.',trackHelp:'Track korun',trackHelpSub:'Status ar timeline dekhun.',subject:'Subject',subjectPh:'Complaint / follow-up / question',message:'Message',messagePh:'Apnar message likhun',submitTicket:'Support ticket submit korun',
+ordersTitle:'Apnar request gulo',ordersSub:'Phone number diye apnar request dekhun.',findBtn:'Request khunjun',noOrders:'Ei phone e kono request paini.',trackingTitle:'Request tracking',timeline:'Timeline',detailsCol:'Details',noTimeline:'Eno timeline nei.',
+status_phone_confirming:'Phone Confirming',status_confirmed:'Confirmed',status_assigned:'Assigned',status_on_the_way:'Rastay ache',status_working:'Kaj cholche',status_completed:'Complete',status_paid:'Paid',status_feedback:'Feedback',status_cancelled:'Cancelled',
+notFoundTitle:'Page paini',notFoundSub:'Ei GOVO page ekhon available na.',searchTitle:'Search',searchSub:'Ek jayga theke dokaan ar service khunjun.',searchPh:'Dokaan / service khunjun',noResults:'Kichu paini.',
+profile:'Profile',notifications:'Notification',notifEmpty:'Notification ashle ekhane dekha jabe.',profileEmpty:'Prothom request er por apnar saved info ekhane thakbe.'}
+};
+var LANGS=[{k:'en',label:'English'},{k:'bn',label:'বাংলা'},{k:'bl',label:'Banglish'}];
+var lang=localStorage.getItem('govo.lang.v1')||'en';
+if(!I18N[lang]) lang='en';
+function t(k){var d=I18N[lang]||{};if(d[k]!=null)return d[k];if(I18N.en[k]!=null)return I18N.en[k];return k;}
+/* ================= THEME ================= */
+var themeChoice=localStorage.getItem('govo.theme.v1')||'system';
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: light)'):null;
+function applyTheme(){var m=themeChoice==='system'?(mq?(mq.matches?'light':'dark'):'light'):themeChoice;document.documentElement.setAttribute('data-theme',m);}
+if(mq&&mq.addEventListener)mq.addEventListener('change',function(){if(themeChoice==='system')applyTheme();});
+applyTheme();
+/* ================= CORE ================= */
+var API=location.origin+'/api/govo-flow';
+var main=document.getElementById('main');
+var sr=document.getElementById('sr');
+var areas=['Meherpur','Gangni','Bamundi','Mujibnagar','Amjhupi'];
+var cats=['All Shops','Food and local shop delivery','General delivery booking','Bike/auto transport request','Doctor appointment','Agriculture products','Domestic/home services','House rent','Other local services'];
+var draftKey='govo.customer.request.draft.v16';
+var profileKey='govo.profile.v1';
+var lastReqKey='govo.last.request.v1';
+var inFlight=false;
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function say(msg){sr.textContent='';setTimeout(function(){sr.textContent=msg;},30);}
+function getProfile(){try{return JSON.parse(localStorage.getItem(profileKey)||'{}');}catch(e){return {};}}
+function saveProfile(p){try{localStorage.setItem(profileKey,JSON.stringify(p));}catch(e){}}
+function errText(code){var map={invalid_phone:'invalidPhone',missing_fields:'missingFields',missing_details:'missingDetails',file_too_large:'imageTooBig',unsupported_file_type:'imageTooBig'};return t(map[code]||'errorLoad');}
+function api(path,opts){
+  var ctl=new AbortController();var timer=setTimeout(function(){ctl.abort();},20000);
+  opts=Object.assign({headers:{Accept:'application/json'},credentials:'same-origin',signal:ctl.signal},opts||{});
+  return fetch(API+path,opts).then(function(r){clearTimeout(timer);var ct=r.headers.get('content-type')||'';if(ct.indexOf('json')===-1){throw new Error(t('errorLoad'));}return r.json().then(function(j){if(!r.ok||j.ok===false){var e=new Error(errText(j.error||j.code));e.data=j;throw e;}return j;});},function(){clearTimeout(timer);throw new Error(t('offlineMsg'));});
+}
+function postJSON(path,data){return api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}
+function path(){var p=location.pathname.replace(/\/+/g,'/').replace(/\/$/,'')||'/';if(p==='/app')p='/';if(p==='/service')p='/services';if(p==='/help')p='/support';return p;}
+function setTitle(x){document.title=x+' — GOVO Express';}
+function activeKey(p){if(p==='/')return 'home';if(p.indexOf('/shops')===0)return 'shops';if(p.indexOf('/services')===0)return 'services';if(/^\/order|^\/one-tap|^\/voice|^\/image/.test(p))return 'order';if(p==='/support'||p==='/profile'||p==='/notifications'||p==='/search')return 'support';return '';}
+/* ================= CHROME (header/nav/menu) ================= */
+function renderChrome(){
+  document.querySelectorAll('[data-logo]').forEach(function(el){el.innerHTML=BRAND.logoSvg;});
+  document.querySelectorAll('[data-i]').forEach(function(el){el.textContent=t(el.getAttribute('data-i'));});
+  var navItems=[['/','home','navHome'],['/shops','shops','navShops'],['/services','services','navServices'],['/order','order','navOrder'],['/support','help','navHelp']];
+  document.getElementById('bottomnav').innerHTML=navItems.map(function(n){return '<a class="nav" data-nav="'+n[1]+'" href="'+n[0]+'"><b>'+ICONS[n[1] === 'help' ? 'help' : n[1]]+'</b>'+t(n[2])+'</a>';}).join('');
+  var menu=[['/','menuHome','home'],['/shops','menuShops','shops'],['/services','menuServices','services'],['/order','menuOrder','order'],['https://merchant.govoexpress.com/onboarding','menuMerchant','merchant'],['https://rider.govoexpress.com/onboarding','menuRider','rider'],['/support','menuSupport','support']];
+  document.getElementById('drawerbox').innerHTML=menu.map(function(m){var ext=m[0].indexOf('http')===0;return '<a href="'+m[0]+'"'+(ext?' data-ext="1"':'')+'><span>'+t(m[1])+'</span><b>'+ICONS[m[2]]+'</b></a>';}).join('')+
+  '<div class="drawer-label">'+t('menuLanguage')+'</div><div class="seg" role="group" aria-label="'+t('menuLanguage')+'">'+LANGS.map(function(l){return '<button type="button" data-lang="'+l.k+'" aria-pressed="'+(lang===l.k)+'">'+l.label+'</button>';}).join('')+'</div>'+
+  '<div class="drawer-label">'+t('menuTheme')+'</div><div class="seg" role="group" aria-label="'+t('menuTheme')+'">'+['dark','light','system'].map(function(th){return '<button type="button" data-theme-ch="'+th+'" aria-pressed="'+(themeChoice===th)+'">'+t('theme'+th.charAt(0).toUpperCase()+th.slice(1))+'</button>';}).join('')+'</div>';
+  document.querySelectorAll('[data-lang]').forEach(function(b){b.onclick=function(){lang=b.getAttribute('data-lang');localStorage.setItem('govo.lang.v1',lang);document.documentElement.lang=lang==='bl'?'bn-Latn':lang;renderChrome();route();say(t('menuLanguage')+': '+b.textContent);};});
+  document.querySelectorAll('[data-theme-ch]').forEach(function(b){b.onclick=function(){themeChoice=b.getAttribute('data-theme-ch');localStorage.setItem('govo.theme.v1',themeChoice);applyTheme();renderChrome();};});
+  updateNav(path());
+}
+function updateNav(p){var k=activeKey(p);document.querySelectorAll('.bottom .nav').forEach(function(a){a.classList.toggle('active',a.getAttribute('data-nav')===k);if(a.getAttribute('data-nav')===k)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});}
+document.addEventListener('click',function(e){var a=e.target.closest('a[href]');if(!a)return;var href=a.getAttribute('href');if(!href||href.indexOf('tel:')===0||href.indexOf('mailto:')===0||href[0]==='#')return;var d=document.getElementById('drawer');if(d)d.removeAttribute('open');if(href.indexOf('http')===0)return;e.preventDefault();history.pushState(null,'',href);route();});
+window.addEventListener('popstate',route);
+window.addEventListener('online',updateOffline);window.addEventListener('offline',updateOffline);
+function updateOffline(){document.getElementById('offline').classList.toggle('show',!navigator.onLine);document.getElementById('offline').textContent=t('offlineMsg');}
+/* ================= SHARED UI ================= */
+function chips(list){return '<div class="area">'+list.map(function(a){return '<span>'+esc(a)+'</span>';}).join('')+'</div>';}
+function skels(n){var h='<div class="grid">';for(var i=0;i<(n||4);i++)h+='<div class="skel"></div>';return h+'</div>';}
+function hero(kick,title,sub){return '<section class="hero"><span class="kicker">'+esc(kick)+'</span><h1>'+esc(title)+'</h1><p class="lead">'+esc(sub)+'</p></section>';}
+function errorBox(msg,retryFn){return '<section class="card"><h2>'+esc(t('errorLoad'))+'</h2><p>'+esc(msg||'')+'</p><div class="actions">'+(retryFn?'<button class="btn primary" data-retry>'+esc(t('retry'))+'</button>':'')+'<a class="btn" href="/">'+esc(t('navHome'))+'</a><a class="btn" href="/support">'+esc(t('menuSupport'))+'</a></div></section>';}
+function bindRetry(fn){var b=main.querySelector('[data-retry]');if(b)b.onclick=fn;}
+function emptyBox(title,msg){return '<section class="card"><h2>'+esc(title)+'</h2><p>'+esc(msg)+'</p><div class="actions"><a class="btn primary" href="/order">'+esc(t('orderHelp'))+'</a><a class="btn" href="/support">'+esc(t('getSupport'))+'</a></div></section>';}
+function card(icon,title,body,href,tag){return '<a class="card link" href="'+esc(href)+'"><div class="icon">'+icon+'</div><h3>'+esc(title)+'</h3><p>'+esc(body||'')+'</p><span class="tag">'+esc(tag||'GOVO')+'</span></a>';}
+function field(name,labelKey,type,phKey,required,val){return '<div><label for="f-'+esc(name)+'">'+esc(t(labelKey))+(required?' <span aria-hidden="true">*</span>':'')+'</label><input id="f-'+esc(name)+'" name="'+esc(name)+'" type="'+esc(type||'text')+'" '+(required?'required aria-required="true"':'')+' placeholder="'+esc(phKey?t(phKey):'')+'" value="'+esc(val||'')+'"></div>';}
+function areaSelect(name,val){return '<div><label for="f-'+esc(name||'customer_area')+'">'+esc(t('area'))+'</label><select id="f-'+esc(name||'customer_area')+'" name="'+esc(name||'customer_area')+'">'+areas.map(function(a){return '<option'+(a===val?' selected':'')+'>'+esc(a)+'</option>';}).join('')+'</select></div>';}
+function statusLabel(s){var k=(s&&s.status)||s||'phone_confirming';return t('status_'+String(k).replace(/\s+/g,'_').toLowerCase())!==('status_'+String(k).replace(/\s+/g,'_').toLowerCase())?t('status_'+String(k).replace(/\s+/g,'_').toLowerCase()):((s&&s.label)||k);}
+function contactFields(p){p=p||getProfile();return field('customer_name','yourName','text','namePh',true,p.name)+field('customer_phone','phone','tel','phonePh',true,p.phone)+areaSelect('customer_area',p.area)+field('customer_address','address','text','addressPh',true,p.address);}
+/* ================= UNIFIED SUBMIT ================= */
+function submitRequest(opts){ // {source, requestType, data, voiceBlob, images[]}
+  if(inFlight)return Promise.reject(new Error('duplicate'));
+  inFlight=true;
+  var hasFiles=!!(opts.voiceBlob||(opts.images&&opts.images.length));
+  var p;
+  if(hasFiles){
+    var fd=new FormData();
+    fd.append('source',opts.source);fd.append('requestType',opts.requestType||'delivery');
+    Object.keys(opts.data||{}).forEach(function(k){if(opts.data[k]!=null&&opts.data[k]!=='')fd.append(k,opts.data[k]);});
+    if(opts.voiceBlob)fd.append('voice',opts.voiceBlob,'voice.webm');
+    (opts.images||[]).forEach(function(b,i){fd.append('images',b,'photo-'+(i+1)+'.jpg');});
+    p=api('/requests',{method:'POST',body:fd});
+  }else{
+    p=postJSON('/requests',Object.assign({source:opts.source,requestType:opts.requestType||'delivery'},opts.data||{}));
+  }
+  return p.then(function(j){
+    var d=opts.data||{};
+    saveProfile({name:d.customer_name||'',phone:d.customer_phone||'',area:d.customer_area||'',address:d.customer_address||''});
+    if(j.order&&j.order.code)try{localStorage.setItem(lastReqKey,j.order.code);}catch(e){}
+    inFlight=false;return j;
+  },function(e){inFlight=false;throw e;});
+}
+function successPage(code,label){
+  var now=new Date().toLocaleString();
+  main.innerHTML='<section class="card" style="max-width:760px"><div class="icon" aria-hidden="true">✅</div><h2>'+esc(t('successTitle'))+'</h2><p>'+esc(t('successSub'))+'</p>'+
+  '<div class="review"><div><span>'+esc(t('requestId'))+'</span><b class="success-id">'+esc(code)+'</b></div><div><span>'+esc(t('submittedAt'))+'</span><b>'+esc(now)+'</b></div><div><span>'+esc(t('currentStatus'))+'</span><b>'+esc(t('status_phone_confirming'))+'</b></div></div>'+
+  '<div class="actions"><a class="btn primary" href="/orders/'+encodeURIComponent(code)+'">'+esc(t('trackRequest'))+'</a><a class="btn" href="/support?related_code='+encodeURIComponent(code)+'">'+esc(t('getSupport'))+'</a><a class="btn" href="/order">'+esc(t('newRequest'))+'</a></div></section>';
+  say(t('successTitle')+' '+code);
+}
+function attachSubmit(form,buildOpts){
+  var state=form.querySelector('[data-submit-state]');var btn=form.querySelector('button[type="submit"],button:not([type])');
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    if(inFlight)return;
+    var data={};new FormData(form).forEach(function(v,k){if(k==='product'){data.description=(data.description?data.description+'; ':'')+v;}else if(v)data[k]=v;});
+    var o=buildOpts(data);
+    if(!o)return;
+    if(!o.skipClientValidate){
+      if(!data.customer_name||!data.customer_phone||!data.customer_address){if(state)state.innerHTML='<span class="errorbox" style="display:block">'+esc(t('missingFields'))+'</span>';say(t('missingFields'));return;}
+      if(!/^(\+?88)?01[0-9]{9}$/.test(String(data.customer_phone).replace(/[^0-9+]/g,''))){if(state)state.innerHTML='<span class="errorbox" style="display:block">'+esc(t('invalidPhone'))+'</span>';say(t('invalidPhone'));return;}
+    }
+    if(btn){btn.disabled=true;btn.textContent=t('submitting');}
+    if(state)state.textContent=t('submitting');
+    submitRequest(o).then(function(j){localStorage.removeItem(draftKey);successPage((j.order&&j.order.code)||'—');},function(err){if(state)state.innerHTML='<span class="errorbox" style="display:block">'+esc(err.message||t('errorLoad'))+'</span>';say(err.message||t('errorLoad'));if(btn){btn.disabled=false;btn.textContent=t('submitRequest');}});
+  });
+}
+/* ================= VOICE WIDGET ================= */
+function voiceWidget(container,onChange){
+  var rec=null,chunks=[],blob=null,stream=null,timer=null,sec=0;
+  var MAX=60;
+  function render(state){
+    if(state==='unsupported'){container.innerHTML='<p class="hint">'+esc(t('micUnsupported'))+'</p>';return;}
+    if(state==='denied'){container.innerHTML='<div class="errorbox"><b>'+esc(t('micDenied'))+'</b><br>'+esc(t('micDeniedSub'))+'</div>';return;}
+    if(state==='recording'){container.innerHTML='<div class="recbox"><p><span class="recdot" aria-hidden="true"></span> <b>'+esc(t('recording'))+'… <span id="rec-t">0s</span>/'+MAX+'s</b></p><button type="button" class="btn danger" data-stop>⏹ '+esc(t('micStop'))+'</button><p class="hint">'+esc(t('voiceMax'))+'</p></div>';container.querySelector('[data-stop]').onclick=stop;return;}
+    if(state==='ready'){var url=URL.createObjectURL(blob);container.innerHTML='<div class="recbox"><p><b>✅ '+esc(t('voiceReady'))+'</b> ('+sec+'s)</p><audio controls src="'+url+'" aria-label="'+esc(t('replay'))+'"></audio><div class="actions" style="margin:6px 0"><button type="button" class="btn" data-rerec>🎙️ '+esc(t('reRecord'))+'</button><button type="button" class="btn danger" data-del>🗑 '+esc(t('delete'))+'</button></div></div>';container.querySelector('[data-rerec]').onclick=function(){blob=null;onChange(null);start();};container.querySelector('[data-del]').onclick=function(){blob=null;sec=0;onChange(null);render('idle');};return;}
+    container.innerHTML='<div class="recbox"><button type="button" class="btn" data-start>🎙️ '+esc(t('micStart'))+'</button><p class="hint">'+esc(t('voiceMax'))+'</p></div>';
+    container.querySelector('[data-start]').onclick=start;
+  }
+  function tick(){sec++;var el=container.querySelector('#rec-t');if(el)el.textContent=sec+'s';if(sec>=MAX)stop();}
+  function start(){
+    if(!navigator.mediaDevices||!window.MediaRecorder){render('unsupported');return;}
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(s){
+      stream=s;chunks=[];sec=0;
+      try{rec=new MediaRecorder(s);}catch(e){render('unsupported');s.getTracks().forEach(function(tr){tr.stop();});return;}
+      rec.ondataavailable=function(ev){if(ev.data.size)chunks.push(ev.data);};
+      rec.onstop=function(){stream.getTracks().forEach(function(tr){tr.stop();});clearInterval(timer);if(chunks.length){blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'});onChange(blob);render('ready');}else{render('idle');}};
+      rec.start();render('recording');timer=setInterval(tick,1000);
+    },function(){render('denied');});
+  }
+  function stop(){if(rec&&rec.state!=='inactive')rec.stop();}
+  render('idle');
+  return {getBlob:function(){return blob;}};
+}
+/* ================= IMAGE WIDGET ================= */
+function imageWidget(container,onChange){
+  var items=[];var MAXN=3;
+  function compress(file){return new Promise(function(res,rej){var img=new Image();var url=URL.createObjectURL(file);img.onload=function(){var M=1280;var w=img.width,h=img.height;var sc=Math.min(1,M/Math.max(w,h));var c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);c.toBlob(function(b){b?res(b):rej(new Error('compress'));},'image/jpeg',.82);};img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('bad image'));};img.src=url;});}
+  function render(){
+    container.innerHTML='<div class="actions" style="margin:6px 0"><button type="button" class="btn" data-cam>📷 '+esc(t('takePhoto'))+'</button><button type="button" class="btn" data-gal>🖼 '+esc(t('fromGallery'))+'</button></div>'+(items.length?'<p class="hint">'+items.length+'/3 '+esc(t('imagesReady'))+'</p>':'<p class="hint">'+esc(t('imageLimit'))+'</p>')+'<div class="thumbs">'+items.map(function(b,i){return '<div class="thumb"><img alt="photo '+(i+1)+'"><button type="button" data-rm="'+i+'" aria-label="'+esc(t('removeImage'))+'">×</button></div>';}).join('')+'</div>';
+    var thumbs=container.querySelectorAll('.thumb img');items.forEach(function(b,i){if(thumbs[i])thumbs[i].src=URL.createObjectURL(b);});
+    container.querySelector('[data-cam]').onclick=function(){pick(true);};
+    container.querySelector('[data-gal]').onclick=function(){pick(false);};
+    container.querySelectorAll('[data-rm]').forEach(function(b){b.onclick=function(){items.splice(+b.getAttribute('data-rm'),1);onChange(items);render();};});
+  }
+  function pick(cam){
+    if(items.length>=MAXN){say(t('imageLimit'));return;}
+    var inp=document.createElement('input');inp.type='file';inp.accept='image/jpeg,image/png,image/webp';if(cam)inp.capture='environment';
+    inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;compress(f).then(function(b){if(b.size>5*1024*1024){say(t('imageTooBig'));return;}items.push(b);onChange(items);render();},function(){say(t('errorLoad'));});};
+    inp.click();
+  }
+  render();
+  return {getImages:function(){return items;}};
+}
+/* ================= PAGES ================= */
+function renderHome(){
+  setTitle(t('navHome'));updateNav('/');
+  var last='';try{last=localStorage.getItem(lastReqKey)||'';}catch(e){}
+  main.innerHTML=hero(t('badge'),t('heroTitle'),t('heroSub'))+
+  '<div class="actions"><a class="btn primary" href="/shops">'+ICONS.shops+' '+esc(t('ctaShops'))+'</a><a class="btn gold" href="/services">'+ICONS.services+' '+esc(t('ctaServices'))+'</a><a class="btn" href="/order">'+ICONS.delivery+' '+esc(t('ctaDelivery'))+'</a></div>'+
+  '<div class="grid two"><a class="card link" href="/one-tap"><div class="icon">'+ICONS.oneTap+'</div><h3>'+esc(t('oneTapTitle'))+'</h3><p>'+esc(t('oneTapSub'))+'</p><span class="tag">'+esc(t('oneTapBtn'))+'</span></a>'+
+  '<a class="card link" href="/voice"><div class="icon">'+ICONS.voice+'</div><h3>'+esc(t('ctaVoice'))+'</h3><p>'+esc(t('voiceSub'))+'</p><span class="tag">'+esc(t('voiceMax'))+'</span></a>'+
+  '<a class="card link" href="/image"><div class="icon">'+ICONS.image+'</div><h3>'+esc(t('ctaImage'))+'</h3><p>'+esc(t('imageSub'))+'</p><span class="tag">'+esc(t('imageLimit'))+'</span></a>'+
+  '<a class="card link" href="/orders"><div class="icon">'+ICONS.track+'</div><h3>'+esc(t('trackHelp'))+'</h3><p>'+esc(t('trackHelpSub'))+'</p><span class="tag">GOVO</span></a></div>'+
+  (last?'<div class="section-title"><h2>'+esc(t('recentTitle'))+'</h2></div><div class="grid"><a class="card link" href="/orders/'+encodeURIComponent(last)+'"><div class="icon">'+ICONS.track+'</div><h3>'+esc(last)+'</h3><p>'+esc(t('trackHelpSub'))+'</p><span class="tag">'+esc(t('trackRequest'))+'</span></a></div>':'')+
+  '<div class="section-title"><h2>'+esc(t('popularShops'))+'</h2><a class="pill" href="/shops">'+esc(t('viewAll'))+'</a></div><div data-home-shops>'+skels(4)+'</div>'+
+  '<div class="section-title"><h2>'+esc(t('localServices'))+'</h2><a class="pill" href="/services">'+esc(t('viewAll'))+'</a></div><div data-home-services>'+skels(4)+'</div>'+
+  '<div class="section-title"><h2>'+esc(t('supportTitle'))+'</h2></div><div class="grid"><a class="card link" href="/support"><div class="icon">'+ICONS.support+'</div><h3>'+esc(t('supportTitle'))+'</h3><p>'+esc(t('supportSub'))+'</p><span class="tag">'+esc(t('getSupport'))+'</span></a></div>';
+  api('/shops').then(function(j){var el=main.querySelector('[data-home-shops]');if(!el)return;var list=(j.shops||[]).slice(0,4);el.innerHTML=list.length?'<div class="grid">'+list.map(function(s){return card(ICONS.shops,s.name,(s.category||'Shop')+' · '+(s.area||''),'/shops/'+s.id,s.open?t('openNow'):t('statusUnavailable'));}).join('')+'</div>':emptyBox(t('emptyShops'),t('emptyShopsSub'));}).catch(function(){var el=main.querySelector('[data-home-shops]');if(el)el.innerHTML=errorBox('');bindRetry(renderHome);});
+  api('/services').then(function(j){var el=main.querySelector('[data-home-services]');if(!el)return;var list=(j.services||[]).slice(0,4);el.innerHTML=list.length?'<div class="grid">'+list.map(function(s){return card(ICONS.services,s.name||s.serviceType,(s.area||'')+' · '+(s.description||''),'/services/'+(s.key||s.id),s.available?t('available'):t('request'));}).join('')+'</div>':emptyBox(t('emptyServices'),'');}).catch(function(){var el=main.querySelector('[data-home-services]');if(el)el.innerHTML=errorBox('');bindRetry(renderHome);});
+}
+function renderShops(){
+  setTitle(t('navShops'));updateNav('/shops');
+  main.innerHTML=hero(ICONS.shops+' '+t('navShops'),t('shopsTitle'),t('shopsSub'))+skels(4);
+  api('/shops'+location.search).then(function(j){
+    var q=new URLSearchParams(location.search);
+    main.innerHTML=hero(ICONS.shops+' '+t('navShops'),t('shopsTitle'),t('shopsSub'))+
+    '<section class="card"><h2>'+esc(t('findShops'))+'</h2><form class="form" data-route-filter><input name="q" placeholder="'+esc(t('shopSearchPh'))+'" value="'+esc(q.get('q')||'')+'" aria-label="'+esc(t('shopSearchPh'))+'">'+areaSelect('area',q.get('area')||'')+'<select name="category" aria-label="'+esc(t('allCategories'))+'"><option value="">'+esc(t('allCategories'))+'</option>'+cats.map(function(c){return '<option'+(q.get('category')===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select><button class="btn primary">'+esc(t('search'))+'</button></form></section>'+
+    '<div class="grid">'+((j.shops||[]).map(function(s){return card(ICONS.shops,s.name,(s.category||'Shop')+' · '+(s.area||''),'/shops/'+s.id,s.open?t('openNow'):t('statusUnavailable'));}).join(''))+'</div>'+((j.shops||[]).length?'':emptyBox(t('emptyShops'),t('emptyShopsSub')));
+    bindForms();
+  }).catch(function(e){main.innerHTML=errorBox(e.message);bindRetry(renderShops);});
+}
+function renderShop(id){
+  setTitle(t('navShops'));updateNav('/shops');
+  main.innerHTML=skels(3);
+  api('/shops/'+encodeURIComponent(id)).then(function(j){
+    var s=j.shop||{};var p=getProfile();
+    var products=(s.products||[]).map(function(pr){return '<label class="card" style="display:block"><input type="checkbox" name="product" value="'+esc(pr.name)+'"> <b>'+esc(pr.name)+'</b><p>'+esc([pr.category,pr.price,pr.description].filter(Boolean).join(' · '))+'</p></label>';}).join('');
+    main.innerHTML=hero(ICONS.shops+' '+esc(s.name),esc(s.name),[s.category,s.area,s.address].filter(Boolean).join(' · '))+
+    '<section class="card"><h2>'+esc(t('shopInfo'))+'</h2><p>'+esc(s.description||'')+'</p><div class="actions"><a class="btn" href="/shops">'+esc(t('back'))+'</a></div></section>'+
+    '<form class="form card" data-order-form><input type="hidden" name="merchant_id" value="'+esc(s.id)+'"><input type="hidden" name="merchant_name" value="'+esc(s.name)+'"><h2>'+esc(t('itemsProducts'))+'</h2>'+(products||'<p class="hint">'+esc(t('noItemsSub'))+'</p>')+field('items','details','text','detailsPh',false)+contactFields(p)+'<div><label for="f-note">'+esc(t('note'))+'</label><textarea id="f-note" name="note" placeholder="'+esc(t('notePh'))+'"></textarea></div><button class="btn primary block" type="submit">'+esc(t('submitRequest'))+'</button><p data-submit-state></p></form>';
+    bindForms();
+  }).catch(function(e){main.innerHTML=errorBox(e.message);bindRetry(function(){renderShop(id);});});
+}
+function renderServices(){
+  setTitle(t('navServices'));updateNav('/services');
+  main.innerHTML=hero(ICONS.services+' '+t('navServices'),t('servicesTitle'),t('servicesSub'))+skels(4);
+  api('/services'+location.search).then(function(j){
+    var q=new URLSearchParams(location.search);
+    main.innerHTML=hero(ICONS.services+' '+t('navServices'),t('servicesTitle'),t('servicesSub'))+
+    '<section class="card"><h2>'+esc(t('findServices'))+'</h2><form class="form" data-route-filter><input name="q" placeholder="'+esc(t('serviceSearchPh'))+'" value="'+esc(q.get('q')||'')+'" aria-label="'+esc(t('serviceSearchPh'))+'">'+areaSelect('area',q.get('area')||'')+'<button class="btn primary">'+esc(t('search'))+'</button></form></section>'+
+    '<div class="grid">'+((j.services||[]).map(function(s){return card(ICONS.services,s.name||s.serviceType,(s.area||'')+' · '+(s.description||''),'/services/'+(s.key||s.id),s.available?t('available'):t('request'));}).join(''))+'</div>'+((j.services||[]).length?'':emptyBox(t('emptyServices'),''));
+    bindForms();
+  }).catch(function(e){main.innerHTML=errorBox(e.message);bindRetry(renderServices);});
+}
+function renderService(id){
+  setTitle(t('navServices'));updateNav('/services');
+  main.innerHTML=skels(3);
+  api('/services/'+encodeURIComponent(id)).then(function(j){
+    var s=j.service||{};var p=getProfile();
+    main.innerHTML=hero(ICONS.services+' '+t('serviceRequest'),s.name||s.serviceType,s.description||'')+
+    '<form class="form card" data-service-form><input type="hidden" name="provider_id" value="'+esc(/^\d+$/.test(String(s.id))?s.id:'')+'"><input type="hidden" name="provider_name" value="'+esc(s.name||'')+'"><input type="hidden" name="service_type" value="'+esc(s.serviceType||s.name||'')+'">'+contactFields(p)+field('preferred_time','preferredTime','text','preferredTimePh',false)+'<div><label for="f-problem">'+esc(t('details'))+' <span aria-hidden="true">*</span></label><textarea id="f-problem" name="description" required aria-required="true" placeholder="'+esc(t('detailsPh'))+'"></textarea></div><button class="btn primary block" type="submit">'+esc(t('submitRequest'))+'</button><p data-submit-state></p></form>';
+    bindForms();
+  }).catch(function(e){main.innerHTML=errorBox(e.message);bindRetry(function(){renderService(id);});});
+}
+function renderOrder(){
+  setTitle(t('navOrder'));updateNav('/order');
+  var params=new URLSearchParams(location.search);var draft={};try{draft=JSON.parse(localStorage.getItem(draftKey)||'{}');}catch(e){}
+  var p=Object.assign(getProfile(),draft);
+  main.innerHTML=hero(ICONS.order+' '+t('navOrder'),t('orderTitle'),t('orderSub'))+
+  '<form class="form card" data-order-form><input type="hidden" name="merchant_id" value="'+esc(params.get('shopId')||'')+'"><div><label for="f-order_type">'+esc(t('requestType'))+'</label><select id="f-order_type" name="requestType"><option value="delivery">'+esc(t('otDelivery'))+'</option><option value="shop">'+esc(t('otShopItem'))+'</option><option value="service">'+esc(t('otHomeService'))+'</option><option value="medicine">'+esc(t('otMedicine'))+'</option><option value="parcel">'+esc(t('otParcel'))+'</option><option value="other">'+esc(t('otOther'))+'</option></select></div>'+
+  '<div><label for="f-items">'+esc(t('details'))+' <span aria-hidden="true">*</span></label><textarea id="f-items" name="description" required aria-required="true" placeholder="'+esc(t('detailsPh'))+'">'+esc(params.get('type')||draft.description||'')+'</textarea></div>'+
+  contactFields(p)+field('merchant_name','shopProvider','text','',false,params.get('merchant_name')||'')+field('preferred_time','preferredTime','text','preferredTimePh',false)+
+  '<div><label for="f-note">'+esc(t('note'))+'</label><textarea id="f-note" name="note" placeholder="'+esc(t('notePh'))+'">'+esc(draft.note||'')+'</textarea></div><button class="btn primary block" type="submit">'+esc(t('submitRequest'))+'</button><p data-submit-state></p></form>';
+  bindForms();
+}
+function renderOneTap(step,state){
+  setTitle(t('oneTapTitle'));updateNav('/order');
+  state=state||{type:'',data:{}};
+  var p=getProfile();
+  function stepsBar(n){return '<div class="steps" aria-hidden="true"><i class="'+(n>=1?'on':'')+'"></i><i class="'+(n>=2?'on':'')+'"></i><i class="'+(n>=3?'on':'')+'"></i></div>';}
+  if(step===1){
+    var types=[['delivery','otDelivery','otDeliverySub','delivery'],['shop','otShopItem','otShopItemSub','shops'],['home_service','otHomeService','otHomeServiceSub','services'],['medicine','otMedicine','otMedicineSub','medicine'],['parcel','otParcel','otParcelSub','parcel'],['other','otOther','otOtherSub','other']];
+    main.innerHTML=hero(ICONS.oneTap+' '+t('oneTapTitle'),t('otStep1'),'')+stepsBar(1)+'<div class="typick">'+types.map(function(tp){return '<button type="button" data-type="'+tp[0]+'" aria-pressed="false"><span class="icon">'+ICONS[tp[3]]+'</span><b>'+esc(t(tp[1]))+'</b><small>'+esc(t(tp[2]))+'</small></button>';}).join('')+'</div>';
+    main.querySelectorAll('[data-type]').forEach(function(b){b.onclick=function(){state.type=b.getAttribute('data-type');renderOneTap(2,state);};});
+    return;
+  }
+  if(step===2){
+    main.innerHTML=hero(ICONS.oneTap+' '+t('oneTapTitle'),t('otStep2'),'')+stepsBar(2)+
+    '<form class="form card" data-ot2>'+contactFields(p)+'<div><label for="f-ot-note">'+esc(t('details'))+' ('+esc(t('optional'))+')</label><textarea id="f-ot-note" name="description" placeholder="'+esc(t('detailsPh'))+'"></textarea></div><div class="actions"><button type="button" class="btn" data-back> '+esc(t('back'))+'</button><button class="btn primary" type="submit">'+esc(t('next'))+'</button></div></form>';
+    main.querySelector('[data-back]').onclick=function(){renderOneTap(1,state);};
+    main.querySelector('[data-ot2]').addEventListener('submit',function(e){e.preventDefault();var d={};new FormData(e.target).forEach(function(v,k){d[k]=v;});if(!d.customer_name||!d.customer_phone||!d.customer_address){say(t('missingFields'));return;}if(!/^(\+?88)?01[0-9]{9}$/.test(String(d.customer_phone).replace(/[^0-9+]/g,''))){say(t('invalidPhone'));return;}state.data=d;renderOneTap(3,state);});
+    return;
+  }
+  // step 3: review + optional voice/images + confirm
+  var otLabelKeys={delivery:'otDelivery',shop:'otShopItem',home_service:'otHomeService',medicine:'otMedicine',parcel:'otParcel',other:'otOther'};
+  main.innerHTML=hero(ICONS.oneTap+' '+t('oneTapTitle'),t('otStep3'),'')+stepsBar(3)+
+  '<section class="card review"><div><span>'+esc(t('reviewType'))+'</span><b>'+esc(t(otLabelKeys[state.type]||'otOther'))+'</b></div><div><span>'+esc(t('yourName'))+'</span><b>'+esc(state.data.customer_name)+'</b></div><div><span>'+esc(t('reviewPhone'))+'</span><b>'+esc(state.data.customer_phone)+'</b></div><div><span>'+esc(t('reviewArea'))+'</span><b>'+esc(state.data.customer_area)+'</b></div><div><span>'+esc(t('reviewAddress'))+'</span><b>'+esc(state.data.customer_address)+'</b></div>'+(state.data.description?'<div><span>'+esc(t('reviewDetails'))+'</span><b>'+esc(state.data.description)+'</b></div>':'')+'</section>'+
+  '<section class="card"><h2>'+esc(t('attachVoice'))+'</h2><div data-vw></div></section><section class="card"><h2>'+esc(t('attachImages'))+'</h2><div data-iw></div></section>'+
+  '<div class="actions"><button class="btn" data-back>'+esc(t('back'))+'</button><button class="btn primary" data-go style="flex:1">'+esc(t('confirmSubmit'))+'</button></div><p data-submit-state></p>';
+  var vw=voiceWidget(main.querySelector('[data-vw]'),function(){});
+  var iw=imageWidget(main.querySelector('[data-iw]'),function(){});
+  main.querySelector('[data-back]').onclick=function(){renderOneTap(2,state);};
+  main.querySelector('[data-go]').onclick=function(){
+    if(inFlight)return;
+    var btn=main.querySelector('[data-go]');btn.disabled=true;btn.textContent=t('submitting');
+    submitRequest({source:'one_tap',requestType:state.type,data:state.data,voiceBlob:vw.getBlob(),images:iw.getImages()}).then(function(j){successPage((j.order&&j.order.code)||'—');},function(err){var st=main.querySelector('[data-submit-state]');if(st)st.innerHTML='<span class="errorbox" style="display:block">'+esc(err.message||t('errorLoad'))+'</span>';btn.disabled=false;btn.textContent=t('confirmSubmit');});
+  };
+}
+function renderVoice(){
+  setTitle(t('ctaVoice'));updateNav('/order');
+  var p=getProfile();
+  main.innerHTML=hero(ICONS.voice+' '+t('ctaVoice'),t('voiceTitle'),t('voiceSub'))+
+  '<form class="form card" data-voice-form><section class="card" style="padding:14px"><div data-vw></div></section><div><label for="f-vtext">'+esc(t('details'))+' ('+esc(t('optional'))+')</label><textarea id="f-vtext" name="description" placeholder="'+esc(t('detailsPh'))+'"></textarea></div>'+contactFields(p)+'<button class="btn primary block" type="submit">'+esc(t('submitRequest'))+'</button><p data-submit-state></p></form>';
+  var vw=voiceWidget(main.querySelector('[data-vw]'),function(){});
+  attachSubmit(main.querySelector('[data-voice-form]'),function(data){
+    if(!vw.getBlob()&&!data.description){var st=main.querySelector('[data-submit-state]');if(st)st.innerHTML='<span class="errorbox" style="display:block">'+esc(t('missingDetails'))+'</span>';say(t('missingDetails'));return null;}
+    return {source:'voice',requestType:'delivery',data:data,voiceBlob:vw.getBlob()};
+  });
+}
+function renderImage(){
+  setTitle(t('ctaImage'));updateNav('/order');
+  var p=getProfile();
+  main.innerHTML=hero(ICONS.image+' '+t('ctaImage'),t('imageTitle'),t('imageSub'))+
+  '<form class="form card" data-image-form><section class="card" style="padding:14px"><div data-iw></div></section><div><label for="f-itext">'+esc(t('details'))+' ('+esc(t('optional'))+')</label><textarea id="f-itext" name="description" placeholder="'+esc(t('detailsPh'))+'"></textarea></div>'+contactFields(p)+'<button class="btn primary block" type="submit">'+esc(t('submitRequest'))+'</button><p data-submit-state></p></form>';
+  var iw=imageWidget(main.querySelector('[data-iw]'),function(){});
+  attachSubmit(main.querySelector('[data-image-form]'),function(data){
+    if(!iw.getImages().length&&!data.description){var st=main.querySelector('[data-submit-state]');if(st)st.innerHTML='<span class="errorbox" style="display:block">'+esc(t('missingDetails'))+'</span>';say(t('missingDetails'));return null;}
+    return {source:'image',requestType:'delivery',data:data,images:iw.getImages()};
+  });
+}
+function renderOrders(id){
+  setTitle(t('ordersTitle'));updateNav('/order');
+  if(id){
+    main.innerHTML=skels(2);
+    api('/orders/'+encodeURIComponent(id)).then(function(j){
+      var o=j.order||{};
+      main.innerHTML=hero(ICONS.track+' '+t('trackingTitle'),o.code||id,t('currentStatus')+': '+statusLabel(o))+
+      '<section class="card"><h2>'+esc(t('timeline'))+'</h2>'+((o.timeline||[]).map(function(x){return '<p><b>'+esc(statusLabel(x.status))+'</b> · '+esc(x.note||'')+'<br><small>'+esc(x.timestamp||'')+'</small></p>';}).join('')||'<p>'+esc(t('noTimeline'))+'</p>')+'</section>'+
+      '<section class="card"><h2>'+esc(t('detailsCol'))+'</h2><p>'+esc(o.items||'')+'</p><p>'+esc(o.address||'')+'</p>'+(o.voiceFile?'<p><audio controls src="'+esc(o.voiceFile)+'"></audio></p>':'')+((o.imageFiles||[]).length?'<div class="thumbs">'+o.imageFiles.map(function(u){return '<div class="thumb"><img src="'+esc(u)+'" alt="" loading="lazy" onerror="this.closest(\'.thumb\').style.display=\'none\'"></div>';}).join('')+'</div>':'')+'<div class="actions"><a class="btn" href="/support?related_code='+esc(o.code||id)+'">'+esc(t('getSupport'))+'</a><a class="btn" href="/orders">'+esc(t('back'))+'</a></div></section>';
+    }).catch(function(e){main.innerHTML=errorBox(e.message);bindRetry(function(){renderOrders(id);});});
+    return;
+  }
+  main.innerHTML=hero(ICONS.track+' '+t('ordersTitle'),t('ordersTitle'),t('ordersSub'))+
+  '<form class="form card" data-orders-lookup>'+field('phone','phone','tel','phonePh',true,getProfile().phone)+'<button class="btn primary">'+esc(t('findBtn'))+'</button><div data-results></div></form>';
+  bindForms();
+}
+function renderSupport(){
+  setTitle(t('menuSupport'));updateNav('/support');
+  var p=new URLSearchParams(location.search);var prof=getProfile();
+  main.innerHTML=hero(ICONS.support+' '+t('menuSupport'),t('supportTitle'),t('supportSub'))+
+  '<div class="grid">'+(BRAND.supportPhone?'<a class="card link" href="tel:'+esc(BRAND.supportPhone)+'"><div class="icon">☎️</div><h3>'+esc(t('callSupport'))+'</h3><p>'+esc(BRAND.supportPhone)+'</p></a>':'')+'<a class="card link" href="/order"><div class="icon">'+ICONS.order+'</div><h3>'+esc(t('orderHelp'))+'</h3><p>'+esc(t('orderHelpSub'))+'</p></a><a class="card link" href="/orders"><div class="icon">'+ICONS.track+'</div><h3>'+esc(t('trackHelp'))+'</h3><p>'+esc(t('trackHelpSub'))+'</p></a></div>'+
+  '<form class="form card" data-support-form>'+field('customer_name','yourName','text','namePh',false,prof.name)+field('customer_phone','phone','tel','phonePh',true,prof.phone)+areaSelect('customer_area',prof.area)+field('subject','subject','text','subjectPh',false)+'<div><label for="f-msg">'+esc(t('message'))+' <span aria-hidden="true">*</span></label><textarea id="f-msg" name="message" required aria-required="true" placeholder="'+esc(t('messagePh'))+'"></textarea></div><input type="hidden" name="related_code" value="'+esc(p.get('related_code')||'')+'"><button class="btn primary block" type="submit">'+esc(t('submitTicket'))+'</button><p data-submit-state></p></form>';
+  bindForms();
+}
+function renderSearch(){
+  setTitle(t('searchTitle'));updateNav('/support');
+  main.innerHTML=hero(ICONS.search+' '+t('searchTitle'),t('searchTitle'),t('searchSub'))+'<form class="form card" data-search-form><input name="q" required placeholder="'+esc(t('searchPh'))+'" aria-label="'+esc(t('searchPh'))+'"><button class="btn primary">'+esc(t('search'))+'</button><div data-results></div></form>';
+  bindForms();
+  var inp=main.querySelector('input[name="q"]');var deb=null;
+  inp.addEventListener('input',function(){clearTimeout(deb);deb=setTimeout(function(){if(inp.value.trim())main.querySelector('[data-search-form]').requestSubmit();},450);});
+}
+function renderSimple(kind){
+  setTitle(t(kind));updateNav('/support');
+  var key=kind==='profile'?'profileEmpty':'notifEmpty';
+  main.innerHTML=hero(kind==='profile'?'👤':'🔔',t(kind),'')+'<section class="card"><h2>'+esc(t(kind))+'</h2><p>'+esc(t(key))+'</p><div class="actions"><a class="btn" href="/support">'+esc(t('menuSupport'))+'</a><a class="btn primary" href="/">'+esc(t('navHome'))+'</a></div></section>';
+}
+function renderNotFound(){
+  setTitle(t('notFoundTitle'));updateNav('');
+  main.innerHTML=hero('404',t('notFoundTitle'),t('notFoundSub'))+'<section class="card"><div class="actions"><a class="btn primary" href="/">'+esc(t('navHome'))+'</a><a class="btn" href="/shops">'+esc(t('navShops'))+'</a><a class="btn" href="/services">'+esc(t('navServices'))+'</a><a class="btn" href="/support">'+esc(t('menuSupport'))+'</a></div></section>';
+}
+/* ================= FORM BINDINGS ================= */
+function bindForms(){
+  document.querySelectorAll('[data-route-filter]').forEach(function(f){f.addEventListener('submit',function(e){e.preventDefault();var q=new URLSearchParams();new FormData(f).forEach(function(v,k){if(v)q.set(k,v);});history.pushState(null,'',path()+(q.toString()?'?'+q:''));route();});});
+  document.querySelectorAll('[data-order-form]').forEach(function(f){
+    f.addEventListener('input',function(){var o={};new FormData(f).forEach(function(v,k){o[k]=v;});try{localStorage.setItem(draftKey,JSON.stringify(o));}catch(e){}});
+    attachSubmit(f,function(data){return {source:data.merchant_id?'shop':'standard_form',requestType:data.requestType||(data.merchant_id?'shop':'delivery'),data:data};});
+  });
+  document.querySelectorAll('[data-service-form]').forEach(function(f){attachSubmit(f,function(data){if(data.service_type)data.description='['+data.service_type+'] '+(data.description||'');return {source:'service',requestType:'service',data:data};});});
+  document.querySelectorAll('[data-support-form]').forEach(function(f){
+    var state=f.querySelector('[data-submit-state]');var btn=f.querySelector('button[type="submit"],button:not([type])');
+    f.addEventListener('submit',function(e){
+      e.preventDefault();if(inFlight)return;inFlight=true;
+      if(btn){btn.disabled=true;btn.textContent=t('submitting');}if(state)state.textContent=t('submitting');
+      var data={};new FormData(f).forEach(function(v,k){if(v)data[k]=v;});
+      postJSON('/support',data).then(function(j){inFlight=false;saveProfile({name:data.customer_name||'',phone:data.customer_phone||'',area:data.customer_area||'',address:''});successPage((j.ticket&&j.ticket.code)||'—',t('submitTicket'));},function(err){inFlight=false;if(state)state.innerHTML='<span class="errorbox" style="display:block">'+esc(err.message||t('errorLoad'))+'</span>';if(btn){btn.disabled=false;btn.textContent=t('submitTicket');}});
+    });
+  });
+  document.querySelectorAll('[data-orders-lookup]').forEach(function(f){f.addEventListener('submit',function(e){e.preventDefault();var phone=new FormData(f).get('phone');var box=f.querySelector('[data-results]');box.innerHTML=skels(2);api('/orders?phone='+encodeURIComponent(phone)).then(function(j){box.innerHTML=(j.orders||[]).map(function(o){return card(ICONS.track,o.code,statusLabel(o)+' · '+(o.address||''),'/orders/'+encodeURIComponent(o.code),t('trackRequest'));}).join('')||'<p>'+esc(t('noOrders'))+'</p>';}).catch(function(err){box.innerHTML='<p class="errorbox">'+esc(err.message)+'</p>';});});});
+  document.querySelectorAll('[data-search-form]').forEach(function(f){f.addEventListener('submit',function(e){e.preventDefault();var q=new FormData(f).get('q');var box=f.querySelector('[data-results]');box.innerHTML=skels(2);Promise.all([api('/shops?q='+encodeURIComponent(q)),api('/services?q='+encodeURIComponent(q))]).then(function(r){var html=(r[0].shops||[]).map(function(s){return card(ICONS.shops,s.name,s.category,'/shops/'+s.id,t('navShops'));}).concat((r[1].services||[]).map(function(s){return card(ICONS.services,s.name,s.serviceType,'/services/'+(s.key||s.id),t('navServices'));})).join('');box.innerHTML=html?'<div class="grid">'+html+'</div>':'<p>'+esc(t('noResults'))+'</p>';}).catch(function(err){box.innerHTML='<p class="errorbox">'+esc(err.message)+'</p>';});});});
+}
+/* ================= ROUTER ================= */
+function route(){
+  var p=path();
+  if(location.pathname!==p&&(location.pathname==='/app'||location.pathname==='/service'||location.pathname==='/help'||/\/$/.test(location.pathname)))history.replaceState(null,'',p+location.search+location.hash);
+  window.scrollTo(0,0);updateNav(p);
+  if(p==='/')return renderHome();
+  if(p==='/shops')return renderShops();
+  if(/^\/shops\/[^/]+$/.test(p))return renderShop(decodeURIComponent(p.split('/')[2]));
+  if(p==='/services')return renderServices();
+  if(/^\/services\/[^/]+$/.test(p))return renderService(decodeURIComponent(p.split('/')[2]));
+  if(p==='/order')return renderOrder();
+  if(p==='/one-tap')return renderOneTap(1);
+  if(p==='/voice')return renderVoice();
+  if(p==='/image')return renderImage();
+  if(p==='/orders')return renderOrders();
+  if(/^\/orders\/[^/]+$/.test(p))return renderOrders(decodeURIComponent(p.split('/')[2]));
+  if(p==='/support')return renderSupport();
+  if(p==='/search')return renderSearch();
+  if(p==='/profile')return renderSimple('profile');
+  if(p==='/notifications')return renderSimple('notifications');
+  return renderNotFound();
+}
+document.documentElement.lang=lang==='bl'?'bn-Latn':lang;
+renderChrome();updateOffline();route();
+})();
+</script>
+</body></html>
