@@ -690,7 +690,7 @@ function bottomNav(active = "home") {
         const isGo = item.key === "go";
         return `
           <a class="govo-nav-item ${active === item.key ? "active" : ""}" href="${esc(item.href)}">
-            ${isGo ? `<div class="govo-nav-go">GO</div>` : `<div class="govo-nav-icon">${esc(icons[item.key] || "•")}</div>`}
+            ${isGo ? `<div class="govo-center-logo"><img src="/uploads/govo-logo.png" alt=""/></div>` : `<div class="govo-nav-icon">${iconSvg(item.icon || item.key)}</div>`}
             <span>${esc(item.label)}</span>
           </a>
         `;

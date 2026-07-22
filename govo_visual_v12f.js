@@ -216,7 +216,7 @@ function css() {
 function logo() {
   return `
     <a class="govo-master-live-logo" href="/app" aria-label="GOVO Express">
-      <img src="/uploads/govo-logo.png" alt="GOVO"/>
+      <img src="/uploads/govo-logo.png" alt="GOVO Express"/>
       <span class="govo-master-live-copy">
         <strong>GOVO EXPRESS</strong>
         <small>OPERATION • TRUST • SPEED • EASY</small>
