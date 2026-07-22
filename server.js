@@ -15,6 +15,68 @@ loadEnv();
 
 const app = express();
 
+// GOVO_ROLE_ISOLATION_V1_START
+app.use((req, res, next) => {
+  const host = String(req.headers.host || "")
+    .split(":")[0]
+    .toLowerCase();
+
+  const path = req.path || "/";
+
+  // Merchant domain ownership
+  if (host === "merchant.govoexpress.com") {
+    if (path === "/") {
+      return res.redirect(302, "/merchant");
+    }
+
+    const customerOnly =
+      path === "/shops" ||
+      path.startsWith("/shops/") ||
+      path === "/services" ||
+      path.startsWith("/services/") ||
+      path.startsWith("/category/") ||
+      path === "/order" ||
+      path.startsWith("/order/") ||
+      path === "/track" ||
+      path.startsWith("/track/");
+
+    if (customerOnly) {
+      return res.redirect(
+        302,
+        "https://app.govoexpress.com" + req.originalUrl
+      );
+    }
+  }
+
+  // Rider domain ownership
+  if (host === "rider.govoexpress.com") {
+    if (path === "/") {
+      return res.redirect(302, "/rider");
+    }
+
+    const customerOnly =
+      path === "/shops" ||
+      path.startsWith("/shops/") ||
+      path === "/services" ||
+      path.startsWith("/services/") ||
+      path.startsWith("/category/") ||
+      path === "/order" ||
+      path.startsWith("/order/");
+
+    if (customerOnly) {
+      return res.redirect(
+        302,
+        "https://app.govoexpress.com" + req.originalUrl
+      );
+    }
+  }
+
+  next();
+});
+// GOVO_ROLE_ISOLATION_V1_END
+
+
+
 // GOVO_PHASE12C_AI_MAP_HARD_ROUTES_START
 app.get(["/ai", "/search", "/voice"], (req, res) => {
   res.setHeader("X-GOVO-UI", "phase12c-live-ai");
@@ -42,7 +104,7 @@ const GOVO_V12C_LIVE_ROUTE_MAP = {
   "/more": "more",
   "/services": "services",
   "/service": "service",
-  "/shops": "shops",
+
   "/shop": "shop",
   "/order": "order",
   "/track": "track",
@@ -110,7 +172,7 @@ app.use((req, res, next) => {
 // GOVO_RESCUE_SHELL_V1_START
 // GOVO_RESCUE_SHELL_V2: customer-first local super app shell.
 // Safety: GET UI override only. Existing POST/admin/auth/db behavior remains untouched.
-const GOVO_RESCUE_SHELL_V1_ACTIVE = true;
+const GOVO_RESCUE_SHELL_V1_ACTIVE = false;
 
 const GOVO_RESCUE_AREAS = ['Meherpur','Gangni','Bamundi','Mujibnagar','Amjhupi'];
 
@@ -437,8 +499,8 @@ function govoRescueShellMiddleware(req,res,next){
   `));
   if (cleanPath === '/order') return res.send(govoOrderPage());
   if (cleanPath === '/service-request') return res.send(govoServiceRequestPage());
-  if (cleanPath === '/merchant') return res.send(govoMerchantPage());
-  if (cleanPath === '/rider') return res.send(govoRiderPage());
+  if (cleanPath === '/merchant') return     res.send(govoPremiumFlowShellInject(govoMerchantPage()));
+  if (cleanPath === '/rider') return     res.send(govoPremiumFlowShellInject(govoRiderPage()));
   if (cleanPath === '/support') return res.send(govoSupportPage());
   if (cleanPath === '/track') return res.send(govoTrackPage());
   if (cleanPath === '/notify') return res.send(govoNotifyCompatPage());
@@ -453,7 +515,8 @@ app.use(govoRescueShellMiddleware);
 
 
 /* GOVO_TRUE_MERGE_V3 */
-require("./govo_unified_v3").mount(app);
+// GOVO_UI_SINGLE_SOURCE_V12: legacy unified visual mount disabled
+// require("./govo_unified_v3").mount(app);
 /* GOVO_TRUE_MERGE_V3_END */
 
 
@@ -1448,18 +1511,18 @@ function govoPhase9CConfig(pathname){
   if(path.startsWith('/merchant') || path.startsWith('/rider')){
     return {
       kicker:path.startsWith('/merchant') ? 'Merchant Menu' : 'Rider / Worker Menu',
-      title:path.startsWith('/merchant') ? 'Merchant flow clear buttons.' : 'Rider-worker flow clear buttons.',
+      title:path.startsWith('/merchant') ? 'Grow your business with GOVO.' : 'Rider-worker flow clear buttons.',
       desc:'Partner onboarding-er sathe customer request/shop/service flow connected thakbe.',
       actions:[
-        ['/service-request','＋ Customer Request',''],
+        ['/service-request','＋ ',''],
         ['/shops','🏪 Shops','alt'],
         ['/services','🛠️ Services','alt'],
         ['/support','☎ Support','alt']
       ],
       sections:[
-        ['Connected GOVO Flow','partner shortcuts',GOVO_PHASE9C_QUICK_BUTTONS,'link']
+        ['','',GOVO_PHASE9C_QUICK_BUTTONS,'link']
       ],
-      pills:['Partner flow','Admin connected','Local operation']
+      pills:['Partner flow','','Local operation']
     };
   }
 
@@ -1653,6 +1716,33 @@ const productUpload = imageUpload;
 
 
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+  const path = req.path || "/";
+
+  if (host === "merchant.govoexpress.com") {
+    if (
+      path.startsWith("/shops") ||
+      path.startsWith("/services") ||
+      path.startsWith("/category/") ||
+      path.startsWith("/order") ||
+      path.startsWith("/track")
+    ) return res.redirect(302, "https://app.govoexpress.com" + req.originalUrl);
+  }
+
+  if (host === "rider.govoexpress.com") {
+    if (
+      path.startsWith("/shops") ||
+      path.startsWith("/services") ||
+      path.startsWith("/category/") ||
+      path.startsWith("/order")
+    ) return res.redirect(302, "https://app.govoexpress.com" + req.originalUrl);
+  }
+
+  next();
+});
+
 app.use(express.json());
 
 const PORT = Number(process.env.PORT || 3000);
@@ -1680,6 +1770,15 @@ function pgConfig() {
     database: process.env.PGDATABASE || process.env.POSTGRES_DB || 'govo',
     user: process.env.PGUSER || process.env.POSTGRES_USER || 'postgres',
     password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || ''};
+}
+
+
+function govoValidPublicMerchant(m) {
+  if (!m) return false;
+  const name = String(m.shop_name || m.name || "").trim();
+  if (!name || /^unnamed shop$/i.test(name) || /^test\b/i.test(name)) return false;
+  if (m.public_visible === false || m.is_demo === true) return false;
+  return true;
 }
 
 function esc(v) {
@@ -2622,6 +2721,23 @@ function govoCleanPublicRuntimeV5() {
 </script>`;
 }
 
+
+/* GOVO FINAL UI ICON PACK */
+function govoUiIcon(name) {
+  const icons = {
+    home:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9v11h13V9"/><path d="M9.5 20v-6h5v6"/></svg>`,
+    shops:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16l-1.5-5h-13L4 9Z"/><path d="M5 9v11h14V9"/><path d="M8 20v-6h8v6"/></svg>`,
+    services:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.8 6.2a4 4 0 0 0-5.1 5.1L4 17l3 3 5.7-5.7a4 4 0 0 0 5.1-5.1l-2.3 2.3-3-3 2.3-2.3Z"/></svg>`,
+    help:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.4 2.2c-.9.5-1.2 1-1.2 1.8"/><path d="M12 17h.01"/></svg>`,
+    voice:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6"/></svg>`,
+    camera:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h4l1.5-2h5L16 7h4v12H4V7Z"/><circle cx="12" cy="13" r="3.5"/></svg>`,
+    tap:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10 13V8.5a2 2 0 1 1 4 0V12l1.4-.8a2 2 0 0 1 2.7.7l1 1.7a3 3 0 0 1 0 3L16.5 21H9l-4-6a2 2 0 0 1 3.2-2.4L10 14"/><path d="M12 2v3M6 5l2 2M18 5l-2 2"/></svg>`,
+    search:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>`,
+    order:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7h12v10H3zM15 10h4l2 3v4h-6"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>`
+  };
+  return icons[name] || icons.home;
+}
+
 function page(title, body, active = '') {
   const isAdmin = active === 'admin';
 
@@ -2638,7 +2754,13 @@ function page(title, body, active = '') {
 
   const publicHeader = `<header class="govo-final-topbar">
     <div class="govo-final-row">
-      <a class="govo-final-logo" href="https://app.govoexpress.com/app">GOVO<span>.</span></a>
+      <a class="govo-master-brand" href="https://app.govoexpress.com/app" aria-label="GOVO Express">
+        <img class="govo-master-mark" src="/uploads/govo-logo.png" alt="GOVO">
+        <span class="govo-master-copy">
+          <strong>GOVO EXPRESS</strong>
+          <small>OPERATION • TRUST • SPEED • EASY</small>
+        </span>
+      </a>
       <button type="button" class="govo-final-menu-btn" aria-label="Open GOVO menu" onclick="event.stopPropagation();document.body.classList.toggle('govo-final-open')">
         <i></i><i></i><i></i>
       </button>
@@ -2810,13 +2932,93 @@ function page(title, body, active = '') {
     }
   `;
 
-  const bottom = isAdmin ? '' : `<nav class="bottom-nav">
-    <a class="${active === 'app' ? 'active' : ''}" href="https://app.govoexpress.com/app">Home</a>
-    <a class="${active === 'shops' ? 'active' : ''}" href="https://app.govoexpress.com/shops">Shops</a>
-    <a class="${active === 'services' ? 'active' : ''}" href="https://app.govoexpress.com/services">Services</a>
-    <a class="${active === 'track' ? 'active' : ''}" href="https://app.govoexpress.com/track">Track</a>
-    <a href="https://merchant.govoexpress.com/merchant">Join</a>
-  </nav>`;
+
+  const govoBrandCss = `
+  .govo-master-brand{display:flex;align-items:center;gap:9px;text-decoration:none!important;min-width:0}
+  .govo-master-mark{width:48px;height:48px;object-fit:contain;display:block;flex:0 0 48px}
+  .govo-master-copy{display:flex;flex-direction:column;line-height:1;min-width:0}
+  .govo-master-copy strong{color:#fff;font-size:16px;font-weight:950;white-space:nowrap}
+  .govo-master-copy small{color:#a8e82f;font-size:6.5px;font-weight:850;letter-spacing:.09em;margin-top:5px;white-space:nowrap}
+  [data-theme="light"] .govo-master-copy strong{color:#102016}
+
+  body.public .govo-final-bottom{display:grid!important;grid-template-columns:1fr 1fr 1.16fr 1fr 1fr!important;align-items:end!important;overflow:visible!important}
+  body.public .govo-final-bottom>a,body.public .govo-main-action{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;background:transparent!important;border:0!important;color:#d9e9dd!important;text-decoration:none!important;min-height:45px!important;padding:4px 2px!important}
+  .govo-nav-icon svg{width:21px;height:21px;display:block}
+  .govo-final-bottom small{font-size:9px!important;font-weight:850!important}
+  body.public .govo-final-bottom>a.active{color:#a8e82f!important}
+
+  body.public .govo-main-action{position:relative!important;overflow:visible!important;cursor:pointer!important;width:100%!important}
+  .govo-main-orb{width:60px;height:60px;display:grid;place-items:center;margin-top:-36px;margin-bottom:3px;border-radius:21px;background:#07140b;border:5px solid #040c0a;box-shadow:0 12px 34px rgba(145,220,40,.34),0 0 0 1px rgba(168,232,47,.32)}
+  .govo-main-orb img{width:48px;height:48px;object-fit:contain;display:block}
+  .govo-main-action small{color:#a8e82f!important}
+
+  .govo-action-overlay{display:none;position:fixed;inset:0;z-index:1000000;background:rgba(0,0,0,.56);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;padding:12px}
+  body.govo-action-open{overflow:hidden}
+  body.govo-action-open .govo-action-overlay{display:flex}
+  .govo-action-sheet{width:min(540px,100%);background:linear-gradient(180deg,#0c1911,#06100a);border:1px solid rgba(168,232,47,.28);border-radius:26px;padding:17px;box-shadow:0 30px 90px rgba(0,0,0,.55)}
+  .govo-action-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:13px}
+  .govo-action-head b{display:block;color:#fff;font-size:20px}
+  .govo-action-head small{display:block;color:rgba(255,255,255,.58);font-size:11px;margin-top:4px}
+  .govo-action-close{width:36px!important;height:36px!important;min-height:36px!important;padding:0!important;border-radius:50%!important;background:rgba(255,255,255,.07)!important;color:#fff!important;font-size:23px!important;box-shadow:none!important}
+  .govo-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .govo-action-grid a{display:flex;align-items:center;gap:10px;padding:12px;border-radius:17px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);color:#fff!important;text-decoration:none!important;min-height:67px}
+  .govo-action-grid svg{width:24px;height:24px;flex:0 0 24px;color:#a8e82f}
+  .govo-action-grid a b{display:block;font-size:13px}
+  .govo-action-grid a small{display:block;color:rgba(255,255,255,.5);font-size:10px;margin-top:2px}
+
+  @media(max-width:720px){
+    .govo-master-mark{width:42px;height:42px;flex-basis:42px}
+    .govo-master-copy strong{font-size:13px}
+    .govo-master-copy small{font-size:5.5px;letter-spacing:.05em}
+    .govo-main-orb{width:55px;height:55px;margin-top:-33px}
+    .govo-main-orb img{width:44px;height:44px}
+  }
+  `;
+
+  const bottom = isAdmin ? '' : `<nav class="bottom-nav govo-final-bottom">
+    <a class="${active === 'app' ? 'active' : ''}" href="/app">
+      <span class="govo-nav-icon">${govoUiIcon('home')}</span><small>Home</small>
+    </a>
+
+    <a class="${active === 'shops' ? 'active' : ''}" href="/shops">
+      <span class="govo-nav-icon">${govoUiIcon('shops')}</span><small>Shops</small>
+    </a>
+
+    <button type="button" class="govo-main-action"
+      onclick="event.stopPropagation();document.body.classList.toggle('govo-action-open')">
+      <span class="govo-main-orb"><img src="/uploads/govo-logo.png" alt=""></span>
+      <small>GOVO</small>
+    </button>
+
+    <a class="${active === 'services' ? 'active' : ''}" href="/services">
+      <span class="govo-nav-icon">${govoUiIcon('services')}</span><small>Services</small>
+    </a>
+
+    <a class="${active === 'support' || active === 'track' ? 'active' : ''}" href="/support">
+      <span class="govo-nav-icon">${govoUiIcon('help')}</span><small>Help</small>
+    </a>
+  </nav>
+
+  <div class="govo-action-overlay" onclick="if(event.target===this)document.body.classList.remove('govo-action-open')">
+    <section class="govo-action-sheet">
+      <div class="govo-action-head">
+        <div>
+          <b>What do you need?</b>
+          <small>Say it, show it, or choose the fastest GOVO flow.</small>
+        </div>
+        <button type="button" class="govo-action-close" onclick="document.body.classList.remove('govo-action-open')">×</button>
+      </div>
+
+      <div class="govo-action-grid">
+        <a href="/order?mode=voice">${govoUiIcon('voice')}<span><b>Voice Need</b><small>Tell GOVO</small></span></a>
+        <a href="/order?mode=image">${govoUiIcon('camera')}<span><b>Photo Need</b><small>Show GOVO</small></span></a>
+        <a href="/order?mode=one-tap">${govoUiIcon('tap')}<span><b>One-Tap</b><small>Fast request</small></span></a>
+        <a href="/services">${govoUiIcon('search')}<span><b>Any Need</b><small>Find a solution</small></span></a>
+        <a href="/order">${govoUiIcon('order')}<span><b>Order / Delivery</b><small>Book instantly</small></span></a>
+        <a href="/track">${govoUiIcon('search')}<span><b>Track</b><small>Check status</small></span></a>
+      </div>
+    </section>
+  </div>`;
 
   const publicJs = isAdmin ? '' : `<script>
     document.addEventListener('click', function(e){
@@ -2826,7 +3028,7 @@ function page(title, body, active = '') {
     });
   </script>`;
 
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${themeHead()}<title>${esc(title)} | GOVO Express</title><style>${css}${publicCss}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app">${isAdmin ? adminHeader : publicHeader}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${publicJs}</body></html>`;
+  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${themeHead()}<link rel="icon" type="image/png" href="/uploads/govo-logo.png"><link rel="apple-touch-icon" href="/uploads/govo-logo.png"><title>${esc(title)} | GOVO Express</title><style>${css}${publicCss}${govoBrandCss}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app">${isAdmin ? adminHeader : publicHeader}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${publicJs}</body></html>`;
 }
 
 function badge(status) {
@@ -4068,7 +4270,7 @@ app.get('/admin/onboarding', async (req, res, next) => {
     const providerCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.provider_name || 'Unnamed Provider')}</h2>${badge(x.status)}</div><div class="actions trust-row">${publicStatus(x)}${imageStatus(x.image_url)}<span class="pill">${esc(x.service_type || 'Service')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(x.area || x.address || 'No area')}</span></div></div>${contactActions(x.phone, x.whatsapp, x.provider_name)}<div class="actions">${statusForm('provider', x.id)}${visibilityForm('provider', x.id, boolish(x.public_visible) ? 'hide_public' : 'show_public', boolish(x.public_visible) ? 'Hide Public' : 'Show Public')}${visibilityForm('provider', x.id, 'mark_demo', 'Mark Demo')}${editLink(`/admin/providers?q=${encodeURIComponent(x.phone || x.provider_name || x.id)}&status=all&visibility=all`)}${editLink(`/admin/provider/${encodeURIComponent(x.id)}`, 'View Details')}${quickTaskForm('provider', x, x.provider_name, x.whatsapp || x.phone, x.area || x.address)}</div></div>`;
     const riderCard = (x) => `<div class="card compact-card"><div class="section-head"><h2>${esc(x.rider_name || 'Unnamed Rider')}</h2>${badge(x.status)}</div><div class="actions trust-row">${publicStatus(x)}<span class="pill">${esc(x.vehicle_type || 'Vehicle not set')}</span></div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.whatsapp || x.phone || 'No phone')}</span></div><div><b>Area</b><span>${esc(x.area || x.location || 'No area')}</span></div></div>${contactActions(x.phone, x.whatsapp, x.rider_name)}<div class="actions">${statusForm('rider', x.id)}${visibilityForm('rider', x.id, boolish(x.public_visible) ? 'hide_public' : 'show_public', boolish(x.public_visible) ? 'Hide Public' : 'Show Public')}${visibilityForm('rider', x.id, 'mark_demo', 'Mark Demo')}${editLink(`/admin/riders?q=${encodeURIComponent(x.phone || x.rider_name || x.id)}&status=all&visibility=all`)}${editLink(`/admin/rider/${encodeURIComponent(x.id)}`, 'View Details')}${quickTaskForm('rider', x, x.rider_name, x.whatsapp || x.phone, x.area || x.location)}</div></div>`;
     const checklistHtml = checklist.map(([label, ok]) => `<div class="activity-row"><span><b>${esc(label)}</b><span>${ok ? 'Ready for pilot' : 'Needs attention before launch'}</span></span><span class="badge ${ok ? 'available' : 'emergency'}">${ok ? 'PASS' : 'NEED WORK'}</span></div>`).join('');
-    res.send(page('Pilot Onboarding', `<section class="card app-hero"><h1>Real Pilot Onboarding</h1><p>Launch control for real merchants, providers and riders.</p><div class="actions"><a class="btn" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a><a class="btn secondary" href="/admin/onboarding">Partner CRM</a><a class="btn secondary" href="/admin/leads?filter=all">Merchants</a><a class="btn secondary" href="/admin/providers?filter=all">Providers</a><a class="btn secondary" href="/admin/riders?filter=all">Riders</a></div></section><section class="grid">${stat('Total Real Merchants', mc.total)}${stat('Approved Merchants', mc.approved)}${stat('Visible Public Merchants', mc.visible)}${stat('Merchants Missing Image', mc.missing_image)}${stat('Merchants Missing Products', missingProducts)}${stat('Total Service Providers', pc.total)}${stat('Approved Providers', pc.approved)}${stat('Visible Public Providers', pc.visible)}${stat('Total Riders', rc.total)}${stat('Approved Riders', rc.approved)}${stat('Launch Ready Score', `${readyScore}%`, `${passCount}/${checklist.length} checks passing`)}</section><section class="card"><h2>Launch Checklist</h2><div class="activity-list">${checklistHtml}</div></section><section class="card"><div class="section-head"><h2>Merchant Onboarding</h2><span class="pill">${merchants.rows.length} showing</span></div></section><section class="cards">${merchants.rows.map(merchantCard).join('') || '<div class="card"><h2>No real merchants found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Provider Onboarding</h2><span class="pill">${providers.rows.length} showing</span></div></section><section class="cards">${providers.rows.map(providerCard).join('') || '<div class="card"><h2>No real providers found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Rider Onboarding</h2><span class="pill">${riders.rows.length} showing</span></div></section><section class="cards">${riders.rows.map(riderCard).join('') || '<div class="card"><h2>No real riders found</h2></div>'}</section>`, 'admin'));
+    res.send(page('Pilot Onboarding', `<section class="card app-hero"><h1>Real Pilot Onboarding</h1><p>Launch control for real merchants, providers and riders.</p><div class="actions"><a class="btn" href="/admin/os">Admin OS</a><a class="btn secondary" href="/admin/command">Daily Command Center</a><a class="btn secondary" href="/admin/tasks">Launch Task Board</a><a class="btn secondary" href="/admin/orders">Order Dispatch</a><a class="btn secondary" href="/admin/service-requests">Service Requests</a><a class="btn secondary" href="/admin/onboarding">Partner CRM</a><a class="btn secondary" href="/admin/leads?filter=all">Merchants</a><a class="btn secondary" href="/admin/providers?filter=all">Providers</a><a class="btn secondary" href="/admin/riders?filter=all">Riders</a></div></section><section class="grid">${stat('Total Real Merchants', mc.total)}${stat('Approved Merchants', mc.approved)}${stat('Visible Public Merchants', mc.visible)}${stat('Merchants Missing Image', mc.missing_image)}${stat('Merchants Missing Products', missingProducts)}${stat('Total Service Providers', pc.total)}${stat('Approved Providers', pc.approved)}${stat('Visible Public Providers', pc.visible)}${stat('Total Riders', rc.total)}${stat('Approved Riders', rc.approved)}${stat('Launch Ready Score', `${readyScore}%`, `${passCount}/${checklist.length} checks passing`)}</section><section class="card"><h2>Launch Checklist</h2><div class="activity-list">${checklistHtml}</div></section><section class="card"><div class="section-head"><h2>Merchant Onboarding</h2><span class="pill">${merchants.rows.length} showing</span></div></section><section class="cards">${merchants.rows.filter(govoValidPublicMerchant).map(merchantCard).join('') || '<div class="card"><h2>No real merchants found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Provider Onboarding</h2><span class="pill">${providers.rows.length} showing</span></div></section><section class="cards">${providers.rows.map(providerCard).join('') || '<div class="card"><h2>No real providers found</h2></div>'}</section><section class="card"><div class="section-head"><h2>Rider Onboarding</h2><span class="pill">${riders.rows.length} showing</span></div></section><section class="cards">${riders.rows.map(riderCard).join('') || '<div class="card"><h2>No real riders found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
 
@@ -4109,7 +4311,7 @@ app.get('/admin/leads', async (req, res, next) => {
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
     const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, opening_hours, COALESCE(delivery_available,true) AS delivery_available, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, password_hash, reset_requested_at, reset_note, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_merchant_leads`);
-    const cards = merchants.rows.map((x) => `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${accountBadges(x)}${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminMerchantEditForm(x)}${adminPasswordResetForm('merchant', x)}${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/admin/merchant/${encodeURIComponent(x.id)}">View Details</a><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
+    const cards = merchants.rows.filter(govoValidPublicMerchant).map((x) => `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${accountBadges(x)}${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminMerchantEditForm(x)}${adminPasswordResetForm('merchant', x)}${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/admin/merchant/${encodeURIComponent(x.id)}">View Details</a><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
     res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1>${approvalFilterLinks('/admin/leads', status)}${visibilityFilterLinks('/admin/leads', status, visibility)}<form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
@@ -7867,7 +8069,7 @@ app.get('/merchant/login', (req, res) => {
 });
 
 app.get('/merchant/onboarding', (req, res) => {
-  res.send(merchantOnboardingPage());
+  res.send(govoPremiumFlowShellInject(merchantOnboardingPage()));
 });
 
 app.get('/merchant/support', (req, res) => {
@@ -7883,7 +8085,8 @@ app.get('/rider/login', (req, res) => {
 });
 
 app.get('/rider/onboarding', (req, res) => {
-  res.send(page('Rider Onboarding', `<section class="card app-hero"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="/login">Rider Login</a></div></section>`, 'rider'));
+      res.send(govoPremiumFlowShellInject(page('Rider Onboarding', `<section class="govo-premium-hero"><span class="govo-kicker">Rider Network</span><h1 class="govo-display">Join GOVO Today<span class="dot">.</span></h1><p class="govo-lead">Become a GOVO rider and start earning. Fill in your details and we will get back to you.</p><div class="govo-actions"><a class="govo-btn" href="/rider/login">Rider Login</a><a class="govo-btn secondary" href="/app">Back to App</a></div></section><section class="govo-grid"><div class="govo-premium-panel"><div class="govo-section-head"><h2>GOVO Rider Registration</h2><span class="pill">Apply</span></div><p class="govo-form-note">Your delivery information</p><form method="POST" action="/rider" class="govo-form-grid"><label>Rider Name <input name="rider_name" required placeholder="Rider name"></label><label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label><label>Location <select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select></label><label>Vehicle Type <select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select></label><label>Experience <textarea name="experience" placeholder="Previous delivery experience"></textarea></label><div class="govo-actions full"><button type="submit">Submit Rider Info</button><a class="govo-btn secondary" href="/rider/login">Already registered?</a></div></form></div></div></section>`, 'rider')));
+
 });
 
 app.get(['/rider/jobs', '/rider/active', '/rider/history'], async (req, res, next) => {
@@ -7925,7 +8128,8 @@ app.get('/admin/not-found', (req, res) => {
   res.status(404).send(govoRoleNotFound('admin', 'Admin'));
 });
 
-require("./govo_flow_api_v16")(app, { pool, sendTelegram, requireAdmin });
+// GOVO flow API v17: shops/services/orders + delivery, merchant/rider join, join-status, cancel (market-ready 2026-07-18)
+require("./govo_flow_api_v17")(app, { pool, sendTelegram, requireAdmin });
 
 app.use((err, req, res, next) => {
   console.error('GOVO error:', err);

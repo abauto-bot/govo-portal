@@ -296,7 +296,7 @@ function bottomNav(active, base) {
          href="${href(base,page)}"
          aria-label="${esc(label)}">
         ${key === "go"
-          ? `<div class="govo-center-logo"><img src="/uploads/govo-logo.png?v=1784762244" alt=""/></div>`
+          ? `<div class="govo-center-logo"><img src="/uploads/govo-logo.png" alt=""/></div>`
           : `<div class="govo-nav-icon">${svg(icon)}</div>`
         }
         <span>${esc(label)}</span>
