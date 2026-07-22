@@ -212,6 +212,53 @@ function extraCss() {
   .flow-chip.active{
     color:#03120d;
   }
+
+  /* GOVO_BOTTOM_FINAL_V1 */
+  .govo-bottom-final-v1{
+    grid-template-columns:1fr 1fr 1.16fr 1fr 1fr!important;
+    overflow:visible!important;
+    align-items:end!important;
+  }
+  .govo-bottom-final-v1 .govo-nav-item{
+    min-width:0;
+  }
+  .govo-bottom-final-v1 .govo-nav-icon{
+    display:grid;
+    place-items:center;
+  }
+  .govo-bottom-final-v1 .govo-nav-icon svg{
+    width:21px;
+    height:21px;
+  }
+  .govo-center-action{
+    position:relative!important;
+    overflow:visible!important;
+    color:#a8e82f!important;
+  }
+  .govo-center-logo{
+    width:58px;
+    height:58px;
+    margin-top:-34px;
+    margin-bottom:2px;
+    display:grid;
+    place-items:center;
+    border-radius:20px;
+    background:linear-gradient(145deg,#132313,#051009);
+    border:5px solid rgba(0,8,5,.98);
+    box-shadow:
+      0 13px 34px rgba(137,215,39,.34),
+      0 0 0 1px rgba(168,232,47,.28);
+  }
+  .govo-center-logo img{
+    width:47px;
+    height:47px;
+    object-fit:contain;
+    display:block;
+  }
+  .govo-center-action span{
+    color:#a8e82f!important;
+    font-weight:950!important;
+  }
   .govo-bottom-nav{
     background:linear-gradient(180deg,rgba(10,54,42,.97),rgba(0,8,5,.99))!important;
     border-color:rgba(202,255,229,.30)!important;
@@ -235,17 +282,23 @@ function extraCss() {
 
 function bottomNav(active, base) {
   const nav = [
-    ["home", "Home", "app", "home"],
-    ["orders", "Orders", "orders", "order"],
-    ["go", "GO", "app", "go"],
-    ["support", "Support", "support", "support"],
-    ["account", "Account", "account", "account"]
+    ["home","Home","app","home"],
+    ["shops","Shops","shops","shops"],
+    ["go","GOVO","ai","bolt"],
+    ["services","Services","services","services"],
+    ["support","Help","support","support"]
   ];
+
   return `
-  <nav class="govo-bottom-nav">
+  <nav class="govo-bottom-nav govo-bottom-final-v1">
     ${nav.map(([key,label,page,icon]) => `
-      <a class="govo-nav-item ${active === key ? "active" : ""}" href="${href(base,page)}">
-        ${key === "go" ? `<div class="govo-nav-go">GO</div>` : `<div class="govo-nav-icon">${svg(icon)}</div>`}
+      <a class="govo-nav-item ${active === key ? "active" : ""} ${key === "go" ? "govo-center-action" : ""}"
+         href="${href(base,page)}"
+         aria-label="${esc(label)}">
+        ${key === "go"
+          ? `<div class="govo-center-logo"><img src="/uploads/govo-logo.png?v=1784762244" alt=""/></div>`
+          : `<div class="govo-nav-icon">${svg(icon)}</div>`
+        }
         <span>${esc(label)}</span>
       </a>
     `).join("")}

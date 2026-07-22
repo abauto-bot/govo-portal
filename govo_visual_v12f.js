@@ -215,11 +215,14 @@ function css() {
 
 function logo() {
   return `
-  <div class="govo-logo-premium" aria-label="GOVO Express">
-    <span class="speed"></span>
-    <span class="g">G</span>
-    <span class="o-clock"><span class="tick"></span></span>
-  </div>`;
+    <a class="govo-master-live-logo" href="/app" aria-label="GOVO Express">
+      <img src="/uploads/govo-logo.png?v=1784762244" alt="GOVO"/>
+      <span class="govo-master-live-copy">
+        <strong>GOVO EXPRESS</strong>
+        <small>OPERATION • TRUST • SPEED • EASY</small>
+      </span>
+    </a>
+  `;
 }
 
 function hero(base, href) {
@@ -243,4 +246,50 @@ function hero(base, href) {
   </section>`;
 }
 
-module.exports = { css, logo, hero };
+
+/* GOVO_MASTER_LIVE_LOGO_V1 */
+const GOVO_MASTER_LIVE_LOGO_CSS = `
+.govo-master-live-logo{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  color:inherit;
+  text-decoration:none;
+  min-width:0;
+}
+.govo-master-live-logo img{
+  width:46px;
+  height:46px;
+  object-fit:contain;
+  display:block;
+  flex:0 0 46px;
+}
+.govo-master-live-copy{
+  display:flex;
+  flex-direction:column;
+  line-height:1;
+  min-width:0;
+}
+.govo-master-live-copy strong{
+  color:#f7fff9;
+  font-size:14px;
+  font-weight:950;
+  white-space:nowrap;
+  letter-spacing:.01em;
+}
+.govo-master-live-copy small{
+  color:#a8e82f;
+  font-size:5.5px;
+  font-weight:900;
+  letter-spacing:.07em;
+  white-space:nowrap;
+  margin-top:5px;
+}
+@media(max-width:420px){
+  .govo-master-live-logo img{width:40px;height:40px;flex-basis:40px}
+  .govo-master-live-copy strong{font-size:12px}
+  .govo-master-live-copy small{font-size:4.8px;letter-spacing:.04em}
+}
+`;
+
+module.exports = { css: () => css() + GOVO_MASTER_LIVE_LOGO_CSS, logo, hero };
