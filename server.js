@@ -77,6 +77,17 @@ app.use((req, res, next) => {
 
 
 
+
+// GOVO_V20_PREVIEW_START
+const govoV20 = require("./govo_v20_pages");
+app.get(["/__v20","/__v20/:page"], (req,res)=>{
+  const page = req.params.page || "app";
+  res.setHeader("X-GOVO-UI","v20-preview");
+  res.setHeader("Cache-Control","no-store");
+  return res.send(govoV20.render(page));
+});
+// GOVO_V20_PREVIEW_END
+
 // GOVO_PHASE12C_AI_MAP_HARD_ROUTES_START
 app.get(["/ai", "/search", "/voice"], (req, res) => {
   res.setHeader("X-GOVO-UI", "phase12c-live-ai");
