@@ -1,3 +1,4 @@
+const govoV20Pages = require("./govo_v20_pages");
 const govoPagesV12c = require("./govo_pages_v12c");
 const govoV12c = require("./govo_components_v12c");
 // GOVO Express Portal - v1.0 Clean Release Phase 1
@@ -102,6 +103,19 @@ app.get(["/map", "/tracking-map"], (req, res) => {
 });
 // GOVO_PHASE12C_AI_MAP_HARD_ROUTES_END
 
+
+
+// ============================================================
+// GOVO V20 PATH-ISOLATED PRODUCTION
+// OWNER: /app ONLY
+// Other routes + V17 flow/API remain untouched.
+// ============================================================
+app.get("/app", (req, res) => {
+  res.setHeader("X-GOVO-UI", "v20-app-live");
+  res.setHeader("Cache-Control", "no-store");
+  return res.send(govoV20Pages.render("app"));
+});
+// GOVO V20 APP ROUTE END
 
 // GOVO_PHASE12C_LIVE_ROUTES_START
 const GOVO_V12C_LIVE_ROUTE_MAP = {
