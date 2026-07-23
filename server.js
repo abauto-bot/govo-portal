@@ -105,21 +105,18 @@ app.get(["/map", "/tracking-map"], (req, res) => {
 
 
 
-// ============================================================
-// GOVO V20 PATH-ISOLATED PRODUCTION
-// OWNER: /app ONLY
-// Other routes + V17 flow/API remain untouched.
-// ============================================================
+
+// GOVO_V20_APP_LIVE_START
 app.get("/app", (req, res) => {
   res.setHeader("X-GOVO-UI", "v20-app-live");
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   return res.send(govoV20Pages.render("app"));
 });
-// GOVO V20 APP ROUTE END
+// GOVO_V20_APP_LIVE_END
 
 // GOVO_PHASE12C_LIVE_ROUTES_START
 const GOVO_V12C_LIVE_ROUTE_MAP = {
-  "/app": "app",
+
   "/delivery": "delivery",
   "/ride": "ride",
   "/doctor": "doctor",
