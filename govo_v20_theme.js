@@ -37,7 +37,8 @@ linear-gradient(145deg,#0a1b14,#0d3426 55%,#0f5839);box-shadow:0 24px 70px rgba(
 .v20-card b{display:block;margin-top:14px;font-size:15px}
 .v20-card span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
 .v20-search{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:12px 14px;background:#0b241a;display:flex;gap:10px;align-items:center}
-.v20-search input{flex:1;background:transparent;border:0;outline:0;color:#fff}
+.v20-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#fff}
+.v20-search svg{width:20px;height:20px;flex:none}
 .v20-bottom{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);width:min(720px,calc(100% - 20px));display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:8px;border:1px solid var(--line);border-radius:24px;background:rgba(5,20,14,.94);backdrop-filter:blur(18px);z-index:40}
 .v20-nav{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:54px;border-radius:16px;color:#cbe8d7;font-size:11px;font-weight:800}
 .v20-nav svg{width:20px;height:20px}

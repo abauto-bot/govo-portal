@@ -4,6 +4,7 @@ COPY package.json package.json
 RUN npm install --omit=dev
 COPY server.js server.js
 COPY govo_v20_pages.js ./
+COPY govo_v20_support.js ./
 COPY govo_v20_icons.js ./
 COPY govo_v20_theme.js ./
 COPY govo_unified_v3.js ./

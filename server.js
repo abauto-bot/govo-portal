@@ -11,6 +11,7 @@ const { Pool } = require('pg');
 const crypto = require('crypto');
 
 const multer = require("multer");
+const { renderSupportPage } = require("./govo_v20_support");
 
 loadEnv();
 
@@ -5888,7 +5889,11 @@ function supportForm(data = {}, error = '') {
   return page('GOVO Support', `${error ? `<section class="card"><h1>Check support details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><h1>GOVO Support</h1><p style="color:var(--muted)">Send order questions, service issues, complaints or follow-up messages to GOVO support.</p><form method="POST" action="/support"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}"><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || '')}"><label>Subject</label><input name="subject" value="${esc(data.subject || '')}" placeholder="Order question / complaint / follow-up"><label>Message</label><textarea name="message" required>${esc(data.message || '')}</textarea><label>Related Type</label><select name="related_type">${opt('general','general')}${opt('order','order')}${opt('service','service')}${opt('merchant','merchant')}${opt('rider','rider')}</select><label>Related Code <span style="color:var(--muted)">(optional)</span></label><input name="related_code" value="${esc(data.related_code || '')}" placeholder="GOVO-000001 / SRV-YYYYMMDD-0001"><button>Submit Support Ticket</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'track');
 }
 
-app.get('/support', (req, res) => res.send(supportForm(req.query || {})));
+app.get('/support', (req, res) => {
+  res.setHeader('X-GOVO-UI', 'v20-support-live');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  return res.send(renderSupportPage(req.query || {}));
+});
 
 app.post('/support', async (req, res, next) => {
   try {
