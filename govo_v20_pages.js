@@ -1,87 +1,32 @@
 const THEME=require('./govo_v20_theme');
 const {icon}=require('./govo_v20_icons');
-
+const {SETTINGS_MARKUP,SETTINGS_SCRIPT}=require('./govo_v23_settings');
+const {renderHeader}=require('./govo_header_v28');
 const logo='/uploads/govo-logo.png';
-
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function shell(title,active,body){
-  const nav=[
-    ['home','Home','/app'],
-    ['shops','Shops','/shops'],
-    ['ai','GOVO','/ai'],
-    ['services','Services','/services'],
-    ['account','Account','/account']
-  ];
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${title} — GOVO Express V20</title>
-<style>${THEME}</style>
-</head>
-<body>
-<div class="v20-shell">
-<header class="v20-top">
-  <a class="v20-brand" href="/app">
-    <img src="${logo}" alt="GOVO">
-    <div><strong>GOVO EXPRESS</strong><small>OPERATION · TRUST · SPEED · EASY</small></div>
-  </a>
-  <a class="v20-icon-btn" href="/more" aria-label="Menu">${icon('menu')}</a>
-</header>
-${body}
-</div>
-<nav class="v20-bottom">
-${nav.map(([k,l,h])=>`
-<a class="v20-nav ${active===k?'active':''} ${k==='ai'?'v20-ai':''}" href="${h}">
-${k==='ai'?`<span class="v20-ai-orb"><img src="${logo}" alt=""></span>`:icon(k)}
-<span>${l}</span>
-</a>`).join('')}
-</nav>
-</body></html>`;
+ const nav=[['home','Home','/app'],['shops','Shops','/shops'],['ai','GOVO','/ai'],['services','Services','/services'],['account','Account','/account']];
+ const header=renderHeader({role:'customer',surface:'v20',logo:`<img src="${logo}" alt="GOVO">`,actions:`<a class="v20-icon-btn" href="/account#notifications" aria-label="Notifications">${icon('bell')}<span class="v20-badge">3</span></a><a class="v20-icon-btn" href="/more" aria-label="Menu">${icon('menu')}</a>`});
+ return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#00110c"><title>${esc(title)} — GOVO Express</title><style>${THEME}</style></head><body><div class="v20-shell">${header}${body}</div><nav class="v20-bottom">${nav.map(([k,l,h])=>`<a class="v20-nav ${active===k?'active':''} ${k==='ai'?'v20-ai':''}" href="${h}">${k==='ai'?`<span class="v20-ai-orb"><img src="${logo}" alt=""></span>`:icon(k)}<span>${l}</span></a>`).join('')}</nav>${SETTINGS_MARKUP}${SETTINGS_SCRIPT}</body></html>`;
 }
-
-function app(){
-  const cards=[
-    ['delivery','Delivery','Parcel, food, medicine'],
-    ['shops','Shops','Local stores & merchants'],
-    ['services','Services','Trusted local help'],
-    ['home','Home Service','Everyday home needs']
-  ];
-  return shell('Home','home',`
-<section class="v20-hero">
-  <span class="v20-kicker">Meherpur Super App</span>
-  <h1>Everything local.<br>One GOVO.</h1>
-  <p>Delivery, shops, riders, transport and everyday services in one trusted local platform.</p>
-  <div class="v20-actions">
-    <a class="v20-btn" href="/ai">Solve with GOVO AI</a>
-    <a class="v20-btn secondary" href="/order">Quick Order</a>
-  </div>
-</section>
-<div class="v20-search">${icon('search')}<input placeholder="Search shops, services, anything..."></div>
-<div class="v20-grid">
-${cards.map(([i,t,s])=>`<a class="v20-card" href="${i==='delivery'?'/delivery':i==='shops'?'/shops':i==='services'?'/services':'/home-service'}">${icon(i)}<b>${t}</b><span>${s}</span></a>`).join('')}
-</div>`);
-}
-
-function generic(name,active,desc){
-  return shell(name,active,`
-<section class="v20-hero">
-<span class="v20-kicker">GOVO V20</span>
-<h1>${name}</h1>
-<p>${desc}</p>
-<div class="v20-actions">
-<a class="v20-btn" href="/ai">Ask GOVO AI</a>
-<a class="v20-btn secondary" href="/app">Back Home</a>
-</div>
-</section>`);
-}
-
-function render(page){
-  if(page==='app') return app();
-  if(page==='shops') return generic('Shops','shops','Find trusted local GOVO merchants and products.');
-  if(page==='services') return generic('Services','services','Book verified local services quickly and simply.');
-  if(page==='ai') return generic('GOVO AI','ai','Speak, type or show a photo. GOVO helps route your need to the right action.');
-  if(page==='account') return generic('Account','account','Your profile, orders, wallet and support.');
-  return generic(page.replace(/-/g,' '),'home','GOVO V20 preview page.');
-}
-module.exports={render};
+function action(name,label,href,badge=''){return `<a class="v22-action" href="${href}">${badge?`<em>${esc(badge)}</em>`:''}<span class="v22-iconbox">${icon(name)}</span><span>${esc(label)}</span></a>`}
+function shopCard(x){const t=x.shop_name||'Local Shop', area=x.shop_address||x.location||'Meherpur';return `<a class="v22-shop-card" href="/shop/${encodeURIComponent(x.id)}"><div class="v22-shop-cover">${esc(t.slice(0,1).toUpperCase())}</div><div class="v22-pad"><b>${esc(t)}</b><small>${esc((x.category||'Local shop')+' · '+area)}</small><div class="v22-meta"><span class="v22-star">★ 4.7</span><span>20–45 min</span></div></div></a>`}
+function providerCard(x){const t=x.provider_name||x.service_type||'Service Provider';return `<a class="v22-provider" href="/service/${encodeURIComponent(x.id)}"><span class="avatar">${esc(t.slice(0,1).toUpperCase())}</span><b>${esc(t)}</b><small>${esc(x.service_type||'Trusted service')}</small><div class="v22-meta"><span class="v22-star">★ 4.8</span><span>30–60 min</span></div></a>`}
+function homePage(opts={}){const shops=opts.shops||[],providers=opts.providers||[];const cats=[['🍽️','Food','food'],['🛍️','Grocery','grocery'],['💊','Pharmacy','medicine'],['📱','Electronics','electronics'],['👗','Fashion','fashion'],['🏠','Home','home'],['💄','Beauty','beauty'],['🚙','Auto','auto'],['🎓','Education','education'],['•••','More','all']];return shell('Home','home',`
+<div class="v22-location"><span>${icon('location')} Meherpur, Bangladesh</span>${icon('menu')}</div>
+<section class="v20-hero v22-hero"><h1>Everything local.<em>One GOVO.</em></h1><p>Shops, services, delivery, transport and everyday help — all in one trusted platform.</p><form method="GET" action="/shops"><div class="v20-search">${icon('search')}<input name="q" placeholder="Search shops, services, products, areas..."></div></form></section>
+<div class="v22-action-grid">${action('delivery','Delivery','/delivery')}${action('shops','Shops','/shops')}${action('services','Services','/services')}${action('home','Home Service','/home-service')}${action('ai','AI Assistant','/ai','New')}${action('ride','Ride','/ride')}${action('track','Track','/track')}${action('more','More','/more')}</div>
+<div class="v20-section"><h2>Popular Categories</h2><a href="/shops">View all</a></div><div class="v22-category-strip">${cats.map(([e,t,c])=>`<a href="/shops?category=${c}"><span>${e}</span><b>${t}</b></a>`).join('')}</div>
+<div class="v20-section"><h2>Featured Shops</h2><a href="/shops?type=shops">View all</a></div>${shops.length?`<div class="v22-card-scroll">${shops.slice(0,6).map(shopCard).join('')}</div>`:`<div class="v20-card"><b>Shops are opening soon</b><span>Approved merchants will appear here automatically.</span></div>`}
+<div class="v20-section"><h2>Trusted Service Providers</h2><a href="/shops?type=services">View all</a></div>${providers.length?`<div class="v22-provider-grid">${providers.slice(0,6).map(providerCard).join('')}</div>`:`<div class="v20-card"><b>Providers are being verified</b><span>Trusted services will appear here automatically.</span></div>`}
+<a class="v22-banner" href="/refer"><div><h3>Refer & Earn</h3><p>Invite friends and earn exciting rewards</p></div><div class="gift">🎁</div></a>
+<div class="v20-section"><h2>How GOVO Works</h2><a href="/more">View all</a></div><div class="v22-steps"><div class="v22-step"><span>1</span><b>Search</b><small>Find what you need</small></div><div class="v22-step"><span>2</span><b>Choose</b><small>Pick the best option</small></div><div class="v22-step"><span>3</span><b>Order/Request</b><small>Place order or request</small></div><div class="v22-step"><span>4</span><b>Get it Done</b><small>We deliver or complete</small></div></div>
+<div class="v20-section"><h2>Why Choose GOVO</h2></div><div class="v22-trust-grid"><div class="v22-trust"><b>✓ Verified & Trusted</b><small>Only verified shops & providers</small></div><div class="v22-trust"><b>◈ Secure & Safe</b><small>Protected customer data</small></div><div class="v22-trust"><b>⚡ Fast & Reliable</b><small>Quick delivery & support</small></div></div>
+<a class="v22-banner" href="/service-request"><div><h3>Need something specific?</h3><p>Request anything, we’ll try our best to get it for you.</p></div><div class="gift">🛍️</div></a>`)}
+function popular(name,title,desc,href){return `<a class="v22-popular" href="${href}">${icon(name)}<b>${title}</b><small>${desc}</small></a>`}
+function aiPage(q=''){const query=String(q||'').trim();const s=['Best pharmacy near me','Grocery delivery in Meherpur','Home cleaning service','Book a delivery','Track my order','Emergency help'];return shell('GOVO AI Assistant','ai',`<section class="v22-page-title"><h1>GOVO AI Assistant</h1><p>Your smart helper for shops, services, delivery & support.</p></section><form class="v22-ai-search" method="GET" action="/ai">${icon('search')}<input name="q" value="${esc(query)}" placeholder="Ask me anything..."><button class="v22-mic" type="submit">${icon('ai')}</button></form>${query?`<div class="v20-card" style="margin-top:12px"><b>${esc(query)}</b><span>Search marketplace results or send a custom request.</span><div class="v20-actions"><a class="v20-btn" href="/shops?q=${encodeURIComponent(query)}">Search</a><a class="v20-btn secondary" href="/service-request?service_type=${encodeURIComponent(query)}">Request</a></div></div>`:''}<div class="v20-section"><h2>Try these</h2></div><div class="v22-suggestions">${s.map(x=>`<a href="/ai?q=${encodeURIComponent(x)}">${esc(x)}</a>`).join('')}</div><div class="v20-section"><h2>Popular Actions</h2></div><div class="v22-popular-grid">${popular('shops','Find Shop','Search shops, products & more','/shops')}${popular('services','Find Service','Find trusted service providers','/services')}${popular('delivery','Book Delivery','Parcel, food, medicine & more','/delivery')}${popular('track','Track Order','Track your order in real time','/track')}${popular('support','Human Support','Call / WhatsApp support','/support')}${popular('requests','Report an Issue','Help us improve GOVO','/support')}</div><div class="v20-section"><h2>Example Questions</h2></div><div class="v20-row-stack">${s.slice(0,4).map(x=>`<a class="v20-row-link" href="/ai?q=${encodeURIComponent(x)}"><span>${icon('search')}</span><span><b>${esc(x)}</b></span><strong>›</strong></a>`).join('')}</div>`)}
+function row(name,title,desc,href,tone=''){return `<a class="v20-row-link ${tone}" href="${href}"><span class="v20-row-icon">${icon(name)}</span><span><b>${title}</b><small>${desc}</small></span><strong>›</strong></a>`}
+function accountPage(){return shell('Account','account',`<section class="v22-account-guest"><span class="avatar">${icon('account')}</span><div><h2>Welcome to GOVO</h2><p>Sign in / Create account to manage your orders, requests and payments.</p></div><div class="v22-auth-actions"><a href="/login">Sign In</a><a class="secondary" href="/register">Create Account</a></div></section><section class="v22-group"><h2>My Account</h2>${row('account','My Profile','Personal information','/profile')}${row('location','Addresses','Manage saved addresses','/addresses')}${row('payment','Payment Methods','Cards, wallets & more','/payments')}${row('orders','My Orders','View your orders','/track')}${row('requests','My Requests','View your service requests','/track?type=service')}${row('track','Track Orders','Track your orders','/track')}</section><section class="v22-group"><h2>Preferences</h2>${row('bell','Notifications','Manage your notifications','#notifications')}${row('language','Language','English · বাংলা · Banglish','#language')}${row('theme','Theme','System · Dark · Light','#theme')}</section><section class="v22-group"><h2>Support & More</h2>${row('support','Help & Support','Get help & contact support','/support')}${row('gift','Refer & Earn','Invite friends & earn rewards','/refer')}${row('shield','About GOVO Express','Version 2.0.0','/about')}${row('shield','Privacy Policy','Your privacy matters','/privacy')}${row('requests','Terms & Conditions','Read our terms','/terms')}</section>`)}
+function morePage(){const i=[['delivery','Delivery','/delivery'],['shops','Shops','/shops'],['services','Services','/services'],['ride','Ride','/ride'],['doctor','Doctor','/doctor'],['home','Home Service','/home-service'],['services','Agri Service','/agri'],['support','Help','/support']];return shell('More Services','ai',`<section class="v22-page-title"><h1>More Services</h1><p>All GOVO local service categories.</p></section><div class="v22-action-grid">${i.map(([n,t,h])=>action(n,t,h)).join('')}</div>`)}
+function app(){return homePage({})}function generic(name,active,desc){return shell(name,active,`<section class="v20-hero"><h1>${esc(name)}</h1><p>${esc(desc)}</p></section>`)}function render(page,opts){if(page==='app')return homePage(opts||{});if(page==='ai')return aiPage((opts||{}).q||'');if(page==='account')return accountPage();if(page==='more')return morePage();return generic(page,'home','GOVO Express')}
+module.exports={render,shell,homePage,aiPage,accountPage,morePage};

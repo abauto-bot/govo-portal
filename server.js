@@ -1,7 +1,8 @@
 const govoV20Pages = require("./govo_v20_pages");
 const govoPagesV12c = require("./govo_pages_v12c");
 const govoV12c = require("./govo_components_v12c");
-// GOVO Express Portal - v1.0 Clean Release Phase 1
+const { renderHeader: renderV28Header } = require("./govo_header_v28");
+// GOVO Express Portal - V26 Enterprise Portals
 // Canonical routes only. Additive schema setup. Telegram notifications preserved.
 
 const fs = require('fs');
@@ -11,7 +12,8 @@ const { Pool } = require('pg');
 const crypto = require('crypto');
 
 const multer = require("multer");
-const { renderSupportPage } = require("./govo_v20_support");
+const { renderSupportPage, renderSupportSuccess } = require("./govo_v20_support");
+const v20Browse = require("./govo_v20_shops");
 
 loadEnv();
 
@@ -25,11 +27,11 @@ app.use((req, res, next) => {
 
   const path = req.path || "/";
 
-  // Merchant domain ownership
+  // Merchant / provider domain ownership
   if (host === "merchant.govoexpress.com") {
-    if (path === "/") {
-      return res.redirect(302, "/merchant");
-    }
+    if (path === "/") return res.redirect(302, "/merchant");
+    if (path === "/app") return res.redirect(302, "/merchant/dashboard");
+    if (path === "/dashboard") return res.redirect(302, "/merchant/dashboard");
 
     const customerOnly =
       path === "/shops" ||
@@ -52,9 +54,12 @@ app.use((req, res, next) => {
 
   // Rider domain ownership
   if (host === "rider.govoexpress.com") {
-    if (path === "/") {
-      return res.redirect(302, "/rider");
-    }
+    if (path === "/") return res.redirect(302, "/rider");
+    if (path === "/app") return res.redirect(302, "/rider/dashboard");
+    if (path === "/dashboard") return res.redirect(302, "/rider/dashboard");
+    if (path === "/jobs") return res.redirect(302, "/rider/jobs");
+    if (path === "/active") return res.redirect(302, "/rider/active");
+    if (path === "/history") return res.redirect(302, "/rider/history");
 
     const customerOnly =
       path === "/shops" ||
@@ -77,6 +82,12 @@ app.use((req, res, next) => {
 });
 // GOVO_ROLE_ISOLATION_V1_END
 
+app.get("/__role-health", (req, res) => {
+  const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, version: "v27.1", host, path: req.path, port: Number(process.env.PORT || 3000) });
+});
+
 
 
 
@@ -90,28 +101,50 @@ app.get(["/__v20","/__v20/:page"], (req,res)=>{
 });
 // GOVO_V20_PREVIEW_END
 
-// GOVO_PHASE12C_AI_MAP_HARD_ROUTES_START
+// GOVO_V20_CUSTOMER_CORE_ROUTES_START
 app.get(["/ai", "/search", "/voice"], (req, res) => {
-  res.setHeader("X-GOVO-UI", "phase12c-live-ai");
-  res.setHeader("Cache-Control", "no-store");
-  return res.send(govoPagesV12c.render("ai", { base: "" }));
+  res.setHeader("X-GOVO-UI", "v20-ai-live");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res.send(govoV20Pages.aiPage(String(req.query.q || "")));
 });
-
+app.get("/more", (req, res) => {
+  res.setHeader("X-GOVO-UI", "v20-more-live");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res.send(govoV20Pages.morePage());
+});
+app.get("/account", (req, res) => {
+  res.setHeader("X-GOVO-UI", "v20-account-live");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res.send(govoV20Pages.accountPage());
+});
 app.get(["/map", "/tracking-map"], (req, res) => {
   res.setHeader("X-GOVO-UI", "phase12c-live-map");
   res.setHeader("Cache-Control", "no-store");
   return res.send(govoPagesV12c.render("map", { base: "" }));
 });
-// GOVO_PHASE12C_AI_MAP_HARD_ROUTES_END
+// GOVO_V20_CUSTOMER_CORE_ROUTES_END
 
 
 
 
 // GOVO_V20_APP_LIVE_START
-app.get("/app", (req, res) => {
+app.get("/app", async (req, res) => {
   res.setHeader("X-GOVO-UI", "v20-app-live");
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-  return res.send(govoV20Pages.render("app"));
+  try {
+    const [merchantResult, providerResult] = await Promise.all([approvedMerchants(), approvedProviders()]);
+    const shops = uniqueByIdentity(merchantResult.rows || [], 'merchant');
+    const providers = uniqueByIdentity(providerResult.rows || [], 'provider');
+    return res.send(govoV20Pages.homePage({
+      shops: shops.slice(0, 6),
+      providers: providers.slice(0, 6),
+      shopCount: shops.length,
+      serviceCount: providers.length
+    }));
+  } catch (e) {
+    console.error('GOVO /app home data error:', e);
+    return res.send(govoV20Pages.homePage({ shops: [], providers: [], shopCount: 0, serviceCount: 0 }));
+  }
 });
 // GOVO_V20_APP_LIVE_END
 
@@ -125,7 +158,6 @@ const GOVO_V12C_LIVE_ROUTE_MAP = {
   "/home": "home",
   "/agri": "agri",
   "/more": "more",
-  "/services": "services",
   "/service": "service",
 
   "/shop": "shop",
@@ -134,9 +166,6 @@ const GOVO_V12C_LIVE_ROUTE_MAP = {
   "/orders": "orders",
   "/wallet": "wallet",
   "/account": "account",
-  "/support": "support",
-  "/merchant": "merchant",
-  "/rider": "rider",
   "/voice": "ai",
   "/search": "ai",
   "/map": "map",
@@ -425,7 +454,7 @@ function govoMerchantPage(){
   return govoRescueShell('Merchant','home',`
     <section class="hero"><span class="kicker">🏪 Merchant Partner</span><h1>আপনার দোকান GOVO-তে যুক্ত করুন</h1><p class="lead">Local shop, pharmacy, restaurant, grocery, electronics—সব merchant GOVO Express shell-এ আসতে পারবে।</p></section>
     <section class="card">
-      <form class="form" method="POST" action="/merchant/register">
+      <form class="form" method="POST" action="/merchant">
         <label>Shop Name</label><input name="shop_name" required placeholder="দোকানের নাম">
         <label>Owner Name</label><input name="owner_name" required placeholder="মালিকের নাম">
         <label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX">
@@ -746,6 +775,7 @@ const GOVO_FINAL_UI_POLISH_V1_CSS = `
 function govoFinalUiPolishInject(html) {
   if (typeof html !== 'string') return html;
   if (html.includes('govo-final-ui-polish-v1')) return html;
+  if (html.includes('v20-shell')) return html;
 
   let out = html;
 
@@ -1091,541 +1121,13 @@ const GOVO_PREMIUM_FLOW_SHELL_V2 = `
 function govoPremiumFlowShellInject(html) {
   if (typeof html !== 'string') return html;
   if (html.includes('govo-premium-flow-shell-v2')) return html;
+  if (html.includes('v20-shell')) return html;
   if (!/<body[^>]*>/i.test(html)) return html;
 
   let out = html.replace(/<body([^>]*)>/i, '<body$1>' + GOVO_PREMIUM_FLOW_SHELL_V2);
   return out;
 }
 
-// GOVO_PHASE9C_RESTORE_BUTTON_FLOW
-// Restores shop/service/category button flow without hiding original page content.
-// Safety: public GET HTML only. No DB/auth/schema/env/notification changes.
-const GOVO_PHASE9C_RESTORE_BUTTON_FLOW_CSS = `
-<style id="govo-phase9c-restore-button-flow">
-  :root{
-    --g9c-green:#073f32;
-    --g9c-green2:#0b5a46;
-    --g9c-gold:#d8b46a;
-    --g9c-ivory:#fffaf0;
-    --g9c-soft:#f4efe3;
-    --g9c-ink:#10231d;
-    --g9c-muted:#68766f;
-    --g9c-line:rgba(7,63,50,.13);
-    --g9c-shadow:0 14px 38px rgba(0,0,0,.13);
-  }
-
-  .govo9c-wrap{
-    max-width:1120px;
-    margin:0 auto 14px;
-    padding:0 14px;
-    box-sizing:border-box;
-    font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;
-  }
-
-  .govo9c-board{
-    background:rgba(255,250,240,.96);
-    color:var(--g9c-ink);
-    border:1px solid rgba(216,180,106,.40);
-    border-radius:26px;
-    padding:15px;
-    box-shadow:var(--g9c-shadow);
-  }
-
-  .govo9c-head{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
-    margin-bottom:12px;
-  }
-
-  .govo9c-kicker{
-    display:inline-flex;
-    align-items:center;
-    gap:7px;
-    padding:7px 10px;
-    border-radius:999px;
-    background:#eef8f3;
-    border:1px solid rgba(7,63,50,.10);
-    color:var(--g9c-green);
-    font-size:12px;
-    font-weight:950;
-  }
-
-  .govo9c-title{
-    margin:8px 0 0;
-    font-size:clamp(23px,5.8vw,38px);
-    line-height:1.08;
-    letter-spacing:0;
-    color:#101713;
-  }
-
-  .govo9c-sub{
-    margin:8px 0 0;
-    color:var(--g9c-muted);
-    line-height:1.48;
-    max-width:760px;
-    font-size:14px;
-  }
-
-  .govo9c-primary-actions{
-    display:flex;
-    flex-wrap:wrap;
-    gap:9px;
-    margin:13px 0 8px;
-  }
-
-  .govo9c-primary-actions a{
-    text-decoration:none;
-    min-height:44px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-    border-radius:16px;
-    padding:10px 13px;
-    font-weight:1000;
-    color:#fffaf0!important;
-    background:linear-gradient(135deg,var(--g9c-green),var(--g9c-green2));
-    box-shadow:0 12px 28px rgba(7,63,50,.20);
-  }
-
-  .govo9c-primary-actions a.alt{
-    background:#fffaf0;
-    color:var(--g9c-green)!important;
-    border:1px solid rgba(7,63,50,.13);
-    box-shadow:0 10px 24px rgba(0,0,0,.08);
-  }
-
-  .govo9c-section-title{
-    margin:14px 0 9px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    color:#101713;
-    font-size:18px;
-    font-weight:1000;
-    letter-spacing:0;
-  }
-
-  .govo9c-section-title small{
-    color:var(--g9c-green);
-    font-size:12px;
-    font-weight:950;
-    background:#eef8f3;
-    border:1px solid rgba(7,63,50,.10);
-    border-radius:999px;
-    padding:6px 9px;
-    white-space:nowrap;
-  }
-
-  .govo9c-grid{
-    display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:10px;
-  }
-
-  .govo9c-card,
-  .govo9c-select{
-    text-decoration:none;
-    border:1px solid var(--g9c-line);
-    background:#fffdf7;
-    color:var(--g9c-ink)!important;
-    border-radius:20px;
-    padding:13px;
-    min-height:106px;
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    box-shadow:0 10px 24px rgba(0,0,0,.06);
-    box-sizing:border-box;
-    cursor:pointer;
-    text-align:left;
-  }
-
-  button.govo9c-select{
-    width:100%;
-    font:inherit;
-  }
-
-  .govo9c-card:hover,
-  .govo9c-select:hover{
-    border-color:rgba(216,180,106,.75);
-    transform:translateY(-1px);
-  }
-
-  .govo9c-icon{
-    width:34px;
-    height:34px;
-    border-radius:13px;
-    display:grid;
-    place-items:center;
-    background:#eef8f3;
-    color:var(--g9c-green);
-    font-size:18px;
-    margin-bottom:10px;
-  }
-
-  .govo9c-name{
-    font-weight:1000;
-    font-size:15px;
-    line-height:1.18;
-    color:#10231d;
-  }
-
-  .govo9c-en{
-    margin-top:4px;
-    color:var(--g9c-muted);
-    font-size:12px;
-    line-height:1.25;
-  }
-
-  .govo9c-pillrow{
-    display:flex;
-    flex-wrap:wrap;
-    gap:7px;
-    margin-top:12px;
-  }
-
-  .govo9c-pillrow span{
-    border-radius:999px;
-    padding:7px 9px;
-    background:#eef8f3;
-    color:var(--g9c-green);
-    font-size:12px;
-    font-weight:900;
-    border:1px solid rgba(7,63,50,.09);
-  }
-
-  .govo9c-selected-note{
-    display:none;
-    margin:10px 0 0;
-    border-radius:16px;
-    background:#073f32;
-    color:#fffaf0;
-    padding:10px 12px;
-    font-size:13px;
-    font-weight:900;
-  }
-
-  .govo9c-selected-note.show{
-    display:block;
-  }
-
-  @media(max-width:900px){
-    .govo9c-grid{
-      grid-template-columns:repeat(3,minmax(0,1fr));
-    }
-  }
-
-  @media(max-width:640px){
-    .govo9c-wrap{
-      padding:0 10px;
-      margin-bottom:12px;
-    }
-
-    .govo9c-board{
-      border-radius:23px;
-      padding:13px;
-    }
-
-    .govo9c-head{
-      display:block;
-    }
-
-    .govo9c-grid{
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:9px;
-    }
-
-    .govo9c-card,
-    .govo9c-select{
-      min-height:116px;
-      border-radius:19px;
-      padding:12px;
-    }
-
-    .govo9c-primary-actions a{
-      flex:1 1 135px;
-    }
-  }
-</style>
-`;
-
-const GOVO_PHASE9C_SHOP_BUTTONS = [
-  ['📦','পার্সেল ডেলিভারি','Parcel Delivery','/service-request?type=parcel'],
-  ['🛒','বাজার-সদাই','Groceries / Market','/service-request?type=grocery'],
-  ['🍚','খাবার/রেস্টুরেন্ট','Food / Restaurant','/service-request?type=food'],
-  ['💊','ঔষধ/ফার্মেসি','Medicine / Pharmacy','/service-request?type=medicine'],
-  ['📱','মোবাইল/ইলেকট্রনিক্স','Mobile / Electronics','/service-request?type=electronics'],
-  ['👕','ফ্যাশন/কাপড়','Fashion / Clothing','/service-request?type=fashion'],
-  ['🏠','হার্ডওয়্যার/হোম','Hardware / Home','/service-request?type=hardware'],
-  ['🌾','কৃষি/মাঠের জিনিস','Agri / Field Items','/service-request?type=agri']
-];
-
-const GOVO_PHASE9C_SERVICE_BUTTONS = [
-  ['🧹','বাসায় কাজ লাগবে','Home Work','/service-request?type=home-work'],
-  ['🩺','ডাক্তারের support','Doctor Support','/service-request?type=doctor'],
-  ['💊','ঔষধ লাগবে','Need Medicine','/service-request?type=medicine'],
-  ['🏡','ঘরের/পরিবারের কাজ','Family Work','/service-request?type=family-work'],
-  ['🌾','কৃষি/মাঠের কাজ','Field Work','/service-request?type=field-work'],
-  ['🚨','জরুরি সাহায্য','Emergency Help','/service-request?type=emergency'],
-  ['🔌','ইলেকট্রিক কাজ','Electrician','/service-request?type=electrician'],
-  ['🚰','প্লাম্বার কাজ','Plumber','/service-request?type=plumber']
-];
-
-const GOVO_PHASE9C_QUICK_BUTTONS = [
-  ['📦','ডেলিভারি বুক','Book Delivery','/service-request?type=parcel'],
-  ['🏪','দোকান দেখুন','Browse Shops','/shops'],
-  ['🛠️','সার্ভিস দেখুন','Browse Services','/services'],
-  ['◎','অর্ডার ট্র্যাক','Track','/track'],
-  ['☎️','সাপোর্ট','Support','/support'],
-  ['🏍️','রাইডার/ওয়ার্কার','Rider / Worker','/rider'],
-  ['🤝','মার্চেন্ট','Merchant','/merchant'],
-  ['📍','এরিয়া','Meherpur Area','/service-request?type=area']
-];
-
-function govoPhase9CEscape(value){
-  return String(value ?? '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-}
-
-function govoPhase9CCards(items, mode){
-  return items.map(function(item){
-    const icon = govoPhase9CEscape(item[0]);
-    const bn = govoPhase9CEscape(item[1]);
-    const en = govoPhase9CEscape(item[2]);
-    const href = govoPhase9CEscape(item[3]);
-    const type = govoPhase9CEscape((item[3].split('type=')[1] || item[1]).replace(/[-+]/g,' '));
-
-    if(mode === 'select'){
-      return '<button type="button" class="govo9c-select" data-govo9c-type="' + type + '" data-govo9c-bn="' + bn + '">' +
-        '<span class="govo9c-icon">' + icon + '</span>' +
-        '<span><span class="govo9c-name">' + bn + '</span><span class="govo9c-en">' + en + '</span></span>' +
-      '</button>';
-    }
-
-    return '<a class="govo9c-card" href="' + href + '">' +
-      '<span class="govo9c-icon">' + icon + '</span>' +
-      '<span><span class="govo9c-name">' + bn + '</span><span class="govo9c-en">' + en + '</span></span>' +
-    '</a>';
-  }).join('');
-}
-
-function govoPhase9CConfig(pathname){
-  const path = String(pathname || '/');
-
-  if(path === '/' || path.startsWith('/app')){
-    return {
-      kicker:'GOVO menu restored',
-      title:'দোকান, সার্ভিস, ডেলিভারি — সব button flow.',
-      desc:'আগের useful দোকান/service/category flow ফিরিয়ে আনা হয়েছে। এখান থেকে customer directly কাজ শুরু করতে পারবে.',
-      actions:[
-        ['/service-request','📦 ডেলিভারি বুক করুন',''],
-        ['/shops','🏪 দোকান দেখুন','alt'],
-        ['/services','🛠️ সার্ভিস দেখুন','alt']
-      ],
-      sections:[
-        ['Quick Menu','সব কাজের shortcut',GOVO_PHASE9C_QUICK_BUTTONS,'link'],
-        ['দোকান / Shop Categories','button type menu',GOVO_PHASE9C_SHOP_BUTTONS,'link'],
-        ['সার্ভিস / Service Categories','customer need menu',GOVO_PHASE9C_SERVICE_BUTTONS,'link']
-      ],
-      pills:['Meherpur first','Dokan + Service','No lost flow','Button menu']
-    };
-  }
-
-  if(path.startsWith('/shops')){
-    return {
-      kicker:'Shop Menu',
-      title:'দোকানগুলো category button আকারে.',
-      desc:'Customer দোকান/category বেছে request দিতে পারবে। Existing shop content নিচে থাকবে, hide করা হয়নি.',
-      actions:[
-        ['/service-request?type=parcel','📦 পার্সেল দিন',''],
-        ['/service-request?type=grocery','🛒 বাজার লাগবে','alt'],
-        ['/app','✦ App Home','alt']
-      ],
-      sections:[
-        ['Shop Categories','local commerce buttons',GOVO_PHASE9C_SHOP_BUTTONS,'link'],
-        ['Related Services','shop-order support',GOVO_PHASE9C_SERVICE_BUTTONS.slice(0,4),'link']
-      ],
-      pills:['Local shop flow','Merchant ready','Delivery connected']
-    };
-  }
-
-  if(path.startsWith('/services')){
-    return {
-      kicker:'Service Menu',
-      title:'সার্ভিসগুলো button আকারে.',
-      desc:'Home work, doctor support, medicine, emergency — customer সহজে category select করবে.',
-      actions:[
-        ['/service-request','＋ Request দিন',''],
-        ['/track','◎ Track করুন','alt'],
-        ['/support','☎ Support','alt']
-      ],
-      sections:[
-        ['Service Categories','daily-life service buttons',GOVO_PHASE9C_SERVICE_BUTTONS,'link'],
-        ['Shop Support','needed items / delivery',GOVO_PHASE9C_SHOP_BUTTONS.slice(0,4),'link']
-      ],
-      pills:['Home service','Emergency help','Worker/Rider flow']
-    };
-  }
-
-  if(path.startsWith('/service-request')){
-    return {
-      kicker:'Request Category',
-      title:'আগে category চাপুন, তারপর form পূরণ করুন.',
-      desc:'Category button চাপলে request type note/form-এর সাথে match করতে সুবিধা হবে.',
-      actions:[
-        ['/shops','🏪 Shops','alt'],
-        ['/services','🛠️ Services','alt'],
-        ['/track','◎ Track','alt']
-      ],
-      sections:[
-        ['ক্যাটাগরি বাছুন','tap kore select korun',GOVO_PHASE9C_SHOP_BUTTONS.concat(GOVO_PHASE9C_SERVICE_BUTTONS),'select']
-      ],
-      pills:['Tap category','Fill form','Operator confirm']
-    };
-  }
-
-  if(path.startsWith('/track')){
-    return {
-      kicker:'Tracking Menu',
-      title:'Track korar sathe request option ready.',
-      desc:'Code thakle track করুন, না থাকলে নতুন request দিন.',
-      actions:[
-        ['/service-request','＋ New Request',''],
-        ['/support','☎ Support','alt'],
-        ['/app','✦ App','alt']
-      ],
-      sections:[
-        ['Need something else?','quick buttons',GOVO_PHASE9C_QUICK_BUTTONS.slice(0,5),'link']
-      ],
-      pills:['Track','Support','New request']
-    };
-  }
-
-  if(path.startsWith('/support')){
-    return {
-      kicker:'Support Menu',
-      title:'Support-er sathe direct action buttons.',
-      desc:'Customer, merchant, rider — support থেকে next action clear button আকারে.',
-      actions:[
-        ['/service-request','＋ Request লিখুন',''],
-        ['/track','◎ Track status','alt'],
-        ['/app','✦ App Home','alt']
-      ],
-      sections:[
-        ['Support Shortcuts','problem type buttons',[
-          ['☎️','Customer support','Customer Help','/service-request?type=customer-support'],
-          ['🏪','Merchant support','Merchant Help','/merchant'],
-          ['🏍️','Rider support','Rider Help','/rider'],
-          ['🚨','জরুরি সাহায্য','Emergency Help','/service-request?type=emergency']
-        ],'link']
-      ],
-      pills:['Customer support','Merchant support','Rider support']
-    };
-  }
-
-  if(path.startsWith('/merchant') || path.startsWith('/rider')){
-    return {
-      kicker:path.startsWith('/merchant') ? 'Merchant Menu' : 'Rider / Worker Menu',
-      title:path.startsWith('/merchant') ? 'Grow your business with GOVO.' : 'Rider-worker flow clear buttons.',
-      desc:'Partner onboarding-er sathe customer request/shop/service flow connected thakbe.',
-      actions:[
-        ['/service-request','＋ ',''],
-        ['/shops','🏪 Shops','alt'],
-        ['/services','🛠️ Services','alt'],
-        ['/support','☎ Support','alt']
-      ],
-      sections:[
-        ['','',GOVO_PHASE9C_QUICK_BUTTONS,'link']
-      ],
-      pills:['Partner flow','','Local operation']
-    };
-  }
-
-  return null;
-}
-
-function govoPhase9CRender(pathname){
-  const cfg = govoPhase9CConfig(pathname);
-  if(!cfg) return '';
-
-  const actions = (cfg.actions || []).map(function(a){
-    return '<a class="' + govoPhase9CEscape(a[2] || '') + '" href="' + govoPhase9CEscape(a[0]) + '">' + govoPhase9CEscape(a[1]) + '</a>';
-  }).join('');
-
-  const sections = (cfg.sections || []).map(function(sec){
-    return '<div class="govo9c-section-title">' + govoPhase9CEscape(sec[0]) + '<small>' + govoPhase9CEscape(sec[1]) + '</small></div>' +
-      '<div class="govo9c-grid">' + govoPhase9CCards(sec[2] || [], sec[3]) + '</div>';
-  }).join('');
-
-  const pills = (cfg.pills || []).map(function(x){
-    return '<span>✓ ' + govoPhase9CEscape(x) + '</span>';
-  }).join('');
-
-  return GOVO_PHASE9C_RESTORE_BUTTON_FLOW_CSS +
-    '<section class="govo9c-wrap" id="govo-phase9c-restore-button-flow">' +
-      '<div class="govo9c-board">' +
-        '<div class="govo9c-head"><div>' +
-          '<div class="govo9c-kicker">' + govoPhase9CEscape(cfg.kicker) + '</div>' +
-          '<h1 class="govo9c-title">' + govoPhase9CEscape(cfg.title) + '</h1>' +
-          '<p class="govo9c-sub">' + govoPhase9CEscape(cfg.desc) + '</p>' +
-        '</div></div>' +
-        '<div class="govo9c-primary-actions">' + actions + '</div>' +
-        '<div class="govo9c-pillrow">' + pills + '</div>' +
-        sections +
-        '<div class="govo9c-selected-note" id="govo9cSelectedNote"></div>' +
-      '</div>' +
-    '</section>' +
-    '<script>(function(){try{var params=new URLSearchParams(location.search);var t=params.get("type");function setNeed(v){var note=document.getElementById("govo9cSelectedNote");if(note){note.textContent="Selected: "+v+" — নিচের form পূরণ করুন";note.classList.add("show");}var fields=document.querySelectorAll("textarea,input");for(var i=0;i<fields.length;i++){var f=fields[i];var n=(f.name||f.placeholder||"").toLowerCase();if(n.indexOf("need")>=0||n.indexOf("problem")>=0||n.indexOf("note")>=0||f.tagName==="TEXTAREA"){if(!f.value)f.value=v;break;}}}if(t)setNeed(t);document.querySelectorAll(".govo9c-select").forEach(function(b){b.addEventListener("click",function(){setNeed(b.getAttribute("data-govo9c-bn")||b.getAttribute("data-govo9c-type")||"service");});});}catch(e){}})();</script>';
-}
-
-function govoPhase9CInject(html, pathname){
-  if(typeof html !== 'string') return html;
-  if(html.includes('govo-phase9c-restore-button-flow')) return html;
-  if(!/<body[^>]*>/i.test(html)) return html;
-
-  const insert = govoPhase9CRender(pathname);
-  if(!insert) return html;
-
-  return html.replace(/<body([^>]*)>/i, '<body$1>' + insert);
-}
-
-app.use((req, res, next) => {
-  if(req.method !== 'GET') return next();
-
-  const path = String(req.path || '');
-  if(path.startsWith('/api/')) return next();
-  if(path.startsWith('/admin') && path !== '/admin/login') return next();
-
-  const originalSend = res.send.bind(res);
-  res.send = function govoPhase9CSend(body){
-    try{
-      const contentType = String(res.getHeader('content-type') || '').toLowerCase();
-
-      if(Buffer.isBuffer(body)){
-        const text = body.toString('utf8');
-        if(text.includes('<body') || contentType.includes('text/html')){
-          return originalSend(Buffer.from(govoPhase9CInject(text, path), 'utf8'));
-        }
-      }
-
-      if(typeof body === 'string' && (body.includes('<body') || contentType.includes('text/html'))){
-        return originalSend(govoPhase9CInject(body, path));
-      }
-    }catch(e){}
-
-    return originalSend(body);
-  };
-
-  next();
-});
 
 
 
@@ -1633,8 +1135,18 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
 
-  // Keep APIs untouched.
+  // Keep APIs and role-owned portals untouched by the legacy customer shell.
   if (String(req.path || '').startsWith('/api/')) return next();
+  const govoHost = String(req.headers.host || '').split(':')[0].toLowerCase();
+  const govoPath = String(req.path || '');
+  const govoRoleOwned =
+    govoHost === 'merchant.govoexpress.com' ||
+    govoHost === 'rider.govoexpress.com' ||
+    govoPath.startsWith('/merchant') ||
+    govoPath.startsWith('/rider') ||
+    govoPath.startsWith('/provider') ||
+    govoPath.startsWith('/admin');
+  if (govoRoleOwned) return next();
 
   const originalSend = res.send.bind(res);
 
@@ -1665,6 +1177,9 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
+  const govoHost = String(req.headers.host || '').split(':')[0].toLowerCase();
+  const govoPath = String(req.path || '');
+  if (govoHost === 'merchant.govoexpress.com' || govoHost === 'rider.govoexpress.com' || govoPath.startsWith('/merchant') || govoPath.startsWith('/rider') || govoPath.startsWith('/provider') || govoPath.startsWith('/admin')) return next();
 
   const originalSend = res.send.bind(res);
 
@@ -1739,6 +1254,9 @@ const productUpload = imageUpload;
 
 
 app.use(express.urlencoded({ extended: true }));
+app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
+
+
 
 app.use((req, res, next) => {
   const host = String(req.headers.host || "").split(":")[0].toLowerCase();
@@ -2033,6 +1551,7 @@ async function sendTelegram(text) {
 const css = `
 :root{--bg:#0b1020;--panel:#111827;--line:#263244;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#60a5fa}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1020;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}.app{max-width:1180px;margin:0 auto;padding:18px}.topbar{position:sticky;top:0;z-index:5;background:rgba(11,16,32,.92);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.16);border-radius:18px;margin-bottom:18px;padding:14px}.brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#22c55e;color:#052e16;display:grid;place-items:center;font-weight:1000}.brand h2{font-size:18px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.nav a{color:#bfdbfe;text-decoration:none;padding:9px 11px;border:1px solid rgba(96,165,250,.18);border-radius:12px;background:#0f172a;font-weight:800;font-size:14px}.nav a.active,.nav a:hover{background:rgba(34,197,94,.15);color:#bbf7d0;border-color:rgba(34,197,94,.45)}.card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:18px;padding:18px;margin-bottom:16px}.card h1{margin:0 0 14px;color:#22c55e;font-size:clamp(28px,5vw,48px);line-height:1.08}.card h2{margin:0 0 10px;color:#e2e8f0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#0f172a;border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}.stat .label{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.stat .value{font-size:28px;font-weight:1000;margin-top:7px}form{display:grid;gap:11px}label{font-weight:850;color:#e2e8f0}input,select,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;padding:12px;font-size:15px}textarea{min-height:92px}.btn,button{border:0;border-radius:13px;padding:11px 14px;font-weight:1000;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#22c55e;color:#052e16}.btn.secondary,button.secondary{background:#1e293b;color:#e2e8f0;border:1px solid #334155}.reject,button.reject{background:#ef4444;color:#fff}.pill,.badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:#052e16;border:1px solid #22c55e;color:#bbf7d0;font-weight:900;font-size:12px;text-transform:capitalize}.badge.rejected,.badge.cancelled,.badge.failed,.badge.unavailable{background:#7f1d1d;border-color:#ef4444;color:#fecaca}.badge.verified{background:#0c4a6e;border-color:#38bdf8;color:#e0f2fe}.badge.trusted{background:#064e3b;border-color:#34d399;color:#d1fae5}.badge.available{background:#052e16;border-color:#22c55e;color:#bbf7d0}.badge.emergency{background:#7c2d12;border-color:#fb923c;color:#ffedd5}.badge.rating{background:#422006;border-color:#facc15;color:#fef9c3}.badge.clear{background:#172554;border-color:#60a5fa;color:#dbeafe}.app-hero{background:radial-gradient(circle at 15% 0%,rgba(34,197,94,.28),transparent 34%),linear-gradient(180deg,#102016,#111827);overflow:hidden}.app-hero h1{font-size:clamp(34px,8vw,58px)}.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.quick-grid .btn{min-height:58px;text-align:center}.chips{display:flex;gap:8px;overflow:auto;padding:2px 0 8px;scrollbar-width:none}.chips a{white-space:nowrap}.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:14px 0}.step{border:1px solid rgba(148,163,184,.18);background:#0f172a;border-radius:14px;padding:10px;text-align:center;color:var(--muted);font-size:12px;font-weight:900}.step.done{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.58);color:#bbf7d0}.step.active{background:#facc15!important;border-color:#facc15!important;color:#422006!important;box-shadow:0 0 0 3px rgba(250,204,21,.14)}.big-status{display:inline-flex;font-size:16px;padding:9px 13px;margin:6px 0 10px}.bottom-nav{position:sticky;bottom:10px;z-index:8;display:none;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(2,6,23,.94);border:1px solid rgba(34,197,94,.35);border-radius:18px;padding:8px;margin-top:18px;backdrop-filter:blur(12px)}.bottom-nav a{color:#d1fae5;text-decoration:none;text-align:center;font-size:12px;font-weight:900;padding:8px 4px;border-radius:12px}.bottom-nav a.active{background:#22c55e;color:#052e16}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.cards{display:grid;gap:14px}.item-grid,.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.detail-grid div,.item-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:10px;min-width:0}.detail-grid b,.item-box b{display:block;margin-bottom:5px}.detail-grid span,.item-box span{word-break:break-word}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.filters{display:grid;grid-template-columns:1fr .55fr auto;gap:8px;margin:12px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:18px 0}.lock-card{max-width:520px;margin:50px auto}.table-wrap{overflow:auto}.admin-table{width:100%;min-width:900px;border-collapse:collapse}.admin-table th,.admin-table td{border-bottom:1px solid #263244;padding:10px;text-align:left;vertical-align:top}.admin-table th{color:#bfdbfe;font-size:12px;text-transform:uppercase}
+input[type=file]{padding:9px;background:var(--surface)!important;border:1px dashed color-mix(in srgb,var(--primary) 55%,var(--border))!important}input[type=file]::file-selector-button{border:0;border-radius:9px;padding:9px 12px;margin-right:10px;background:var(--primary);color:var(--primaryText);font-weight:900;cursor:pointer}.upload-preview{width:100%;max-width:220px;aspect-ratio:4/3;object-fit:cover;border-radius:14px;border:1px solid var(--border);display:none;margin-top:8px}
 @media(max-width:760px){.app{padding:12px 12px 88px}.grid,.item-grid,.detail-grid,.filters,.three{grid-template-columns:1fr}.quick-grid,.timeline{grid-template-columns:repeat(2,minmax(0,1fr))}.brand-row{align-items:flex-start}.card{padding:15px}.actions .btn,.actions form,button{width:100%}.bottom-nav{display:grid}}
 
 /* GOVO Theme System v1 */
@@ -2761,45 +2280,44 @@ function govoUiIcon(name) {
   return icons[name] || icons.home;
 }
 
+function govoInlineLogoMark() {
+  return `<span class="govo-inline-logo" aria-hidden="true"><svg viewBox="0 0 64 64" role="img"><defs><linearGradient id="govoMarkGradient" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7ff2f"/><stop offset="1" stop-color="#65d80f"/></linearGradient></defs><circle cx="35" cy="34" r="20" fill="none" stroke="url(#govoMarkGradient)" stroke-width="9"/><path d="M35 14v11h15" fill="none" stroke="#07130f" stroke-width="6" stroke-linecap="round"/><circle cx="35" cy="7" r="5" fill="#d7ff2f"/><path d="M5 27h15M2 36h18M8 45h14" stroke="#8ee719" stroke-width="4" stroke-linecap="round"/></svg></span>`;
+}
+
 function page(title, body, active = '') {
   const isAdmin = active === 'admin';
+  const isMerchant = active === 'merchant';
+  const isRider = active === 'rider';
+  const isProvider = active === 'provider' || (active === 'services' && /Provider/i.test(String(title || '')));
+  const roleName = isMerchant ? 'Merchant' : isRider ? 'Rider' : isProvider ? 'Service Provider' : '';
+  const roleClass = isAdmin ? 'admin' : isMerchant ? 'public role-portal merchant-portal' : isRider ? 'public role-portal rider-portal' : isProvider ? 'public role-portal provider-portal' : 'public';
+  const headerRole = isAdmin ? 'admin' : isMerchant ? 'merchant' : isRider ? 'rider' : isProvider ? 'provider' : 'customer';
+  const header = renderV28Header({
+    role: headerRole,
+    logo: govoInlineLogoMark(),
+    adminNav: isAdmin ? adminNav(active) : '',
+    themeToggle: isAdmin ? themeToggle() : ''
+  });
 
-  const adminHeader = `<header class="topbar">
-    <div class="brand-row">
-      <div class="brand">
-        <div class="logo"></div>
-        <div><h2>GOVO</h2><p>Meherpur Super App</p></div>
-      </div>
-      <div class="header-actions"><span class="pill">Live System</span>${themeToggle()}</div>
-    </div>
-    ${adminNav(active)}
-  </header>`;
-
-  const publicHeader = `<header class="govo-final-topbar">
-    <div class="govo-final-row">
-      <a class="govo-master-brand" href="https://app.govoexpress.com/app" aria-label="GOVO Express">
-        <img class="govo-master-mark" src="/uploads/govo-logo.png" alt="GOVO">
-        <span class="govo-master-copy">
-          <strong>GOVO EXPRESS</strong>
-          <small>OPERATION • TRUST • SPEED • EASY</small>
-        </span>
-      </a>
-      <button type="button" class="govo-final-menu-btn" aria-label="Open GOVO menu" onclick="event.stopPropagation();document.body.classList.toggle('govo-final-open')">
-        <i></i><i></i><i></i>
-      </button>
-    </div>
-    <nav class="govo-final-panel">
-      <button type="button" onclick="event.stopPropagation(); if(window.govoToggleTheme){window.govoToggleTheme()}">☀️ / 🌙 Theme</button>
-      <a href="https://app.govoexpress.com/app">🏠 App</a>
-      <a href="https://app.govoexpress.com/shops">🏪 Shops</a>
-      <a href="https://app.govoexpress.com/services">🛠️ Services</a>
-      <a href="https://app.govoexpress.com/track">🔎 Track</a>
-      <a href="https://app.govoexpress.com/support">☎️ Support</a>
-      <a href="https://merchant.govoexpress.com/merchant/dashboard">🏬 Merchant Login</a>
-      <a href="https://merchant.govoexpress.com/merchant">➕ Merchant Join</a>
-      <a href="https://rider.govoexpress.com/rider">🏍️ Rider</a>
-    </nav>
-  </header>`;
+  const roleCss = `
+    body.role-portal{background:linear-gradient(180deg,#06130e 0%,#03100b 100%)!important;color:#f7fff8!important}
+    body.role-portal .app{width:min(1180px,calc(100% - 28px))!important;padding:0 0 96px!important}
+    body.role-portal .govo-final-topbar,body.role-portal .govo-final-bottom,body.role-portal .govo-action-overlay{display:none!important}
+    .govo-role-topbar{position:sticky;top:0;z-index:1200;margin:0 -1px 20px;padding:14px 16px;display:flex;flex-direction:column;align-items:stretch;gap:10px;background:rgba(4,18,12,.92);border:1px solid rgba(168,232,47,.18);border-radius:0 0 24px 24px;backdrop-filter:blur(18px);box-shadow:0 16px 50px rgba(0,0,0,.30)}
+    .govo-v28-header-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .govo-role-brand{display:flex;align-items:center;gap:11px;color:#fff!important;text-decoration:none!important}.govo-role-brand img{width:46px;height:46px;object-fit:contain}.govo-inline-logo{width:48px;height:48px;display:inline-grid;place-items:center;flex:0 0 auto;border-radius:15px;background:linear-gradient(145deg,#10291b,#06130d);border:1px solid rgba(168,232,47,.35);box-shadow:0 10px 28px rgba(0,0,0,.35),0 0 24px rgba(168,232,47,.12)}.govo-inline-logo svg{width:42px;height:42px;display:block}.govo-role-brand strong{display:block;font-size:18px;line-height:1}.govo-role-brand small{display:block;color:#a8e82f;font-size:9px;letter-spacing:.12em;margin-top:5px;font-weight:900}
+    .govo-role-actions{display:flex;gap:8px}.govo-role-actions a,.govo-role-actions button{width:42px;height:42px;min-height:42px;padding:0!important;display:grid;place-items:center;border-radius:14px!important;background:rgba(255,255,255,.055)!important;border:1px solid rgba(255,255,255,.12)!important;color:#fff!important;text-decoration:none!important;font-size:19px!important;box-shadow:none!important}
+    .govo-role-menu{display:none;position:absolute;right:14px;top:70px;width:220px;padding:10px;border-radius:18px;background:#081a12;border:1px solid rgba(168,232,47,.25);box-shadow:0 24px 70px rgba(0,0,0,.48)}body.govo-role-menu-open .govo-role-menu{display:grid}.govo-role-menu a{padding:12px 13px;border-radius:12px;color:#fff!important;text-decoration:none!important;font-weight:800}.govo-role-menu a:hover{background:rgba(168,232,47,.10)}
+    body.role-portal .card,body.role-portal .stat{background:linear-gradient(180deg,rgba(14,42,29,.88),rgba(7,27,18,.94))!important;border:1px solid rgba(168,232,47,.15)!important;border-radius:22px!important;box-shadow:0 16px 45px rgba(0,0,0,.20)!important}
+    body.role-portal .app-hero{background:radial-gradient(circle at 90% 0%,rgba(168,232,47,.16),transparent 38%),linear-gradient(145deg,#0b2a1b,#071a12)!important}
+    body.role-portal h1,body.role-portal h2{color:#fff!important}body.role-portal .stat .value{color:#a8e82f!important}
+    body.role-portal input,body.role-portal select,body.role-portal textarea{background:#04120c!important;color:#fff!important;border:1px solid rgba(255,255,255,.13)!important}body.role-portal input:focus,body.role-portal select:focus,body.role-portal textarea:focus{border-color:#a8e82f!important;box-shadow:0 0 0 3px rgba(168,232,47,.12)!important}
+    body.role-portal button,body.role-portal .btn:not(.secondary){background:linear-gradient(135deg,#c7ff2e,#8edb18)!important;color:#102000!important;border:0!important;font-weight:900!important}body.role-portal .btn.secondary,body.role-portal button.secondary{background:rgba(255,255,255,.055)!important;color:#fff!important;border:1px solid rgba(255,255,255,.12)!important}
+    body.role-portal .badge,body.role-portal .pill{background:rgba(168,232,47,.12)!important;color:#cfff63!important;border-color:rgba(168,232,47,.24)!important}
+    body.role-portal .detail-grid div,body.role-portal .item-box{background:rgba(255,255,255,.035)!important;border-color:rgba(255,255,255,.09)!important}
+    body.admin{background:linear-gradient(180deg,#06130e,#030b08)!important;color:#f7fff8!important}body.admin .govo-v28-header-admin{background:rgba(4,18,12,.94)!important;border:1px solid rgba(168,232,47,.18)!important}body.admin .card,body.admin .stat{background:linear-gradient(180deg,#0b2418,#07170f)!important;border-color:rgba(168,232,47,.14)!important}body.admin .nav a.active,body.admin button:not(.secondary),body.admin .btn:not(.secondary){background:linear-gradient(135deg,#c7ff2e,#8edb18)!important;color:#102000!important}body.admin input,body.admin select,body.admin textarea{background:#04120c!important;color:#fff!important;border-color:rgba(255,255,255,.13)!important}
+    @media(max-width:760px){body.role-portal .app{width:100%!important;padding:0 10px 84px!important}.govo-role-topbar{margin:0 -10px 12px;padding:12px 14px}.govo-role-brand img{width:40px;height:40px}.govo-role-brand strong{font-size:15px}.govo-role-brand small{font-size:7px}.govo-role-actions a,.govo-role-actions button{width:38px;height:38px;min-height:38px}.govo-role-menu{right:10px;top:62px}.role-portal .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.role-portal .card{padding:12px!important;border-radius:18px!important}}
+  `;
 
   const publicCss = isAdmin ? '' : `
     body.public{
@@ -3009,7 +2527,7 @@ function page(title, body, active = '') {
 
     <button type="button" class="govo-main-action"
       onclick="event.stopPropagation();document.body.classList.toggle('govo-action-open')">
-      <span class="govo-main-orb"><img src="/uploads/govo-logo.png" alt=""></span>
+      <span class="govo-main-orb">${govoInlineLogoMark()}</span>
       <small>GOVO</small>
     </button>
 
@@ -3051,7 +2569,7 @@ function page(title, body, active = '') {
     });
   </script>`;
 
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${themeHead()}<link rel="icon" type="image/png" href="/uploads/govo-logo.png"><link rel="apple-touch-icon" href="/uploads/govo-logo.png"><title>${esc(title)} | GOVO Express</title><style>${css}${publicCss}${govoBrandCss}</style></head><body class="${isAdmin ? 'admin' : 'public'}"><main class="app">${isAdmin ? adminHeader : publicHeader}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${publicJs}</body></html>`;
+  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${themeHead()}<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23071d14'/%3E%3Cpath d='M44 20a18 18 0 1 0 2 23' fill='none' stroke='%23b7ff21' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E"><title>${esc(title)} | GOVO Express</title><style>${css}${publicCss}${roleCss}${govoBrandCss}</style></head><body class="${roleClass}"><main class="app">${header}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${publicJs}<script>document.addEventListener('change',function(e){if(e.target.matches('input[type=file][accept*=image]')&&e.target.files&&e.target.files[0]){let p=e.target.parentElement.querySelector('.upload-preview');if(!p){p=document.createElement('img');p.className='upload-preview';e.target.parentElement.appendChild(p)}p.src=URL.createObjectURL(e.target.files[0]);p.style.display='block'}});</script></body></html>`;
 }
 
 function badge(status) {
@@ -3112,6 +2630,12 @@ function publicVisibilitySql(alias = '') {
 function publicApprovedSql(alias = '') {
   const prefix = alias ? `${alias}.` : '';
   return `LOWER(TRIM(COALESCE(${prefix}status,'')))='approved' AND ${publicVisibilitySql(alias)}`;
+}
+
+// Public marketplace accepts approved and operational legacy records, while blocking rejected/suspended entries.
+function publicListingSql(alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  return `${publicVisibilitySql(alias)} AND LOWER(TRIM(COALESCE(${prefix}status,''))) NOT IN ('rejected','blocked','suspended','deleted','hidden')`;
 }
 
 function visibilityBadges(x) {
@@ -3247,6 +2771,12 @@ async function ensureSchema() {
   }
 await pool.query(`CREATE TABLE IF NOT EXISTS govo_merchant_leads (id SERIAL PRIMARY KEY, shop_name TEXT, owner_name TEXT, phone TEXT, location TEXT, category TEXT, delivery_needed TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_rider_leads (id SERIAL PRIMARY KEY, rider_name TEXT, phone TEXT, location TEXT, vehicle_type TEXT, experience TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
+  await pool.query(`ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS image_url TEXT`);
+  await pool.query(`ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS nid_number TEXT`);
+  await pool.query(`ALTER TABLE govo_merchant_leads ADD COLUMN IF NOT EXISTS trade_license TEXT`);
+  await pool.query(`ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS image_url TEXT`);
+  await pool.query(`ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS nid_number TEXT`);
+  await pool.query(`ALTER TABLE govo_rider_leads ADD COLUMN IF NOT EXISTS driving_license TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_orders (id SERIAL PRIMARY KEY, shop_name TEXT, merchant_phone TEXT, customer_name TEXT, customer_phone TEXT, pickup_location TEXT, drop_location TEXT, item_details TEXT, note TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_order_events (id SERIAL PRIMARY KEY, order_id INTEGER, event_type TEXT, status TEXT, note TEXT, actor_type TEXT DEFAULT 'admin', actor_name TEXT, created_at TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS govo_shop_products (id SERIAL PRIMARY KEY, merchant_lead_id INT, shop_name TEXT, merchant_phone TEXT, product_name TEXT, price TEXT, category TEXT, description TEXT, image_url TEXT, is_available BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
@@ -3693,7 +3223,7 @@ app.get('/merchant', (req, res) => {
           </div>
           <p class="govo-form-note">Shop info din. Approval er por app-e customer order korte parbe.</p>
 
-          <form method="POST" action="/merchant" class="govo-form-grid">
+          <form method="POST" action="/merchant" enctype="multipart/form-data" class="govo-form-grid">
             <label>Shop Name
               <input name="shop_name" required placeholder="Shop name">
             </label>
@@ -3724,6 +3254,16 @@ app.get('/merchant', (req, res) => {
                 <option>Later</option>
               </select>
             </label>
+            <label>NID Number
+              <input name="nid_number" inputmode="numeric" placeholder="NID number">
+            </label>
+            <label>Trade License
+              <input name="trade_license" placeholder="Trade license number (optional)">
+            </label>
+            <label>Shop / Owner Photo
+              <input type="file" name="merchant_image" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+              <small class="govo-form-note">Camera diye chobi tulte ba Gallery theke upload korte parben. Max 3MB.</small>
+            </label>
             <div class="govo-actions full">
               <button type="submit">Submit Merchant Info</button>
               <a class="govo-btn secondary" href="https://merchant.govoexpress.com/merchant/dashboard">Already registered?</a>
@@ -3735,12 +3275,12 @@ app.get('/merchant', (req, res) => {
   `, 'merchant'));
 });
 
-app.post('/merchant', async (req, res, next) => {
+app.post('/merchant', imageUpload.single('merchant_image'), async (req, res, next) => {
   try {
-    const lead = { shop_name: req.body.shop_name, owner_name: req.body.owner_name, phone: req.body.phone, location: req.body.location, category: req.body.category, delivery_needed: req.body.delivery_needed };
-    await pool.query(`INSERT INTO govo_merchant_leads (shop_name, owner_name, phone, location, category, delivery_needed, status) VALUES ($1,$2,$3,$4,$5,$6,'pending')`, [lead.shop_name, lead.owner_name, lead.phone, lead.location, lead.category, lead.delivery_needed]);
-    sendTelegram(['New GOVO Merchant Lead', '', `Shop: ${lead.shop_name || ''}`, `Owner: ${lead.owner_name || ''}`, `Phone: ${lead.phone || ''}`, `Location: ${lead.location || ''}`, `Category: ${lead.category || ''}`, `Delivery: ${lead.delivery_needed || ''}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
-    res.send(page('Merchant Submitted', `<section class="card"><h1>Merchant Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="https://merchant.govoexpress.com/merchant">Add Another</a></section>`));
+    const lead = { shop_name: req.body.shop_name, owner_name: req.body.owner_name, phone: req.body.phone, location: req.body.location, category: req.body.category, delivery_needed: req.body.delivery_needed, nid_number: req.body.nid_number, trade_license: req.body.trade_license, image_url: req.file ? `/uploads/${req.file.filename}` : '' };
+    await pool.query(`INSERT INTO govo_merchant_leads (shop_name, owner_name, phone, location, category, delivery_needed, nid_number, trade_license, image_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending')`, [lead.shop_name, lead.owner_name, lead.phone, lead.location, lead.category, lead.delivery_needed, lead.nid_number, lead.trade_license, lead.image_url]);
+    sendTelegram(['New GOVO Merchant Lead', '', `Shop: ${lead.shop_name || ''}`, `Owner: ${lead.owner_name || ''}`, `Phone: ${lead.phone || ''}`, `Location: ${lead.location || ''}`, `Category: ${lead.category || ''}`, `Delivery: ${lead.delivery_needed || ''}`, `Photo: ${lead.image_url || 'not uploaded'}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
+    res.send(page('Merchant Submitted', `<section class="card"><h1>Merchant Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="https://merchant.govoexpress.com/merchant">Add Another</a></section>`, 'merchant'));
   } catch (e) { next(e); }
 });
 
@@ -3750,14 +3290,14 @@ app.get('/rider', (req, res) => {
 });
 
 app.get('/rider/register', (req, res) => {
-  res.send(page('Rider Registration', `<section class="card"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="https://rider.govoexpress.com/rider">Rider Login</a></div></section>`, 'rider'));
+  res.send(page('Rider Registration', `<section class="card"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider" enctype="multipart/form-data"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><label>NID Number</label><input name="nid_number"><label>Driving License</label><input name="driving_license"><label>Rider Photo</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp" capture="user" required><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="https://rider.govoexpress.com/rider">Rider Login</a></div></section>`, 'rider'));
 });
 
-app.post('/rider', async (req, res, next) => {
+app.post('/rider', imageUpload.single('rider_image'), async (req, res, next) => {
   try {
-    await pool.query(`INSERT INTO govo_rider_leads (rider_name, phone, location, vehicle_type, experience, status) VALUES ($1,$2,$3,$4,$5,'pending')`, [req.body.rider_name, req.body.phone, req.body.location, req.body.vehicle_type, req.body.experience]);
-    sendTelegram(['New GOVO Rider Lead', '', `Name: ${req.body.rider_name || ''}`, `Phone: ${req.body.phone || ''}`, `Location: ${req.body.location || ''}`, `Vehicle: ${req.body.vehicle_type || ''}`, `Experience: ${req.body.experience || ''}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
-    res.send(page('Rider Submitted', `<section class="card"><h1>Rider Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="https://rider.govoexpress.com/rider/register">Add Another</a></section>`));
+    await pool.query(`INSERT INTO govo_rider_leads (rider_name, phone, location, vehicle_type, experience, nid_number, driving_license, image_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending')`, [req.body.rider_name, req.body.phone, req.body.location, req.body.vehicle_type, req.body.experience, req.body.nid_number || '', req.body.driving_license || '', req.file ? `/uploads/${req.file.filename}` : '']);
+    sendTelegram(['New GOVO Rider Lead', '', `Name: ${req.body.rider_name || ''}`, `Phone: ${req.body.phone || ''}`, `Location: ${req.body.location || ''}`, `Vehicle: ${req.body.vehicle_type || ''}`, `Experience: ${req.body.experience || ''}`, `Photo: ${req.file ? `/uploads/${req.file.filename}` : 'not uploaded'}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
+    res.send(page('Rider Submitted', `<section class="card"><h1>Rider Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="https://rider.govoexpress.com/rider/register">Add Another</a></section>`, 'rider'));
   } catch (e) { next(e); }
 });
 
@@ -3773,8 +3313,9 @@ app.post('/merchant/account/create', async (req, res, next) => {
     if (!phone) return res.status(400).send(accountCreatePage('merchant', phone, 'Phone required.'));
     if (password.length < 6) return res.status(400).send(accountCreatePage('merchant', phone, 'Password minimum 6 characters.'));
     if (password !== confirm) return res.status(400).send(accountCreatePage('merchant', phone, 'Confirm password did not match.'));
-    const r = await pool.query(`SELECT id, shop_name, phone, whatsapp FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     if (!r.rows.length) return res.status(404).send(accountCreatePage('merchant', phone, 'No registered merchant found for this phone. Please register first.'));
+    if (normalizeStatus(r.rows[0].status) !== 'approved') return res.status(403).send(accountCreatePage('merchant', phone, 'Admin approval required before account creation.'));
     const hp = hashPassword(password);
     await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
     res.send(accountCreateSuccessPage('merchant', r.rows[0].phone || phone));
@@ -3786,9 +3327,10 @@ app.post('/merchant/login', async (req, res, next) => {
     const phone = String(req.body.phone || '').trim();
     const password = String(req.body.password || '');
     if (!phone || !password) return res.status(400).send(merchantLoginPage(phone, 'Phone and password required.'));
-    const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, password_hash, password_salt FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, COALESCE(status,'pending') AS status, password_hash, password_salt FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     const m = r.rows[0];
     if (!m) return res.status(404).send(merchantLoginPage(phone, 'No registered merchant found. Use Register or Create Account.'));
+    if (normalizeStatus(m.status) !== 'approved') return res.status(403).send(merchantLoginPage(phone, 'Your merchant application is not approved yet.'));
     if (!m.password_hash || !m.password_salt) return res.status(403).send(merchantLoginPage(phone, 'Password not set. Create account first.'));
     if (!verifyPassword(password, m.password_salt, m.password_hash)) return res.status(401).send(merchantLoginPage(phone, 'Wrong phone or password.'));
     await pool.query(`UPDATE govo_merchant_leads SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1`, [m.id]);
@@ -3831,8 +3373,9 @@ app.post('/rider/account/create', async (req, res, next) => {
     if (!phone) return res.status(400).send(accountCreatePage('rider', phone, 'Phone required.'));
     if (password.length < 6) return res.status(400).send(accountCreatePage('rider', phone, 'Password minimum 6 characters.'));
     if (password !== confirm) return res.status(400).send(accountCreatePage('rider', phone, 'Confirm password did not match.'));
-    const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     if (!r.rows.length) return res.status(404).send(accountCreatePage('rider', phone, 'No registered rider found for this phone. Please register first.'));
+    if (normalizeStatus(r.rows[0].status) !== 'approved') return res.status(403).send(accountCreatePage('rider', phone, 'Admin approval required before account creation.'));
     const hp = hashPassword(password);
     await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
     res.send(accountCreateSuccessPage('rider', r.rows[0].phone || phone));
@@ -3844,9 +3387,10 @@ app.post('/rider/login', async (req, res, next) => {
     const phone = String(req.body.phone || '').trim();
     const password = String(req.body.password || '');
     if (!phone || !password) return res.status(400).send(riderLoginPage(phone, 'Phone and password required.'));
-    const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, password_hash, password_salt FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(status,'pending') AS status, password_hash, password_salt FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     const rd = r.rows[0];
     if (!rd) return res.status(404).send(riderLoginPage(phone, 'No registered rider found. Use Register or Create Account.'));
+    if (normalizeStatus(rd.status) !== 'approved') return res.status(403).send(riderLoginPage(phone, 'Your rider application is not approved yet.'));
     if (!rd.password_hash || !rd.password_salt) return res.status(403).send(riderLoginPage(phone, 'Password not set. Create account first.'));
     if (!verifyPassword(password, rd.password_salt, rd.password_hash)) return res.status(401).send(riderLoginPage(phone, 'Wrong phone or password.'));
     await pool.query(`UPDATE govo_rider_leads SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1`, [rd.id]);
@@ -4334,7 +3878,7 @@ app.get('/admin/leads', async (req, res, next) => {
     if (q) { params.push(`%${q.toLowerCase()}%`); where.push(`LOWER(COALESCE(shop_name,'') || ' ' || COALESCE(owner_name,'') || ' ' || COALESCE(phone,'') || ' ' || COALESCE(location,'') || ' ' || COALESCE(category,'') || ' ' || COALESCE(products,'')) LIKE $${params.length}`); }
     const merchants = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, CASE WHEN status IS NULL OR TRIM(status)='' THEN 'pending' ELSE LOWER(TRIM(status)) END AS status, admin_note, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, opening_hours, COALESCE(delivery_available,true) AS delivery_available, COALESCE(public_visible,true) AS public_visible, COALESCE(is_demo,false) AS is_demo, password_hash, reset_requested_at, reset_note, created_at FROM govo_merchant_leads ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT 150`, params);
     const counts = await pool.query(`SELECT COUNT(*)::int total, COUNT(*) FILTER (WHERE ${approvalPendingSql})::int pending, COUNT(*) FILTER (WHERE ${approvalApprovedSql})::int approved, COUNT(*) FILTER (WHERE ${approvalRejectedSql})::int rejected FROM govo_merchant_leads`);
-    const cards = merchants.rows.filter(govoValidPublicMerchant).map((x) => `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${accountBadges(x)}${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminMerchantEditForm(x)}${adminPasswordResetForm('merchant', x)}${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/admin/merchant/${encodeURIComponent(x.id)}">View Details</a><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
+    const cards = merchants.rows.map((x) => `<div class="card">${listingImage(x.image_url, x.shop_name)}<div class="actions" style="justify-content:space-between"><h2>${esc(x.shop_name || 'Unnamed Shop')}</h2>${badge(x.status)}</div>${accountBadges(x)}${visibilityBadges(x)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>Admin Note</b><span>${esc(x.admin_note || 'No note')}</span></div></div><form method="POST" action="/admin/merchant/status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="admin_note" placeholder="Admin note"><div class="three"><button name="status" value="approved">Approve</button><button class="reject" name="status" value="rejected">Reject</button><button class="secondary" name="status" value="pending">Pending</button></div></form>${adminMerchantEditForm(x)}${adminPasswordResetForm('merchant', x)}${adminTrustControls('merchant', x, pin)}${adminVisibilityControls('merchant', x)}<div class="actions"><a class="btn secondary" href="/admin/merchant/${encodeURIComponent(x.id)}">View Details</a><a class="btn secondary" href="/shop/${encodeURIComponent(x.id)}">View Shop</a><a class="btn secondary" href="/merchant/dashboard?phone=${encodeURIComponent(x.phone || '')}">Dashboard</a><a class="btn secondary" href="/merchant/products?phone=${encodeURIComponent(x.phone || '')}">Products</a></div></div>`).join('');
     res.send(page('Admin Merchants', `${statCards(counts.rows[0] || {})}<section class="card"><h1>Admin Merchants</h1>${approvalFilterLinks('/admin/leads', status)}${visibilityFilterLinks('/admin/leads', status, visibility)}<form class="filters" method="GET" action="/admin/leads"><input name="q" value="${esc(q)}" placeholder="Search merchants"><select name="status"><option value="all">All</option><option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${status === 'rejected' ? 'selected' : ''}>Rejected</option></select><select name="visibility"><option value="all" ${visibility === 'all' ? 'selected' : ''}>All Visibility</option><option value="visible" ${visibility === 'visible' ? 'selected' : ''}>Visible</option><option value="hidden" ${visibility === 'hidden' ? 'selected' : ''}>Hidden</option><option value="demo" ${visibility === 'demo' ? 'selected' : ''}>Demo/Test</option></select><button>Search</button></form><div class="toolbar"><a class="btn secondary" href="/admin/os">Admin Home</a><a class="btn secondary" href="/admin/riders">Riders</a><a class="btn secondary" href="/admin/orders">Orders</a></div></section><section class="cards">${cards || '<div class="card"><h2>No merchant found</h2></div>'}</section>`, 'admin'));
   } catch (e) { next(e); }
 });
@@ -4716,7 +4260,7 @@ async function approvedMerchants() {
            COALESCE(string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' '), '') AS product_search
     FROM govo_merchant_leads l
     LEFT JOIN govo_shop_products p ON (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false
-    WHERE ${publicApprovedSql('l')}
+    WHERE ${publicListingSql('l')}
     GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.is_verified, l.is_trusted, l.is_available, l.emergency_available, l.rating_avg, l.rating_count, l.public_visible, l.is_demo, l.created_at
     ORDER BY l.id DESC
     LIMIT 500
@@ -4726,51 +4270,78 @@ async function approvedMerchants() {
 app.get('/shops', async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
-    const all = await approvedMerchants();
-    const uniqueRows = uniqueByIdentity(all.rows, 'merchant');
-    const rows = q ? uniqueRows.filter((x) => merchantSearchText(x).includes(q)) : uniqueRows.slice(0, 30);
-    const chips = superAppCategories.slice(0, 12).map((cat) => chip(`${cat.icon} ${cat.title.replace(' / Restaurant', '').replace(' / Mobile', '')}`, `/category/${encodeURIComponent(cat.slug)}`)).join('');
-    const cards = rows.map(merchantCard).join('');
-    res.send(page('GOVO Shops', `
-      <section class="card app-hero">
-        <span class="pill">GOVO Shops</span>
-        <h1>Shop, order and discover local partners</h1>
-        <p style="color:var(--muted);font-size:16px;line-height:1.55">Search approved GOVO merchants by shop, product, category, location or phone.</p>
-        <form method="GET" action="/shops" style="margin-top:14px"><input name="q" value="${esc(q)}" placeholder="Search food, grocery, medicine, phone, location"><button>Search Shops</button></form>
-        <div class="toolbar"><a class="btn secondary" href="https://app.govoexpress.com/app">Home</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/order">Order</a></div>
-      </section>
-      <section class="card"><div class="section-head"><h2>Categories</h2><span class="pill">${superAppCategories.length}</span></div><div class="chips">${chips}</div></section>
-      <section class="card"><div class="section-head"><h2>${q ? 'Shop Search Results' : 'Featured Verified Shops'}</h2><span class="pill">${rows.length} showing</span></div></section>
-      <section class="cards">${cards || pilotPartnerEmpty('merchant')}</section>
-    `, 'shops'));
-  } catch (e) { next(e); }
+    const type = ['all','shops','services'].includes(String(req.query.type || '').toLowerCase()) ? String(req.query.type).toLowerCase() : 'all';
+    const category = String(req.query.category || '').trim().toLowerCase();
+    const area = String(req.query.area || '').trim().toLowerCase();
+    const availability = String(req.query.availability || '').trim().toLowerCase();
+    const sort = ['newest','name','rating'].includes(String(req.query.sort || '').toLowerCase()) ? String(req.query.sort).toLowerCase() : 'newest';
+
+    const [merchantResult, providerResult] = await Promise.all([approvedMerchants(), approvedProviders()]);
+    let shops = uniqueByIdentity(merchantResult.rows, 'merchant');
+    let providers = uniqueByIdentity(providerResult.rows, 'provider');
+
+    const matchesArea = (value) => !area || String(value || '').toLowerCase().includes(area);
+    const matchesAvailability = (x) => {
+      if (availability === 'available') return boolish(x.is_available);
+      if (availability === 'emergency') return boolish(x.emergency_available);
+      if (availability === 'verified') return boolish(x.is_verified) || boolish(x.is_trusted);
+      return true;
+    };
+
+    if (q) {
+      shops = shops.filter((x) => merchantSearchText(x).includes(q));
+      providers = providers.filter((x) => providerSearchText(x).includes(q));
+    }
+    if (category) {
+      shops = shops.filter((x) => String(x.category || '').toLowerCase().includes(category) || String(x.product_search || '').toLowerCase().includes(category));
+      providers = providers.filter((x) => String(x.service_type || '').toLowerCase().includes(category));
+    }
+    shops = shops.filter((x) => matchesArea(x.shop_address || x.location) && matchesAvailability(x));
+    providers = providers.filter((x) => matchesArea(x.area || x.address) && matchesAvailability(x));
+
+    const sorter = sort === 'name'
+      ? (a,b) => String(a.shop_name || a.provider_name || '').localeCompare(String(b.shop_name || b.provider_name || ''))
+      : sort === 'rating'
+        ? (a,b) => Number(b.rating_avg || 0) - Number(a.rating_avg || 0)
+        : (a,b) => Number(b.id || 0) - Number(a.id || 0);
+    shops.sort(sorter);
+    providers.sort(sorter);
+
+    if (type === 'shops') providers = [];
+    if (type === 'services') shops = [];
+
+    const cats = superAppCategories.slice(0, 12).map((cat) => ({ icon: cat.icon, title: cat.title.replace(' / Restaurant', '').replace(' / Mobile', ''), slug: cat.slug }));
+    const serviceCats = serviceCategories.map((cat) => ({ icon: cat.icon, title: cat.title }));
+    const areaSet = new Set();
+    merchantResult.rows.forEach((x) => { const v = String(x.shop_address || x.location || '').trim(); if (v) areaSet.add(v); });
+    providerResult.rows.forEach((x) => { const v = String(x.area || x.address || '').trim(); if (v) areaSet.add(v); });
+    const areas = [...areaSet].sort((a,b) => a.localeCompare(b)).slice(0, 100);
+
+    res.setHeader('X-GOVO-UI', 'v20-marketplace-live');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.send(v20Browse.shopsPage({ q, type, category, area, availability, sort, cats, serviceCats, areas, rows: shops, providers, totalShops: shops.length, totalServices: providers.length }));
+  } catch (e) {
+    console.error('GOVO /shops error:', e);
+    res.status(500).send(v20Browse.shopsPage({ error: true, cats: [], serviceCats: [], areas: [], rows: [], providers: [], q: '', type: 'all' }));
+  }
 });
 
 app.get('/category/:slug', async (req, res, next) => {
   try {
     const slug = String(req.params.slug || '').trim().toLowerCase();
     const cat = categoryForSlug(slug);
-    if (!cat) return res.status(404).send(page('Category Not Found', `<section class="card"><h1>Category Not Found</h1><p>This GOVO category is not available.</p><a class="btn" href="https://app.govoexpress.com/shops">Back to Super App</a></section>`, 'shops'));
+    if (!cat) {
+      res.status(404);
+      return res.send(v20Browse.categoryPage({ cat: { slug, title: 'Category Not Found', desc: 'This GOVO category is not available.', icon: '' }, q: '', rows: [] }));
+    }
     const q = String(req.query.q || '').trim().toLowerCase();
     const all = await approvedMerchants();
     let rows = all.rows.filter((x) => merchantMatchesCategory(x, cat));
     if (q) rows = rows.filter((x) => merchantSearchText(x).includes(q));
-    const cards = rows.map(merchantCard).join('');
-    res.send(page(cat.title, `
-      <section class="card" style="background:linear-gradient(180deg,#102016,#111827)">
-        <a class="btn secondary" href="https://app.govoexpress.com/shops">Back to Super App</a>
-        <div style="font-size:38px;margin-top:14px">${cat.icon}</div>
-        <h1>${esc(cat.title)}</h1>
-        <p style="color:var(--muted);font-size:16px;line-height:1.55">${esc(cat.desc)}</p>
-        <form method="GET" action="/category/${encodeURIComponent(cat.slug)}" style="margin-top:14px">
-          <input name="q" value="${esc(q)}" placeholder="Search within ${esc(cat.title)} by name, product, location, phone">
-          <button>Search Category</button>
-        </form>
-      </section>
-      <section class="card"><div class="actions" style="justify-content:space-between"><h2>Approved ${esc(cat.title)}</h2><span class="pill">${rows.length}</span></div></section>
-      <section class="cards">${cards || pilotPartnerEmpty('merchant')}</section>
-    `, 'shops'));
-  } catch (e) { next(e); }
+    res.setHeader('X-GOVO-UI', 'v20-shops-live');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.send(v20Browse.categoryPage({ cat, q, rows }));
+  } catch (e) { console.error('GOVO /category error:', e); res.status(500).send(v20Browse.categoryPage({ error: true, cat: { slug: '', title: 'Category', desc: '' }, q: '', rows: [] })); }
 });
 
 
@@ -4782,27 +4353,24 @@ async function visibleShopProducts(merchantId, merchantPhone = '') {
 
 app.get('/shop/:id', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
-    if (!x) return res.status(404).send(page('Shop Not Found', `<section class="card"><h1>Shop Not Found</h1><p>This shop is not public right now.</p></section>${pilotPartnerEmpty('merchant')}`, 'shops'));
-    const products = await visibleShopProducts(x.id, x.phone || x.whatsapp || '');
-    const productHtml = products.map((p) => {
-      const key = `${p.source}-${p.id}`;
-      const price = productPrice(p.price_text);
-      return `<div class="card" style="padding:14px;margin:0"><div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><span class="pill">${esc(p.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(p.name || 'Product')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">${price ? `৳${esc(price)}` : esc(p.price_text || '')}</p></div>${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name || 'Product')}" style="width:86px;height:86px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(p.description || '')}</p><label style="display:flex;align-items:center;gap:10px;margin-top:10px"><input type="checkbox" name="product_keys" value="${esc(key)}"> Add to order</label><label>Qty</label><input name="qty_${esc(key)}" type="number" min="1" max="50" value="1"></div>`;
-    }).join('');
-    const empty = '<div class="card"><h2>This shop is preparing its menu. Call or WhatsApp to order.</h2></div>';
-    res.send(page(x.shop_name || 'GOVO Shop', `<section class="card"><a class="btn secondary" href="https://app.govoexpress.com/shops">Back Shops</a><h1>${esc(x.shop_name || '')}</h1>${listingImage(x.image_url, x.shop_name, true)}${trustBadges(x)}<div class="detail-grid"><div><b>Owner</b><span>${esc(x.owner_name)}</span></div><div><b>Phone</b><span>${esc(x.whatsapp || x.phone)}</span></div><div><b>Location</b><span>${esc(x.shop_address || x.location)}</span></div><div><b>Category</b><span>${esc(x.category)}</span></div><div><b>Delivery</b><span>${esc(x.delivery_needed)}</span></div><div><b>About</b><span>${esc(x.shop_description || '')}</span></div></div><div class="actions">${x.whatsapp || x.phone ? `<a class="btn secondary wa" href="https://wa.me/${esc(String(x.whatsapp || x.phone).replace(/\D/g,''))}">WhatsApp</a><a class="btn secondary" href="tel:${esc(x.whatsapp || x.phone)}">Call</a>` : ''}</div></section><form method="POST" action="/shop/${encodeURIComponent(x.id)}/order"><section class="card"><div class="section-head"><h2>Products / Menu</h2><span class="pill">${products.length}</span></div><p style="color:var(--muted);font-weight:900">Select items and place order</p><div class="item-grid">${productHtml || empty}</div></section><section class="card"><h2>Place Order</h2><label>Your Name</label><input name="customer_name" required><label>Your Phone</label><input name="customer_phone" required><label>Your Area</label><input name="customer_area" placeholder="Meherpur / Mujibnagar"><label>Delivery Address</label><input name="customer_address" required><label>Payment Method</label><select name="payment_method"><option>cash</option><option>bKash</option><option>Nagad</option><option>card</option></select><label>Note</label><textarea name="note"></textarea><button ${products.length ? '' : 'disabled'}>Submit Shop Order</button></section></form>`, 'shops'));
+    if (!x) return res.status(404).send(v20Browse.messagePage({ title: 'Shop Not Found', message: 'This shop is not public right now.', backHref: '/shops', backLabel: 'Back to Shops', active: 'shops' }));
+    const productsRaw = await visibleShopProducts(x.id, x.phone || x.whatsapp || '');
+    const products = productsRaw.map((p) => ({ ...p, price_display: productPrice(p.price_text) }));
+    res.setHeader('X-GOVO-UI', 'v20-shops-live');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.send(v20Browse.shopDetailPage({ shop: x, products }));
   } catch (e) { next(e); }
 });
 
 app.post('/shop/:id/order', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [req.params.id]);
     const m = shop.rows[0];
-    if (!m) return res.status(404).send(page('Shop Not Found', '<section class="card"><h1>Shop not found</h1></section>', 'shops'));
+    if (!m) return res.status(404).send(v20Browse.messagePage({ title: 'Shop Not Found', message: 'This shop is not public right now.', backHref: '/shops', backLabel: 'Back to Shops', active: 'shops' }));
     const selected = Array.isArray(req.body.product_keys) ? req.body.product_keys : req.body.product_keys ? [req.body.product_keys] : [];
-    if (!selected.length) return res.status(400).send(page('Select Items', `<section class="card"><h1>Select at least one item</h1><a class="btn" href="/shop/${encodeURIComponent(m.id)}">Back to shop</a></section>`, 'shops'));
+    if (!selected.length) return res.status(400).send(v20Browse.messagePage({ title: 'Select Items', message: 'Select at least one available item before submitting.', backHref: `/shop/${encodeURIComponent(m.id)}`, backLabel: 'Back to Shop', active: 'shops' }));
     const products = await visibleShopProducts(m.id, m.phone || m.whatsapp || '');
     const byKey = new Map(products.map((p) => [`${p.source}-${p.id}`, p]));
     const lines = [];
@@ -4816,10 +4384,10 @@ app.post('/shop/:id/order', async (req, res, next) => {
       subtotal += price * qty;
       lines.push(`${p.name || 'Product'} x${qty}${price ? ` @ ${price}` : ''}${price ? ` = ${price * qty}` : ''}`);
     }
-    if (!lines.length) return res.status(400).send(page('Select Items', `<section class="card"><h1>Selected products are no longer available</h1><a class="btn" href="/shop/${encodeURIComponent(m.id)}">Back to shop</a></section>`, 'shops'));
+    if (!lines.length) return res.status(400).send(v20Browse.messagePage({ title: 'Items Unavailable', message: 'The selected products are no longer available.', backHref: `/shop/${encodeURIComponent(m.id)}`, backLabel: 'Back to Shop', active: 'shops' }));
     const created = await createDispatchOrder({ customer_name: req.body.customer_name || '', customer_phone: req.body.customer_phone || '', customer_area: req.body.customer_area || '', customer_address: req.body.customer_address || '', order_type: 'shop', merchant_id: m.id, merchant_name: m.shop_name || '', items: lines.join('\n'), note: String(req.body.note || '').trim(), pickup_location: m.shop_address || m.location || m.shop_name || '', subtotal, total_amount: subtotal, payment_method: req.body.payment_method || 'cash', payment_status: 'unpaid', status: 'new', priority: 'normal' }, 'customer');
     sendTelegram(['New GOVO Shop Order', '', `Order: ${created.code}`, `Shop: ${m.shop_name || ''}`, `Customer: ${req.body.customer_name || ''}`, `Phone: ${req.body.customer_phone || ''}`, `Address: ${req.body.customer_address || ''}`, `Items: ${lines.join('; ')}`, `Total: ${subtotal || 'N/A'}`].join('\n')).catch(() => {});
-    res.send(page('Order Submitted', `<section class="card app-hero"><span class="pill">Order Received</span><h1>Shop Order Submitted</h1><p>Your order has been sent to GOVO dispatch.</p><h2>Tracking Code: ${esc(created.code)}</h2><div class="actions"><a class="btn" href="/track?code=${encodeURIComponent(created.code)}">Track Order</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">Back to Shop</a><a class="btn secondary" href="https://app.govoexpress.com/shops">All Shops</a></div></section>`, 'track'));
+    res.send(v20Browse.requestSuccessPage({ code: created.code, kind: 'shop' }));
   } catch (e) { next(e); }
 });
 
@@ -5909,10 +5477,10 @@ app.post('/support', async (req, res, next) => {
     const missing = [];
     if (!data.customer_phone) missing.push('phone');
     if (!data.message) missing.push('message');
-    if (missing.length) return res.status(400).send(supportForm(data, `Please fill: ${missing.join(', ')}`));
+    if (missing.length) return res.status(400).send(renderSupportPage(data, `Please fill: ${missing.join(', ')}`));
     const created = await createSupportTicket(data, 'customer');
     sendTelegram(['New GOVO Support Ticket', '', `Ticket: ${created.code}`, `Customer: ${data.customer_name || ''}`, `Phone: ${data.customer_phone}`, `Area: ${data.customer_area || ''}`, `Subject: ${data.subject || ''}`, `Related: ${data.related_type} ${data.related_code || ''}`, `Message: ${data.message}`].join('\n')).catch(() => {});
-    res.send(page('Support Ticket Submitted', `<section class="card app-hero"><span class="pill">Ticket Received</span><h1>Support Ticket Submitted</h1><p>GOVO support has received your message.</p><h2>Ticket Code: ${esc(created.code)}</h2>${supportContactActions()}<div class="actions"><a class="btn" href="/track?code=${encodeURIComponent(created.code)}">Track Ticket</a><a class="btn secondary" href="https://app.govoexpress.com/support">Submit Another</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'track'));
+    res.send(renderSupportSuccess(created.code));
   } catch (e) { next(e); }
 });
 
@@ -5999,7 +5567,7 @@ function providerCard(x) {
 }
 
 async function approvedProviders() {
-  return pool.query(`SELECT * FROM govo_service_providers WHERE ${publicApprovedSql()} ORDER BY id DESC LIMIT 500`);
+  return pool.query(`SELECT * FROM govo_service_providers WHERE ${publicListingSql()} ORDER BY id DESC LIMIT 500`);
 }
 
 
@@ -6080,7 +5648,7 @@ app.all('/provider', imageUpload.single('provider_image'), async (req, res, next
       const r = await pool.query(`INSERT INTO govo_service_providers (provider_name, phone, whatsapp, service_type, area, address, experience, description, image_url, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',NOW(),NOW()) RETURNING *`, [req.body.provider_name || '', req.body.phone || '', req.body.whatsapp || '', req.body.service_type || '', req.body.area || '', req.body.address || '', req.body.experience || '', req.body.description || '', imageUrl]);
       const x = r.rows[0];
       sendTelegram(['New GOVO Service Provider', '', `Provider ID: #${x.id}`, `Name: ${x.provider_name || ''}`, `Phone: ${x.phone || ''}`, `WhatsApp: ${x.whatsapp || ''}`, `Type: ${x.service_type || ''}`, `Area: ${x.area || ''}`, `Address: ${x.address || ''}`].join('\n')).catch(() => {});
-      return res.send(page('Provider Submitted', `<section class="card"><h1>Provider Submitted</h1><p>GOVO team review kore approve korbe.</p><div class="actions"><a class="btn" href="https://merchant.govoexpress.com/provider">Add Another</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a></div></section>`, 'services'));
+      return res.send(page('Provider Submitted', `<section class="card"><h1>Provider Submitted</h1><p>GOVO team review kore approve korbe.</p><div class="actions"><a class="btn" href="https://merchant.govoexpress.com/provider">Add Another</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a></div></section>`, 'provider'));
     }
     res.send(page('Provider Registration', `<section class="card"><h1>Service Provider Registration</h1><p class="form-hint">Join GOVO Super App as an approved service provider.</p><form method="POST" action="/provider" enctype="multipart/form-data"><label>Provider Name</label><input name="provider_name" required><label>Phone</label><input name="phone" required><label>WhatsApp</label><input name="whatsapp"><label>Service Type</label><input name="service_type" placeholder="Electrician / Doctor / Transport" required><label>Area</label><input name="area" required><label>Address</label><textarea name="address"></textarea><label>Experience</label><input name="experience" placeholder="5 years / 100+ jobs"><label>Description</label><textarea name="description"></textarea><label>Profile / Service Image</label><input type="file" name="provider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" placeholder="Optional existing image URL"><button>Submit Provider</button></form></section>`, 'services'));
   } catch (e) { next(e); }
@@ -6091,7 +5659,7 @@ app.post('/provider/profile/update', imageUpload.single('provider_image'), async
   try {
     const phone = String(req.body.phone || '').trim();
     const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!provider.rows.length) return res.status(404).send(page('Provider Not Found', '<section class="card"><h1>Provider Not Found</h1></section>', 'services'));
+    if (!provider.rows.length) return res.status(404).send(page('Provider Not Found', '<section class="card"><h1>Provider Not Found</h1></section>', 'provider'));
     const p = provider.rows[0];
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : keepValue(req.body.image_url, p.image_url);
     await pool.query(`UPDATE govo_service_providers SET provider_name=$1, whatsapp=$2, service_type=$3, area=$4, address=$5, experience=$6, description=$7, image_url=$8, is_available=$9, emergency_available=$10, working_hours=$11, updated_at=NOW() WHERE id=$12`, [keepValue(req.body.provider_name, p.provider_name), keepValue(req.body.whatsapp, p.whatsapp), keepValue(req.body.service_type, p.service_type), keepValue(req.body.area, p.area), keepValue(req.body.address, p.address), keepValue(req.body.experience, p.experience), keepValue(req.body.description, p.description), imageUrl, checkboxBool(req.body.is_available), checkboxBool(req.body.emergency_available), keepValue(req.body.working_hours, p.working_hours), p.id]);
@@ -6111,12 +5679,16 @@ app.post('/rider/profile/update', imageUpload.single('rider_image'), async (req,
   } catch (e) { next(e); }
 });
 
+app.get('/provider', (req, res) => {
+  return res.send(page('Become a Service Provider', `<section class="card app-hero"><span class="pill">SERVICE PROVIDER PORTAL</span><h1>Grow your service business with GOVO</h1><p class="form-hint">Receive local service requests, manage availability and build customer trust.</p><div class="actions"><a class="btn" href="/provider/dashboard">Provider Login</a><a class="btn secondary" href="https://app.govoexpress.com/services">View Public Services</a></div></section><section class="grid"><div class="card"><h2>Service Requests</h2><p>Accept and update customer requests.</p></div><div class="card"><h2>Availability</h2><p>Control regular and emergency availability.</p></div><div class="card"><h2>Trusted Profile</h2><p>Maintain service details, area and profile image.</p></div><div class="card"><h2>Support</h2><p>Get help from GOVO operations.</p></div></section>`, 'provider'));
+});
+
 app.all('/provider/dashboard', imageUpload.single('provider_image'), async (req, res, next) => {
   try {
     const phone = String((req.query && req.query.phone) || (req.body && req.body.phone) || '').trim();
-    if (!phone) return res.send(page('Provider Dashboard', `<section class="card app-hero"><h1>Provider Dashboard</h1><p>Login with your provider phone to manage service requests.</p><form method="GET" action="/provider/dashboard"><label>Provider Phone</label><input name="phone" required placeholder="01XXXXXXXXX"><button>Open Dashboard</button></form><div class="actions"><a class="btn secondary" href="https://merchant.govoexpress.com/provider">Register Provider</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'services'));
+    if (!phone) return res.send(page('Provider Dashboard', `<section class="card app-hero"><h1>Provider Dashboard</h1><p>Login with your provider phone to manage service requests.</p><form method="GET" action="/provider/dashboard"><label>Provider Phone</label><input name="phone" required placeholder="01XXXXXXXXX"><button>Open Dashboard</button></form><div class="actions"><a class="btn secondary" href="https://merchant.govoexpress.com/provider">Register Provider</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'provider'));
     const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!provider.rows.length) return res.send(page('Provider Not Found', '<section class="card"><h1>Provider Not Found</h1><a class="btn" href="https://merchant.govoexpress.com/provider">Register Provider</a></section>', 'services'));
+    if (!provider.rows.length) return res.send(page('Provider Not Found', '<section class="card"><h1>Provider Not Found</h1><a class="btn" href="https://merchant.govoexpress.com/provider">Register Provider</a></section>', 'provider'));
     const p = provider.rows[0];
     if (req.method === 'POST' && req.body.action === 'profile') {
       const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || p.image_url || '').trim();
@@ -6138,7 +5710,7 @@ app.all('/provider/dashboard', imageUpload.single('provider_image'), async (req,
     const requests = await pool.query(`SELECT *, COALESCE(customer_note,note,'') AS display_note FROM govo_service_requests WHERE provider_id=$1 OR provider_phone=$2 ORDER BY id DESC LIMIT 100`, [fresh.id, fresh.phone || '']);
     const requestActions = (x) => `<form method="POST" action="/provider/request/status"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="request_id" value="${esc(x.id)}"><input name="provider_note" value="${esc(x.provider_note || '')}" placeholder="Provider note"><div class="three"><button name="status" value="in_progress">In Progress</button><button name="status" value="completed">Complete</button></div></form>`;
     const requestCards = requests.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.customer_name || 'Customer')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Service Address</b><span>${esc(x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Preferred Time</b><span>${esc(x.preferred_time || 'Any time')}</span></div><div><b>Notes</b><span>${esc(x.display_note || 'No note')}</span></div><div><b>Provider Note</b><span>${esc(x.provider_note || 'No provider note')}</span></div><div><b>Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${requestActions(x)}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(x.request_code || serviceRequestCodeFromId(x.id, x.created_at))}">Track Request</a></div></div>`).join('');
-    res.send(page('Provider Dashboard', `<section class="card app-hero"><h1>Provider Dashboard</h1>${listingImage(fresh.image_url, fresh.provider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(fresh.provider_name || '')}</span></div><div><b>Phone</b><span>${esc(fresh.whatsapp || fresh.phone || phone)}</span></div><div><b>Service Type</b><span>${esc(fresh.service_type || '')}</span></div><div><b>Area</b><span>${esc(fresh.area || '')}</span></div><div><b>Status</b><span>${badge(fresh.status)}</span></div><div><b>Trust</b><span>${trustBadges(fresh)}</span></div><div><b>Rating</b><span>${esc(ratingText(fresh))}</span></div><div><b>Requests</b><span>${esc(requests.rows.length)}</span></div></div><div class="actions"><a class="btn" href="#requests">My Requests</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section><section class="card"><h2>Provider Profile</h2><form method="POST" action="/provider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Provider Name</label><input name="provider_name" value="${esc(fresh.provider_name || '')}" required><label>WhatsApp</label><input name="whatsapp" value="${esc(fresh.whatsapp || '')}"><label>Service Type</label><input name="service_type" value="${esc(fresh.service_type || '')}" required><label>Area</label><input name="area" value="${esc(fresh.area || '')}" required><label>Address</label><textarea name="address">${esc(fresh.address || '')}</textarea><label>Experience</label><input name="experience" value="${esc(fresh.experience || '')}"><label>Description</label><textarea name="description">${esc(fresh.description || '')}</textarea><label>Working Hours</label><input name="working_hours" value="${esc(fresh.working_hours || '')}"><label><input type="checkbox" name="is_available" ${boolish(fresh.is_available) ? 'checked' : ''}> Available</label><label><input type="checkbox" name="emergency_available" ${boolish(fresh.emergency_available) ? 'checked' : ''}> Emergency Available</label><label>Profile / Service Image</label><input type="file" name="provider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(fresh.image_url || '')}"><button>Save Profile</button></form><div class="actions"><a class="btn secondary" href="/service/${encodeURIComponent(fresh.id)}">Public Page</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a></div></section><section class="card" id="requests"><div class="section-head"><h2>Service Requests</h2><span class="pill">${esc(requests.rows.length)} requests</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, start working, complete, or reject.</p></section><section class="cards">${requestCards || '<div class="card"><h2>No requests yet</h2><p style="color:var(--muted);font-weight:900">Customer service requests will appear here.</p></div>'}</section>`, 'services'));
+    res.send(page('Provider Dashboard', `<section class="card app-hero"><h1>Provider Dashboard</h1>${listingImage(fresh.image_url, fresh.provider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(fresh.provider_name || '')}</span></div><div><b>Phone</b><span>${esc(fresh.whatsapp || fresh.phone || phone)}</span></div><div><b>Service Type</b><span>${esc(fresh.service_type || '')}</span></div><div><b>Area</b><span>${esc(fresh.area || '')}</span></div><div><b>Status</b><span>${badge(fresh.status)}</span></div><div><b>Trust</b><span>${trustBadges(fresh)}</span></div><div><b>Rating</b><span>${esc(ratingText(fresh))}</span></div><div><b>Requests</b><span>${esc(requests.rows.length)}</span></div></div><div class="actions"><a class="btn" href="#requests">My Requests</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section><section class="card"><h2>Provider Profile</h2><form method="POST" action="/provider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Provider Name</label><input name="provider_name" value="${esc(fresh.provider_name || '')}" required><label>WhatsApp</label><input name="whatsapp" value="${esc(fresh.whatsapp || '')}"><label>Service Type</label><input name="service_type" value="${esc(fresh.service_type || '')}" required><label>Area</label><input name="area" value="${esc(fresh.area || '')}" required><label>Address</label><textarea name="address">${esc(fresh.address || '')}</textarea><label>Experience</label><input name="experience" value="${esc(fresh.experience || '')}"><label>Description</label><textarea name="description">${esc(fresh.description || '')}</textarea><label>Working Hours</label><input name="working_hours" value="${esc(fresh.working_hours || '')}"><label><input type="checkbox" name="is_available" ${boolish(fresh.is_available) ? 'checked' : ''}> Available</label><label><input type="checkbox" name="emergency_available" ${boolish(fresh.emergency_available) ? 'checked' : ''}> Emergency Available</label><label>Profile / Service Image</label><input type="file" name="provider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(fresh.image_url || '')}"><button>Save Profile</button></form><div class="actions"><a class="btn secondary" href="/service/${encodeURIComponent(fresh.id)}">Public Page</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a></div></section><section class="card" id="requests"><div class="section-head"><h2>Service Requests</h2><span class="pill">${esc(requests.rows.length)} requests</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, start working, complete, or reject.</p></section><section class="cards">${requestCards || '<div class="card"><h2>No requests yet</h2><p style="color:var(--muted);font-weight:900">Customer service requests will appear here.</p></div>'}</section>`, 'provider'));
   } catch (e) { next(e); }
 });
 
@@ -6166,49 +5738,10 @@ app.get('/services', async (req, res, next) => {
     const all = await approvedProviders();
     const uniqueRows = uniqueByIdentity(all.rows, 'provider');
     const rows = q ? uniqueRows.filter((x) => providerSearchText(x).includes(q) || (q === 'emergency' && boolish(x.emergency_available))) : uniqueRows.slice(0, 30);
-
-    const chips = serviceCategories.map((cat) => chip(`${cat.icon} ${cat.title}`, `/services?q=${encodeURIComponent(cat.title)}`)).join('');
-    const cards = rows.map(providerCard).join('');
-
-    res.send(page('GOVO Services', `
-      ${govoDirectPublicCss()}
-      <main class="govo-public-page">
-        <section class="govo-premium-hero">
-          <span class="govo-kicker">GOVO Services</span>
-          <h1 class="govo-display">Trusted local service providers<span class="dot">.</span></h1>
-          <p class="govo-lead">Find approved providers for repair, health, agriculture, transport, rent and home support.</p>
-
-          <form method="GET" action="/services" class="govo-actions">
-            <input name="q" value="${govoDirectSafe(q)}" placeholder="Search service, area, name, phone">
-            <button type="submit">Search Services</button>
-          </form>
-
-          <div class="govo-actions">
-            <a class="govo-btn secondary" href="https://app.govoexpress.com/shops">Browse Shops</a>
-            <a class="govo-btn secondary" href="https://merchant.govoexpress.com/provider">Become Provider</a>
-          </div>
-        </section>
-
-        <section class="govo-grid">
-          <div class="govo-premium-panel">
-            <div class="govo-section-head">
-              <h2>Service Categories</h2>
-              <span class="pill">${serviceCategories.length}</span>
-            </div>
-            <div class="govo-chip-list">${chips}</div>
-          </div>
-
-          <div class="govo-premium-panel">
-            <div class="govo-section-head">
-              <h2>${q ? 'Service Search Results' : 'Featured Trusted Providers'}</h2>
-              <span class="pill">${rows.length} showing</span>
-            </div>
-            <div class="govo-result-grid">${cards || pilotPartnerEmpty('provider')}</div>
-          </div>
-        </section>
-      </main>
-    `, 'services'));
-  } catch (e) { next(e); }
+    res.setHeader('X-GOVO-UI', 'v20-services-live');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.send(v20Browse.servicesPage({ q, cats: serviceCategories, rows }));
+  } catch (e) { console.error('GOVO /services error:', e); res.status(500).send(v20Browse.servicesPage({ error: true, cats: serviceCategories, rows: [], q: '' })); }
 });
 
 function normalizeServiceRequestBody(body = {}) {
@@ -6241,10 +5774,12 @@ function serviceDetailPage(provider, data = {}, error = '') {
 
 app.get('/service/:id', async (req, res, next) => {
   try {
-    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [req.params.id]);
+    const r = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [req.params.id]);
     const provider = r.rows[0];
-    if (!provider) return res.status(404).send(page('Service Not Found', `<section class="card"><h1>Service Not Found</h1><p>This provider is not public right now.</p><a class="btn" href="https://app.govoexpress.com/services">Back Services</a></section>${pilotPartnerEmpty('provider')}`, 'services'));
-    res.send(serviceDetailPage(provider));
+    if (!provider) return res.status(404).send(v20Browse.messagePage({ title: 'Service Not Found', message: 'This provider is not public right now.', backHref: '/services', backLabel: 'Back to Services', active: 'services' }));
+    res.setHeader('X-GOVO-UI', 'v20-services-live');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.send(v20Browse.serviceDetailPage({ provider }));
   } catch (e) { next(e); }
 });
 
@@ -6260,7 +5795,7 @@ function operatorSupportActions() {
 
 function serviceRequestSuccessPage(code = '') {
   const safeCode = String(code || '').trim();
-  return page('Service Request Submitted', '<section class="card app-hero"><span class="pill">Request Received</span><h1>Service Request Submitted</h1><p>GOVO operator will phone-confirm the details before matching a provider.</p><h2>Request ID: ' + esc(safeCode) + '</h2><div class="detail-grid"><div><b>Status</b><span>Phone Confirming</span></div><div><b>Tracking Link</b><span>/track?code=' + esc(safeCode) + '</span></div></div>' + timelineHtml('service', 'new') + '<div class="actions"><a class="btn" href="/track?code=' + encodeURIComponent(safeCode) + '">Track Request</a>' + operatorSupportActions() + '<a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>', 'services');
+  return v20Browse.requestSuccessPage({ code: safeCode, kind: 'service' });
 }
 
 function sendServiceRequestTelegram(created, data, provider = {}) {
@@ -6271,16 +5806,16 @@ function sendServiceRequestTelegram(created, data, provider = {}) {
 async function handleServiceRequestSubmit(req, res, providerId = '') {
   const data = normalizeServiceRequestBody({ ...req.body, provider_id: providerId || req.body.provider_id });
   let provider = { rows: [] };
-  if (data.provider_id && process.env.GOVO_SKIP_DB !== '1') provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [data.provider_id]);
+  if (data.provider_id && process.env.GOVO_SKIP_DB !== '1') provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [data.provider_id]);
   const p = provider.rows[0] || {};
-  if (data.provider_id && process.env.GOVO_SKIP_DB !== '1' && !p.id) return res.status(404).send(page('Provider Not Found', `<section class="card"><h1>Provider Not Found</h1><a class="btn" href="https://app.govoexpress.com/services">Back Services</a></section>${pilotPartnerEmpty('provider')}`, 'services'));
+  if (data.provider_id && process.env.GOVO_SKIP_DB !== '1' && !p.id) return res.status(404).send(v20Browse.messagePage({ title: 'Provider Not Found', message: 'This provider is not available right now.', backHref: '/services', backLabel: 'Back to Services', active: 'services' }));
   const missing = [];
   for (const [field, label] of [['customer_name', 'Your name'], ['customer_phone', 'Your phone'], ['customer_address', 'Service address'], ['problem_details', 'Problem details']]) {
     if (!data[field]) missing.push(label);
   }
   if (!data.service_type && !p.service_type) missing.push('Service type');
-  if (missing.length && p.id) return res.status(400).send(serviceDetailPage(p, data, `Please fill: ${missing.join(', ')}`));
-  if (missing.length) return res.status(400).send(generalServiceRequestPage(data, `Please fill: ${missing.join(', ')}`));
+  if (missing.length && p.id) return res.status(400).send(v20Browse.serviceDetailPage({ provider: p, data, error: `Please fill: ${missing.join(', ')}` }));
+  if (missing.length) return res.status(400).send(v20Browse.generalServiceRequestPage({ data, error: `Please fill: ${missing.join(', ')}` }));
   const created = await createServiceRequest({ ...data, service_type: data.service_type || p.service_type || '', provider_id: p.id || '', provider_name: p.provider_name || '', provider_phone: p.phone || '', status: 'new', priority: data.priority }, 'customer');
   sendServiceRequestTelegram(created, data, p);
   res.send(serviceRequestSuccessPage(created.code));
@@ -6298,7 +5833,7 @@ function generalServiceRequestPage(data = {}, error = '') {
   return page('Service Request', `${error ? `<section class="card"><h1>Check request details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><h1>Request GOVO Service</h1><p style="color:var(--muted)">Tell GOVO what service you need. Admin will match the request with a provider.</p><form method="POST" action="/service-request"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}" required><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || '')}"><label>Service Address</label><textarea name="customer_address" required>${esc(data.customer_address || data.service_address || '')}</textarea><label>Service Type</label><input name="service_type" value="${esc(data.service_type || '')}" required><label>Preferred Time</label><input name="preferred_time" value="${esc(data.preferred_time || '')}"><label>Problem Details</label><textarea name="problem_details" required>${esc(data.problem_details || '')}</textarea><label>Note</label><textarea name="note">${esc(data.note || data.notes || '')}</textarea><button>Submit Service Request</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a></div></section>`, 'services');
 }
 
-app.get('/service-request', (req, res) => res.send(generalServiceRequestPage(normalizeServiceRequestBody(req.query || {}))));
+app.get('/service-request', (req, res) => { res.setHeader('X-GOVO-UI', 'v20-services-live'); res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0'); res.send(v20Browse.generalServiceRequestPage({ data: normalizeServiceRequestBody(req.query || {}) })); });
 app.post('/service-request', async (req, res, next) => {
   try { await handleServiceRequestSubmit(req, res, ''); } catch (e) { next(e); }
 });
@@ -6413,7 +5948,7 @@ app.post('/api/requests', async (req, res, next) => {
 
     let p = {};
     if (data.provider_id && process.env.GOVO_SKIP_DB !== '1') {
-      const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicApprovedSql()} LIMIT 1`, [data.provider_id]);
+      const provider = await pool.query(`SELECT * FROM govo_service_providers WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [data.provider_id]);
       p = provider.rows[0] || {};
       if (!p.id) return res.status(404).json({ success: false, error: 'provider_not_found' });
     }
@@ -8050,8 +7585,8 @@ app.post('/admin/dispatch/assign', express.urlencoded({ extended: false, limit: 
 
 
 function govoRoleNotFound(role, label) {
-  const home = role === 'admin' ? '/login' : '/';
-  const dashboard = '/dashboard';
+  const home = role === 'admin' ? '/admin/login' : role === 'merchant' ? '/merchant' : role === 'rider' ? '/rider' : '/provider/dashboard';
+  const dashboard = role === 'admin' ? '/admin/os' : role === 'merchant' ? '/merchant/dashboard' : role === 'rider' ? '/rider/dashboard' : '/provider/dashboard';
   const support = role === 'admin' ? '/admin/support' : '/support';
   return page(`${label} Page Not Found`, `<section class="card app-hero"><span class="pill">${esc(label)}</span><h1>Page not found</h1><p style="color:var(--muted);font-weight:900">Requested ${esc(label.toLowerCase())} page is not available.</p><div class="actions"><a class="btn" href="${home}">Home</a><a class="btn secondary" href="${dashboard}">Dashboard</a><a class="btn secondary" href="${support}">Support</a></div></section>`, role);
 }
@@ -8076,7 +7611,7 @@ function merchantOnboardingPage() {
             <span class="pill">Apply</span>
           </div>
           <p class="govo-form-note">Shop info din. Approval er por app-e customer order korte parbe.</p>
-          <form method="POST" action="/merchant" class="govo-form-grid">
+          <form method="POST" action="/merchant" enctype="multipart/form-data" class="govo-form-grid">
             <label>Shop Name <input name="shop_name" required placeholder="Shop name"></label>
             <label>Owner Name <input name="owner_name" required placeholder="Owner name"></label>
             <label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label>
@@ -8112,7 +7647,7 @@ app.get('/rider/login', (req, res) => {
 });
 
 app.get('/rider/onboarding', (req, res) => {
-      res.send(govoPremiumFlowShellInject(page('Rider Onboarding', `<section class="govo-premium-hero"><span class="govo-kicker">Rider Network</span><h1 class="govo-display">Join GOVO Today<span class="dot">.</span></h1><p class="govo-lead">Become a GOVO rider and start earning. Fill in your details and we will get back to you.</p><div class="govo-actions"><a class="govo-btn" href="/rider/login">Rider Login</a><a class="govo-btn secondary" href="/app">Back to App</a></div></section><section class="govo-grid"><div class="govo-premium-panel"><div class="govo-section-head"><h2>GOVO Rider Registration</h2><span class="pill">Apply</span></div><p class="govo-form-note">Your delivery information</p><form method="POST" action="/rider" class="govo-form-grid"><label>Rider Name <input name="rider_name" required placeholder="Rider name"></label><label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label><label>Location <select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select></label><label>Vehicle Type <select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select></label><label>Experience <textarea name="experience" placeholder="Previous delivery experience"></textarea></label><div class="govo-actions full"><button type="submit">Submit Rider Info</button><a class="govo-btn secondary" href="/rider/login">Already registered?</a></div></form></div></div></section>`, 'rider')));
+      res.send(govoPremiumFlowShellInject(page('Rider Onboarding', `<section class="govo-premium-hero"><span class="govo-kicker">Rider Network</span><h1 class="govo-display">Join GOVO Today<span class="dot">.</span></h1><p class="govo-lead">Become a GOVO rider and start earning. Fill in your details and we will get back to you.</p><div class="govo-actions"><a class="govo-btn" href="/rider/login">Rider Login</a><a class="govo-btn secondary" href="/app">Back to App</a></div></section><section class="govo-grid"><div class="govo-premium-panel"><div class="govo-section-head"><h2>GOVO Rider Registration</h2><span class="pill">Apply</span></div><p class="govo-form-note">Your delivery information</p><form method="POST" action="/rider" enctype="multipart/form-data" class="govo-form-grid"><label>Rider Name <input name="rider_name" required placeholder="Rider name"></label><label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label><label>Location <select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select></label><label>Vehicle Type <select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select></label><label>Experience <textarea name="experience" placeholder="Previous delivery experience"></textarea></label><label>NID Number <input name="nid_number" inputmode="numeric" placeholder="NID number"></label><label>Driving License <input name="driving_license" placeholder="License number (optional)"></label><label>Rider Photo <input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp" capture="user" required><small class="govo-form-note">Camera ba Gallery theke clear face photo upload korun. Max 3MB.</small></label><div class="govo-actions full"><button type="submit">Submit Rider Info</button><a class="govo-btn secondary" href="/rider/login">Already registered?</a></div></form></div></div></section>`, 'rider')));
 
 });
 
@@ -8168,7 +7703,9 @@ ensureSchema().then(() => {
 
 
 
-  app.listen(PORT, () => console.log('GOVO Express v1.0 clean running on', PORT));
+  
+
+app.listen(PORT, () => console.log('GOVO Express v1.0 clean running on', PORT));
 }).catch((e) => {
   console.error('Startup failed:', e);
   process.exit(1);

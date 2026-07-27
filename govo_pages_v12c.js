@@ -286,7 +286,7 @@ function bottomNav(active, base) {
     ["shops","Shops","shops","shops"],
     ["go","GOVO","ai","bolt"],
     ["services","Services","services","services"],
-    ["support","Help","support","support"]
+    ["account","Account","account","account"]
   ];
 
   return `

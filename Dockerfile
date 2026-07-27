@@ -3,10 +3,13 @@ WORKDIR /app
 COPY package.json package.json
 RUN npm install --omit=dev
 COPY server.js server.js
+COPY govo_header_v28.js ./
 COPY govo_v20_pages.js ./
+COPY govo_v20_shops.js ./
 COPY govo_v20_support.js ./
 COPY govo_v20_icons.js ./
 COPY govo_v20_theme.js ./
+COPY govo_v23_settings.js ./
 COPY govo_unified_v3.js ./
 COPY govo_ui_foundation.js ./
 COPY govo_theme_v1.js ./
