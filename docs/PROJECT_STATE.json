@@ -130,5 +130,18 @@
     "base_image": "govo_portal:role-flows-complete-20261003_220547",
     "protected": "8b95663b72228a6a4c2941e5d40a7defb232da4d3ec89b26050c1de37c2b2753  /app/server.js\nbd65cb13deddebc7b0a6a24c3a934a83ec603ddf2515e677327fd0b78f612f44  /app/govo_header_v28.js",
     "note": "Concurrent role-flow deployment/rollback/redeployment replaced the portal during final checks. Reapplied only the approved three Home/More modules to the final active complete-role-flow release. Its server/header are preserved. Repeated staged and live checks successfully."
+  },
+  "customer_header_motion": {
+    "status": "deployed_verified",
+    "time": "2026-10-04T04:33:45.943679+06:00",
+    "scope": "Customer Home/More transparent header and continuous original logo motion",
+    "container": "7caf7f834dd70fbea084c63c8a9b9b5e33c0cb1337e1d432e5d44a924ad943e5",
+    "file": "govo_home_v30_css.js",
+    "sha256": "49ec7173f66b40cc85e081b54b441cbbb776f2f98abafa3112804ef0c7ee4e5a",
+    "backup": "/home/abu/govo-header-motion-20261004/backup-20261003T223217Z",
+    "source_checkpoint": "/home/abu/govo-icon-polish-20261003/releases/header-motion-20261004",
+    "checkpoint_image": "govo_portal:home-transparent-motion-20261004",
+    "validation": "8 staged and 8 live browser views; header transparency/no shadow, original logo loaded, differing animation transforms, infinite loop, reduced motion, unchanged geometry/links/grid and no JS errors",
+    "backend_changes": false
   }
 }

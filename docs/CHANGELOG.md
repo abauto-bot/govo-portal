@@ -159,3 +159,10 @@ Created persistent project context for AI agents so GOVO work can continue witho
 ### Home release follow-up — final complete-role-flow runtime
 
 Concurrent role-flow deployment, rollback and redeployment replaced the portal during checks. Home/More patch reapplied to final govo_portal:role-flows-complete-20261003_220547 with its server/header preserved. Repeated twenty staged layouts, eight live browser views and twenty-five destination/asset checks. Durable image: govo_portal:home-3x3-roleflows-20261003_2224. Backup: /home/abu/govo-home-3x3-20261004/backup-20261003T222252Z. Pending role-flow Dockerfile now includes the three approved home modules.
+
+
+## 2026-10-04 (Asia/Dhaka) — Transparent customer header and original-logo motion
+
+- User-requested Home/More CSS only: removed header background gradient/shadow and logo drop shadow; original logo floats/tilts continuously in a 4.8s loop. Reduced-motion preference respected.
+- Eight staged and eight live browser checks passed in mobile/desktop, dark/light; layout/links unchanged, 3x3 grids preserved, AI/account HTML unchanged, server/header and all other UI module hashes preserved.
+- Backup: /home/abu/govo-header-motion-20261004/backup-20261003T223217Z. Rollback: restore its CSS to /app/govo_home_v30_css.js and restart only the portal. Durable image: govo_portal:home-transparent-motion-20261004. Future role-flow build CSS updated.
