@@ -110,14 +110,14 @@
   "approved_customer_home_3x3": {
     "date": "2026-10-03T22:20:36.508463+00:00",
     "scope": "customer Home/More UI",
-    "image": "govo_portal:home-3x3-glossy-20261003_2225",
-    "container": "4c56c4a83c21fe5209629cc63bb154c2b71c8cd6e47cb826aba6d38c781b0671",
+    "image": "govo_portal:home-3x3-roleflows-20261003_2224",
+    "container": "7caf7f834dd70fbea084c63c8a9b9b5e33c0cb1337e1d432e5d44a924ad943e5",
     "sources": {
       "govo_v20_pages.js": "8eeb4cc06bf488618f012d1443d210e8ae622e6c16f76320fbac82249aa153e0",
       "govo_glossy_icons_v30.js": "d2729019ec4a973806bc311502e286b1a2c01992a2fba160fed734adfb651686",
       "govo_home_v30_css.js": "544f6f05e7d74365944c47838e9ffa66af447991f3d7e7e8fe64fb93ab236715"
     },
-    "backup": "/home/abu/govo-home-3x3-20261004/backup-20261003T221750Z",
+    "backup": "/home/abu/govo-home-3x3-20261004/backup-20261003T222252Z",
     "source_checkpoint": "/home/abu/govo-icon-polish-20261003/releases/home-3x3-20261004",
     "future_build_context": "/home/abu/govo-role-flows-complete-20261003_220547",
     "validation": {
@@ -126,6 +126,9 @@
       "http_destinations": 23,
       "assets": 2
     },
-    "backend_changes": false
+    "backend_changes": false,
+    "base_image": "govo_portal:role-flows-complete-20261003_220547",
+    "protected": "8b95663b72228a6a4c2941e5d40a7defb232da4d3ec89b26050c1de37c2b2753  /app/server.js\nbd65cb13deddebc7b0a6a24c3a934a83ec603ddf2515e677327fd0b78f612f44  /app/govo_header_v28.js",
+    "note": "Concurrent role-flow deployment/rollback/redeployment replaced the portal during final checks. Reapplied only the approved three Home/More modules to the final active complete-role-flow release. Its server/header are preserved. Repeated staged and live checks successfully."
   }
 }

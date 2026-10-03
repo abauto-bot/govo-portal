@@ -154,3 +154,8 @@ Created persistent project context for AI agents so GOVO work can continue witho
 - Compact hero, explicit shops-search button, readable shop cards; removed fixed sample ratings/time and notification count on these pages.
 - Twenty staged layouts, eight live browser views, twenty-three destination responses and two asset hash checks passed. AI/account rendering unchanged; live server/header hashes preserved.
 - Durable image: govo_portal:home-3x3-glossy-20261003_2225. Source: /home/abu/govo-icon-polish-20261003/releases/home-3x3-20261004. Rollback: /home/abu/govo-home-3x3-20261004/backup-20261003T221750Z. Pending role-flow build includes the three home modules; its server/header unchanged.
+
+
+### Home release follow-up — final complete-role-flow runtime
+
+Concurrent role-flow deployment, rollback and redeployment replaced the portal during checks. Home/More patch reapplied to final govo_portal:role-flows-complete-20261003_220547 with its server/header preserved. Repeated twenty staged layouts, eight live browser views and twenty-five destination/asset checks. Durable image: govo_portal:home-3x3-roleflows-20261003_2224. Backup: /home/abu/govo-home-3x3-20261004/backup-20261003T222252Z. Pending role-flow Dockerfile now includes the three approved home modules.
