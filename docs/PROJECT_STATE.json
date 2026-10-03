@@ -106,5 +106,26 @@
     "Payment data",
     "Real notification delivery"
   ],
-  "last_updated": "2026-07-18"
+  "last_updated": "2026-07-18",
+  "approved_customer_home_3x3": {
+    "date": "2026-10-03T22:20:36.508463+00:00",
+    "scope": "customer Home/More UI",
+    "image": "govo_portal:home-3x3-glossy-20261003_2225",
+    "container": "4c56c4a83c21fe5209629cc63bb154c2b71c8cd6e47cb826aba6d38c781b0671",
+    "sources": {
+      "govo_v20_pages.js": "8eeb4cc06bf488618f012d1443d210e8ae622e6c16f76320fbac82249aa153e0",
+      "govo_glossy_icons_v30.js": "d2729019ec4a973806bc311502e286b1a2c01992a2fba160fed734adfb651686",
+      "govo_home_v30_css.js": "544f6f05e7d74365944c47838e9ffa66af447991f3d7e7e8fe64fb93ab236715"
+    },
+    "backup": "/home/abu/govo-home-3x3-20261004/backup-20261003T221750Z",
+    "source_checkpoint": "/home/abu/govo-icon-polish-20261003/releases/home-3x3-20261004",
+    "future_build_context": "/home/abu/govo-role-flows-complete-20261003_220547",
+    "validation": {
+      "staged_layouts": 20,
+      "live_browser_views": 8,
+      "http_destinations": 23,
+      "assets": 2
+    },
+    "backend_changes": false
+  }
 }

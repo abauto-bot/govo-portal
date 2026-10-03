@@ -146,3 +146,11 @@ Created persistent project context for AI agents so GOVO work can continue witho
 
 - Working tree was clean after backup
 - Remote Git backup confirmed
+
+
+## 2026-10-03 — Customer Home/More 3x3 glossy update
+
+- Larger polished carved raster glyphs and glass tiles in dark/light; nine Home shortcuts and nine popular categories in three columns. More exposes twelve services/options and the full categories list.
+- Compact hero, explicit shops-search button, readable shop cards; removed fixed sample ratings/time and notification count on these pages.
+- Twenty staged layouts, eight live browser views, twenty-three destination responses and two asset hash checks passed. AI/account rendering unchanged; live server/header hashes preserved.
+- Durable image: govo_portal:home-3x3-glossy-20261003_2225. Source: /home/abu/govo-icon-polish-20261003/releases/home-3x3-20261004. Rollback: /home/abu/govo-home-3x3-20261004/backup-20261003T221750Z. Pending role-flow build includes the three home modules; its server/header unchanged.
