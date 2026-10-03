@@ -143,5 +143,41 @@
     "checkpoint_image": "govo_portal:home-transparent-motion-20261004",
     "validation": "8 staged and 8 live browser views; header transparency/no shadow, original logo loaded, differing animation transforms, infinite loop, reduced motion, unchanged geometry/links/grid and no JS errors",
     "backend_changes": false
+  },
+  "all_pages_pattern_v32": {
+    "status": "deployed_verified",
+    "time": "2026-10-04T05:40:03.313638+06:00",
+    "scope": "GOVO all-page shared presentation plus customer HTML 404 boundary",
+    "sources": {
+      "server.js": "1b6e2079904fbb2675d2e0395120cbff91c33e6d6378424375f6220f4a06dae4",
+      "govo_header_v28.js": "dc84e883a894193c49a30d0945cbad3098cede8867dd99c9d5ffb159f91810d9",
+      "govo_v20_pages.js": "2fa741c33df7ca5c6a48df77f03cc59c0de57c51162071a3f383e6aadb7029bf",
+      "govo_pages_v12c.js": "c2cfbeb684a9a74fdb5cc45b069aeadb426ab524dab06ecf371df63597f9c47b",
+      "govo_ui_pattern_v32.js": "be2514101bdaf368bda5fdcb8bcfe07f7b4903cca39163aad384bc4f8da066f5",
+      "govo_all_pages_v32_css.js": "f2186eb3b7fee49dac07ff63b8057e4ad11ba0a91adad5949cd1c87a762bef44"
+    },
+    "container": "7caf7f834dd70fbea084c63c8a9b9b5e33c0cb1337e1d432e5d44a924ad943e5",
+    "image": "govo_portal:all-pages-v32-20261004",
+    "backup": "/home/abu/govo-all-pages-20261004/backup-20261003T233552Z",
+    "rollback": "python3 /home/abu/govo-all-pages-20261004/backup-20261003T233552Z/rollback.py",
+    "source_checkpoint": "/home/abu/govo-icon-polish-20261003/releases/all-pages-20261004",
+    "source_commit": "e5bd0e0",
+    "future_build_context": "/home/abu/govo-role-flows-complete-20261003_220547",
+    "validation": {
+      "app_role_views": 116,
+      "public_views": 6,
+      "menu_theme_interactions": 3,
+      "admin_authentication_gate": 401
+    },
+    "staged_validation": {
+      "app_role_views": 118,
+      "public_views": 6,
+      "api_regressions": 5
+    },
+    "business_backend_changes": false,
+    "remaining": [
+      "Customer login/register/profile/addresses/payments/referral/legal content remain unavailable; HTTP 404 with branded UI.",
+      "Authenticated merchant/rider/admin workflows were not submitted or end-to-end tested."
+    ]
   }
 }

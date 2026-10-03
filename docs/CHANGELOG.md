@@ -166,3 +166,11 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - User-requested Home/More CSS only: removed header background gradient/shadow and logo drop shadow; original logo floats/tilts continuously in a 4.8s loop. Reduced-motion preference respected.
 - Eight staged and eight live browser checks passed in mobile/desktop, dark/light; layout/links unchanged, 3x3 grids preserved, AI/account HTML unchanged, server/header and all other UI module hashes preserved.
 - Backup: /home/abu/govo-header-motion-20261004/backup-20261003T223217Z. Rollback: restore its CSS to /app/govo_home_v30_css.js and restart only the portal. Durable image: govo_portal:home-transparent-motion-20261004. Future role-flow build CSS updated.
+
+
+## 2026-10-04 (Asia/Dhaka) — Shared glossy pattern across GOVO pages
+
+- Customer legacy/V20 and role shells now share transparent headers, original-logo motion, glossy green/cyan icons, dark/light surfaces and form/navigation styling. Approved Home/More markup preserved. Public stylesheet updated without changing its HTML/JS/actions.
+- Missing customer features remain HTTP 404 with an honest branded unavailable page; business/auth/DB/payment methods preserved.
+- Verified 118 staged app/role views + 6 public views; 116 final live app/role views + 6 public views, theme/menu interactions and five read-only API regressions. Production admin authentication wall remains 401; authenticated workflows not submitted.
+- Backup: /home/abu/govo-all-pages-20261004/backup-20261003T233552Z. Rollback: python3 /home/abu/govo-all-pages-20261004/backup-20261003T233552Z/rollback.py. Durable image: govo_portal:all-pages-v32-20261004. Source commit: e5bd0e0. Future role-flow build context updated.
