@@ -179,5 +179,27 @@
       "Customer login/register/profile/addresses/payments/referral/legal content remain unavailable; HTTP 404 with branded UI.",
       "Authenticated merchant/rider/admin workflows were not submitted or end-to-end tested."
     ]
+  },
+  "shops_first_v33": {
+    "status": "deployed_verified",
+    "time": "2026-10-04T06:10:04.554902+06:00",
+    "scope": "Customer /shops presentation only: list first, collapsed filters, large photo cards",
+    "file": "govo_v20_shops.js",
+    "sha256": "a45d6a4e92972f43b2326070548823714cf2b0e07c06017c55fb041ca33d9c1b",
+    "backup": "/home/abu/govo-shops-first-20261004/backup-20261004T000725Z",
+    "rollback": "python3 /home/abu/govo-shops-first-20261004/backup-20261004T000725Z/rollback.py",
+    "image": "govo_portal:shops-first-20261004",
+    "source_commit": "b122da2",
+    "source_checkpoint": "/home/abu/govo-icon-polish-20261003/releases/shops-first-20261004",
+    "validation": {
+      "staged_views": 14,
+      "live_views": 8,
+      "filter_submission": true,
+      "shop_navigation": true
+    },
+    "protected_files_unchanged": true,
+    "backend_changes": false,
+    "photo_size": "180px mobile; 190-210px desktop/tablet",
+    "remaining": "Some merchants have no photo; source image quality depends on their existing uploads."
   }
 }

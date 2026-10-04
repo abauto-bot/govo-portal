@@ -174,3 +174,11 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - Missing customer features remain HTTP 404 with an honest branded unavailable page; business/auth/DB/payment methods preserved.
 - Verified 118 staged app/role views + 6 public views; 116 final live app/role views + 6 public views, theme/menu interactions and five read-only API regressions. Production admin authentication wall remains 401; authenticated workflows not submitted.
 - Backup: /home/abu/govo-all-pages-20261004/backup-20261003T233552Z. Rollback: python3 /home/abu/govo-all-pages-20261004/backup-20261003T233552Z/rollback.py. Durable image: govo_portal:all-pages-v32-20261004. Source commit: e5bd0e0. Future role-flow build context updated.
+
+
+## 2026-10-04 (Asia/Dhaka) — Shops first, larger marketplace photos
+
+- /shops now places approved shops immediately after a compact search and tab/filter toolbar. Advanced filters start collapsed; existing fields and destinations preserved. Stats moved after listings.
+- Larger responsive photo cards: 180px mobile covers; 190-210px desktop/tablet, with honest missing-photo placeholders. Other browse renderers unchanged.
+- Verified 14 staged and 8 live layouts in dark/light, 320-1280px; filters expand/apply correctly and View Shop navigation works. Only govo_v20_shops.js changed; server, Home/More, shared role UI and API hashes unchanged.
+- Backup: /home/abu/govo-shops-first-20261004/backup-20261004T000725Z. Rollback: python3 /home/abu/govo-shops-first-20261004/backup-20261004T000725Z/rollback.py. Image: govo_portal:shops-first-20261004. Source commit: b122da2. Future role-flow build context updated.
