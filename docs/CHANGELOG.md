@@ -182,3 +182,11 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - Larger responsive photo cards: 180px mobile covers; 190-210px desktop/tablet, with honest missing-photo placeholders. Other browse renderers unchanged.
 - Verified 14 staged and 8 live layouts in dark/light, 320-1280px; filters expand/apply correctly and View Shop navigation works. Only govo_v20_shops.js changed; server, Home/More, shared role UI and API hashes unchanged.
 - Backup: /home/abu/govo-shops-first-20261004/backup-20261004T000725Z. Rollback: python3 /home/abu/govo-shops-first-20261004/backup-20261004T000725Z/rollback.py. Image: govo_portal:shops-first-20261004. Source commit: b122da2. Future role-flow build context updated.
+
+
+## 2026-10-04 (Asia/Dhaka) — Merchant, rider and admin OS workspaces
+
+- Shared role-only presentation: desktop sidebar, mobile drawer/dock, nine large glossy shortcuts, accessible navigation, matching dark/light cards, forms and scrollable tables. Prioritized merchant/rider orders and admin alerts. Custom admin dispatch, preview and report shells included.
+- Preserved role auth, POST field/action contracts, DB/payment/notification logic and all protected customer/Home/More/shops modules. Rebased over the concurrent final role-flow cleanup before deployment.
+- Verified 96 synthetic authenticated layouts, 16 selected-status layouts, 45 staged role/gate checks, 44 live role/gate checks, 10 final smoke checks and eight customer regression views. No production form submissions/messages; protected admin visual checks used synthetic fixtures.
+- Files: govo_role_os_v34.js and server UI wrapper patch. Backup: /home/abu/govo-role-os-20261004/backup-20261004T003328Z. Rollback: python3 /home/abu/govo-role-os-20261004/backup-20261004T003328Z/rollback.py. Durable image: govo_portal:role-os-v34-20261004. Source commit: 41a609c. Future build context updated.

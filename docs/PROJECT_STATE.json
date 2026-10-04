@@ -201,5 +201,36 @@
     "backend_changes": false,
     "photo_size": "180px mobile; 190-210px desktop/tablet",
     "remaining": "Some merchants have no photo; source image quality depends on their existing uploads."
+  },
+  "role_os_v34": {
+    "status": "deployed_verified",
+    "scope": "Merchant, rider and admin OS-style presentation only",
+    "time": "2026-10-04T06:37:58.515399+06:00",
+    "sources": {
+      "server.js": "3071020e47f604b700b985074a238d212c840205d88c23c04f3556bd6147ad78",
+      "govo_role_os_v34.js": "1e3ce1afcd854b1169dabe20ee29cac8c319d08ef239537be2f4baff12a47939"
+    },
+    "image": "govo_portal:role-os-v34-20261004",
+    "container": "36075b794f24689e46cce59fed466b9bb054ef397573e011dbbcf0cd77034af2",
+    "backup": "/home/abu/govo-role-os-20261004/backup-20261004T003328Z",
+    "rollback": "python3 /home/abu/govo-role-os-20261004/backup-20261004T003328Z/rollback.py",
+    "source_checkpoint": "/home/abu/govo-icon-polish-20261003/releases/role-os-20261004",
+    "validation": {
+      "synthetic_authenticated_views": 96,
+      "selected_status_views": 16,
+      "staged_role_views": 45,
+      "live_role_views_and_gates": 44,
+      "final_live_smoke_views_and_gates": 10,
+      "customer_regression_views": 8,
+      "form_contracts_preserved": true,
+      "customer_renderer_identical": true
+    },
+    "business_backend_changes": false,
+    "preserved_concurrent_release": "role-flows-final-20261004_002315",
+    "remaining": [
+      "Authenticated production form submissions and order/payment/notification end-to-end workflows were not exercised.",
+      "Production admin remains protected by its existing authentication wall; signed-in layout validated with isolated synthetic fixtures."
+    ],
+    "source_commit": "41a609c"
   }
 }
