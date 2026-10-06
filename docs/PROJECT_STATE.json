@@ -268,5 +268,15 @@
       "protected_runtime_hashes": "unchanged"
     },
     "business_backend_changes": false
+  },
+  "public_header_logo_crop_20261006": {
+    "status": "staged_verified_pending_admin_deployment",
+    "scope": "Header logo lower curve only",
+    "cause": "Existing 770x460 bitmap clips 266 opaque pixels at its bottom edge",
+    "fix": "Existing complete 770x500 original symbol in SVG wrapper; header layout and colour animation preserved",
+    "validation": "8 staged viewport/theme browser checks and visual inspection passed",
+    "backup": "/home/abu/govo-logo-crop-20261006/backup",
+    "deployment_command": "sudo python3 /home/abu/govo-logo-crop-20261006/deploy.py",
+    "source_checkpoint": "/opt/govo-portal/public/releases/logo-crop-20261006"
   }
 }

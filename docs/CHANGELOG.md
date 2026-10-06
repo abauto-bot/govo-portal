@@ -205,3 +205,9 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - Forty isolated browser cases, sixteen HTTPS mobile/theme views and four public/role HTTP gates passed. Docker image build/render passed; server/header/theme hashes unchanged. No business backend, database, nginx or payment edits.
 - Initial verification used the documented legacy 8090 port and automatically restored the UI; confirmed actual live upstream 3000, redeployed and verified successfully.
 - Backup: /home/abu/govo-mobile-ux-20261006/backup. Rollback: python3 /home/abu/govo-mobile-ux-20261006/rollback.py. Durable image: govo_portal:mobile-ux-deployed-20261006. Future build source updated.
+
+## 2026-10-06 — Public header logo crop fix staged
+
+- Confirmed lower symbol curve was clipped inside the raster source rather than by header CSS. Restored complete existing original artwork in the SVG wrapper.
+- Eight staged size/theme browser checks and visual inspection passed; header layout retained.
+- Logo asset, CSS pointer and stylesheet cache version prepared. Deploy blocked by public-file ownership and unavailable passwordless sudo. Command: sudo python3 /home/abu/govo-logo-crop-20261006/deploy.py. Backup: /home/abu/govo-logo-crop-20261006/backup.
