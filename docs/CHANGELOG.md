@@ -211,3 +211,7 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - Confirmed lower symbol curve was clipped inside the raster source rather than by header CSS. Restored complete existing original artwork in the SVG wrapper.
 - Eight staged size/theme browser checks and visual inspection passed; header layout retained.
 - Logo asset, CSS pointer and stylesheet cache version prepared. Deploy blocked by public-file ownership and unavailable passwordless sudo. Command: sudo python3 /home/abu/govo-logo-crop-20261006/deploy.py. Backup: /home/abu/govo-logo-crop-20261006/backup.
+
+### Public logo deployment verified
+
+User ran the prepared sudo deploy command. Both public domains serve the new stylesheet version; the complete original SVG matches the staged asset. Eight live size/theme header checks passed. Backup retained at /home/abu/govo-logo-crop-20261006/backup.
