@@ -1,0 +1,8 @@
+{
+  "status": "deployed_verified_http",
+  "backup": "/home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z",
+  "scope": "public homepage role buttons and header sizing",
+  "time": "2026-10-06T02:57:38.923195+00:00",
+  "sha256": "095b0577fb8d77a89192944c717c2be52751b007272cf514b8c7c3e7211365cf",
+  "browser_checks": 16
+}

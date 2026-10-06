@@ -232,5 +232,20 @@
       "Production admin remains protected by its existing authentication wall; signed-in layout validated with isolated synthetic fixtures."
     ],
     "source_commit": "41a609c"
+  },
+  "public_home_ui_20261006": {
+    "status": "deployed_verified",
+    "time": "2026-10-06T02:55:39.984389+00:00",
+    "host": "www.govoexpress.com",
+    "source": "/var/www/govo-main/index.html",
+    "stage": "/home/abu/govo-home-ui-fix-20261006",
+    "scope": "compact role CTAs, consistent icons and header/logo sizing",
+    "validation": "16 staged and 8 live size/theme browser checks; menu/theme interactions and 6 HTTPS destinations passed",
+    "deployment_command": "sudo python3 /home/abu/govo-home-ui-fix-20261006/deploy.py",
+    "business_backend_changes": false,
+    "verified_at": "2026-10-06T02:59:18.504252+00:00",
+    "backup": "/home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z",
+    "live_source_sha256": "095b0577fb8d77a89192944c717c2be52751b007272cf514b8c7c3e7211365cf",
+    "rollback": "Restore /home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z/index.html to /var/www/govo-main/index.html"
   }
 }

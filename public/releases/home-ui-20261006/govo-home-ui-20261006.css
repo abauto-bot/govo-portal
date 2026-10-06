@@ -1,0 +1,30 @@
+/* GOVO public homepage role/header fix 20261006. Scoped to this source page. */
+body[data-govo-home-ui="20261006"] .audience{gap:12px;grid-template-columns:1fr}
+body[data-govo-home-ui="20261006"] .aud{display:grid;grid-template-columns:44px minmax(0,1fr) 18px;align-items:center;gap:12px;min-height:88px;padding:16px;border-radius:18px;text-align:left;text-decoration:none!important;color:var(--text);transition:border-color .15s,box-shadow .15s}
+body[data-govo-home-ui="20261006"] .aud *{text-decoration:none!important}
+body[data-govo-home-ui="20261006"] .aud i{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#39e75f20,#19cff020);color:#39e75f}
+body[data-govo-home-ui="20261006"] .aud svg{width:24px;height:24px;display:block;flex:none}
+body[data-govo-home-ui="20261006"] .aud b{display:block;margin:0;font-size:16px;line-height:1.35}
+body[data-govo-home-ui="20261006"] .aud small{display:block;margin-top:4px;font-size:12px;line-height:1.45}
+body[data-govo-home-ui="20261006"] .aud:after{content:'→';font-size:22px;line-height:1;color:#19cff0}
+body[data-govo-home-ui="20261006"] .aud:hover{border-color:#19cff080;box-shadow:0 6px 20px #19cff012}
+body[data-govo-home-ui="20261006"] :is(.aud,.brand,.theme-switch,.hamb):focus-visible{outline:3px solid #19cff0;outline-offset:4px}
+body[data-govo-home-ui="20261006"] header.nav.glass{gap:12px!important;overflow:visible!important;min-height:72px!important;padding:10px 16px!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .brand-horizontal{flex:1 1 auto!important;min-width:0!important;max-width:none!important;gap:10px!important;overflow:visible!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .brand-mark{width:58px!important;height:44px!important;flex:0 0 58px!important;object-fit:contain!important;transform:none!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .brand-copy{min-width:0!important;padding:4px 0!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .brand-copy strong{font-size:16px!important;letter-spacing:.025em!important;line-height:1.3!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .brand-copy small{font-size:6px!important;letter-spacing:.06em!important;line-height:1.5!important;white-space:normal!important;overflow:visible!important;max-width:170px!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .nav-actions{flex:0 0 auto!important;gap:8px!important}
+body[data-govo-home-ui="20261006"] header.nav.glass :is(.theme-switch,.hamb){width:44px!important;height:44px!important;min-width:44px!important;flex:0 0 44px!important;padding:8px!important;overflow:visible!important;align-items:center!important;justify-content:center!important}
+body[data-govo-home-ui="20261006"] header.nav.glass :is(.theme-switch,.hamb):before{width:26px!important;height:26px!important;flex:none!important;background-image:none!important;background:none!important;content:none!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .theme-switch:before{content:''!important;background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2319cff0' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4L19 5'/%3E%3C/svg%3E")!important}
+body[data-govo-home-ui="20261006"] header.nav.glass .hamb:before{content:''!important;background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2319cff0' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h16'/%3E%3C/svg%3E")!important}
+html[data-theme="light"] body[data-govo-home-ui="20261006"] .aud{color:#18352f;background:linear-gradient(145deg,#fff,#eef9f4);border-color:#bddfd3}
+html[data-theme="light"] body[data-govo-home-ui="20261006"] .aud i{color:#16894e}
+@media(max-width:1100px){body[data-govo-home-ui="20261006"] .audience{grid-template-columns:1fr}}
+@media(max-width:700px){body[data-govo-home-ui="20261006"] header.nav.glass{padding:8px 10px!important;gap:8px!important}body[data-govo-home-ui="20261006"] header.nav.glass .brand-mark{width:46px!important;height:40px!important;flex-basis:46px!important}body[data-govo-home-ui="20261006"] header.nav.glass .brand-copy strong{font-size:clamp(11px,3.4vw,15px)!important}body[data-govo-home-ui="20261006"] header.nav.glass .brand-copy small{font-size:5.5px!important}body[data-govo-home-ui="20261006"] header.nav.glass .brand-horizontal{gap:7px!important}body[data-govo-home-ui="20261006"] .aud{min-height:82px}}
+@media(prefers-reduced-motion:reduce){body[data-govo-home-ui="20261006"] .aud{transition:none}}
+
+body[data-govo-home-ui="20261006"] .nav-shell{background:rgba(3,18,26,.96)!important;backdrop-filter:none!important}
+html[data-theme="light"] body[data-govo-home-ui="20261006"] .nav-shell{background:rgba(242,249,247,.96)!important}

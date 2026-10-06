@@ -190,3 +190,10 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - Preserved role auth, POST field/action contracts, DB/payment/notification logic and all protected customer/Home/More/shops modules. Rebased over the concurrent final role-flow cleanup before deployment.
 - Verified 96 synthetic authenticated layouts, 16 selected-status layouts, 45 staged role/gate checks, 44 live role/gate checks, 10 final smoke checks and eight customer regression views. No production form submissions/messages; protected admin visual checks used synthetic fixtures.
 - Files: govo_role_os_v34.js and server UI wrapper patch. Backup: /home/abu/govo-role-os-20261004/backup-20261004T003328Z. Rollback: python3 /home/abu/govo-role-os-20261004/backup-20261004T003328Z/rollback.py. Durable image: govo_portal:role-os-v34-20261004. Source commit: 41a609c. Future build context updated.
+
+
+## 2026-10-06 — Public homepage role/header fix deployed
+
+- Compact Customer/Merchant/Rider links with consistent SVG glyphs; contained original logo and 44px header controls. Existing destinations and theme/menu JavaScript preserved.
+- Sixteen staged browser size/theme cases passed; original logo loaded, menu/theme interactions passed. Public HTML/CSS patch and deployment script checkpointed under public/releases/home-ui-20261006.
+- User ran the prepared administrator command. Deployment verified: 8 live browser size/theme views, menu/theme interactions, both public domains, the CSS asset and all three role destinations passed. Backup: /home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z. Rollback: restore its index.html over /var/www/govo-main/index.html. No backend, database, nginx configuration or container change. Header contrast is protected over scrolled content in both themes.
