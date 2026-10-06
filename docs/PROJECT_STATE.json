@@ -106,7 +106,7 @@
     "Payment data",
     "Real notification delivery"
   ],
-  "last_updated": "2026-07-18",
+  "last_updated": "2026-10-06",
   "approved_customer_home_3x3": {
     "date": "2026-10-03T22:20:36.508463+00:00",
     "scope": "customer Home/More UI",
@@ -247,5 +247,26 @@
     "backup": "/home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z",
     "live_source_sha256": "095b0577fb8d77a89192944c717c2be52751b007272cf514b8c7c3e7211365cf",
     "rollback": "Restore /home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z/index.html to /var/www/govo-main/index.html"
+  },
+  "customer_mobile_ux_20261006": {
+    "status": "deployed_verified",
+    "time": "2026-10-06T04:15:00.449475+00:00",
+    "container": "govo_portal_v20_live",
+    "runtime_port": 3000,
+    "scope": "Customer accessibility, search keyboard hint, safe-area spacing and tap targets; original October Home/More design preserved",
+    "file": "govo_v20_pages.js",
+    "sha256": "dd6c0433589bde2218798613fde4605ec669568f33cdb0603f8947b31023b086",
+    "image": "govo_portal:mobile-ux-deployed-20261006",
+    "backup": "/home/abu/govo-mobile-ux-20261006/backup",
+    "rollback": "python3 /home/abu/govo-mobile-ux-20261006/rollback.py",
+    "source_checkpoint": "/opt/govo-portal/customer/releases/mobile-ux-20261006",
+    "future_build_context": "/home/abu/govo-role-flows-complete-20261003_220547",
+    "validation": {
+      "staged_layout_theme_cases": 40,
+      "live_mobile_theme_cases": 16,
+      "role_public_gates": 4,
+      "protected_runtime_hashes": "unchanged"
+    },
+    "business_backend_changes": false
   }
 }

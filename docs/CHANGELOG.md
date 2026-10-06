@@ -197,3 +197,11 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 - Compact Customer/Merchant/Rider links with consistent SVG glyphs; contained original logo and 44px header controls. Existing destinations and theme/menu JavaScript preserved.
 - Sixteen staged browser size/theme cases passed; original logo loaded, menu/theme interactions passed. Public HTML/CSS patch and deployment script checkpointed under public/releases/home-ui-20261006.
 - User ran the prepared administrator command. Deployment verified: 8 live browser size/theme views, menu/theme interactions, both public domains, the CSS asset and all three role destinations passed. Backup: /home/abu/govo-home-ui-fix-20261006/backup-20261006T025738Z. Rollback: restore its index.html over /var/www/govo-main/index.html. No backend, database, nginx configuration or container change. Header contrast is protected over scrolled content in both themes.
+
+## 2026-10-06 — Customer mobile accessibility deployed
+
+- Rebased the initial GitHub candidate onto the actual October live module; preserved the approved 3x3 Home/More design and existing search submit button.
+- Added active-page navigation semantics, search input types/keyboard hints, 16px inputs, 44px touch targets, keyboard focus, safe-area spacing and reduced-motion support. Only govo_v20_pages.js changed in runtime.
+- Forty isolated browser cases, sixteen HTTPS mobile/theme views and four public/role HTTP gates passed. Docker image build/render passed; server/header/theme hashes unchanged. No business backend, database, nginx or payment edits.
+- Initial verification used the documented legacy 8090 port and automatically restored the UI; confirmed actual live upstream 3000, redeployed and verified successfully.
+- Backup: /home/abu/govo-mobile-ux-20261006/backup. Rollback: python3 /home/abu/govo-mobile-ux-20261006/rollback.py. Durable image: govo_portal:mobile-ux-deployed-20261006. Future build source updated.

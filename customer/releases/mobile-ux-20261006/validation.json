@@ -1,0 +1,15 @@
+{
+  "cases": 40,
+  "status": "passed",
+  "widths": [
+    320,
+    360,
+    390,
+    768,
+    1280
+  ],
+  "themes": [
+    "dark",
+    "light"
+  ]
+}

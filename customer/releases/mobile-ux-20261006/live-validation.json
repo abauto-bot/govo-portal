@@ -1,0 +1,22 @@
+{
+  "cases": 16,
+  "gates": [
+    {
+      "url": "https://merchant.govoexpress.com/merchant",
+      "status": 200
+    },
+    {
+      "url": "https://rider.govoexpress.com/rider",
+      "status": 200
+    },
+    {
+      "url": "https://govoexpress.com/",
+      "status": 200
+    },
+    {
+      "url": "https://add.govoexpress.com/admin",
+      "status": 401
+    }
+  ],
+  "status": "passed"
+}
