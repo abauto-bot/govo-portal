@@ -215,3 +215,15 @@ Concurrent role-flow deployment, rollback and redeployment replaced the portal d
 ### Public logo deployment verified
 
 User ran the prepared sudo deploy command. Both public domains serve the new stylesheet version; the complete original SVG matches the staged asset. Eight live size/theme header checks passed. Backup retained at /home/abu/govo-logo-crop-20261006/backup.
+
+
+## 2026-10-07 — Bengali public homepage prepared
+
+- Existing UI and repaired complete logo retained. Bengali navigation, hero, services, mission/vision, request steps, local benefits, merchant/rider promotion, area aspirations and footer. No fabricated discounts, ratings, time or income guarantees. Service icons use canonical keys; translated theme label and accessible menu close behavior. Bengali network SVG labels.
+- Ten staged browser cases passed at 320–1280px, dark/light: text, layout, images, seven icons, complete logo, search, menu and theme. JS/Python syntax checked; mobile visual reviewed.
+- Awaiting administrator deployment: sudo python3 /home/abu/govo-home-bn-20261006/deploy.py. Hash guards and atomic index install; no backend/container/nginx/database changes.
+- Backup: /home/abu/govo-home-bn-20261006/backup. Rollback: sudo python3 /home/abu/govo-home-bn-20261006/rollback.py. Local source checkpoint saved. GitHub commit/push blocked by automatic approval review pending explicit repository export authorization.
+
+### Bengali homepage deployed and verified
+
+User ran the administrator command; installed 2026-10-06T23:40:53Z. Ten live dark/light browser cases passed at 320–1280px. Both public domains and all four release files matched expected hashes (8 HTTPS checks). Previous index retained for rollback; complete referenced public-asset snapshot saved at /home/abu/govo-home-bn-20261006/public-homepage-deployed-20261007.tar.gz. User explicitly authorized GitHub backup.

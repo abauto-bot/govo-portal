@@ -1,0 +1,14 @@
+{
+  "files": {
+    "index.html": "48d61c594f79eac79984aa796a6060a8a6ec00735838cdfed94415be4807f471",
+    "assets/govo-home-bn-20261006.css": "b245ba3d53d4602502f0ac7155e9b933594522e2a34f7f05453eeb70b1afd2d7",
+    "assets/govo-home-bn-20261006.js": "dfdb6c276b3a6c9d32693284dfa2c0daf61ac6501e85628ffa835cd3f4d09e40",
+    "assets/govo-network-bn-20261006.svg": "a3c131f782a2b896a363addc46664b30869f0c81917469d4820b7622e912fb28"
+  },
+  "previous_index_sha256": "903253c1b7cafa9df53849d95a7ea198b3c36e3d2236cb9d692f22b7d8cc0aca",
+  "protected": {
+    "assets/govo-home-ui-20261006.css": "92009812faef48c562d8c01add41d38e9027451793cc3f28be397aff372ca36e",
+    "assets/govo-symbol-complete-v20261006.svg": "6d2cd2c8954cd7e1db3aad87e7ff9ebed4b1ff87a7032c0e593594ae57acaa5b",
+    "assets/styles-v20261004-mainfix.css": "81292257bb245c2733543a046c1112a4580c0bdfdfb9963f9f8c1b323cb5a9a6"
+  }
+}

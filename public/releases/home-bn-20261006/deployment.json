@@ -1,0 +1,10 @@
+{
+  "status": "installed",
+  "utc": "2026-10-06T23:40:53.569992+00:00",
+  "files": {
+    "index.html": "48d61c594f79eac79984aa796a6060a8a6ec00735838cdfed94415be4807f471",
+    "assets/govo-home-bn-20261006.css": "b245ba3d53d4602502f0ac7155e9b933594522e2a34f7f05453eeb70b1afd2d7",
+    "assets/govo-home-bn-20261006.js": "dfdb6c276b3a6c9d32693284dfa2c0daf61ac6501e85628ffa835cd3f4d09e40",
+    "assets/govo-network-bn-20261006.svg": "a3c131f782a2b896a363addc46664b30869f0c81917469d4820b7622e912fb28"
+  }
+}

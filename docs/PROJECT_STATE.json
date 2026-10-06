@@ -106,7 +106,7 @@
     "Payment data",
     "Real notification delivery"
   ],
-  "last_updated": "2026-10-06",
+  "last_updated": "2026-10-07",
   "approved_customer_home_3x3": {
     "date": "2026-10-03T22:20:36.508463+00:00",
     "scope": "customer Home/More UI",
@@ -279,5 +279,40 @@
     "deployment_command": "sudo python3 /home/abu/govo-logo-crop-20261006/deploy.py",
     "source_checkpoint": "/opt/govo-portal/public/releases/logo-crop-20261006",
     "verified_at": "2026-10-06T04:27:25.461906+00:00"
+  },
+  "public_homepage_bengali": {
+    "status": "deployed_verified",
+    "date": "2026-10-07",
+    "scope": "Bengali public copy, mission/vision, request steps, local benefits, merchant/rider promotion and area information in existing UI",
+    "validation": {
+      "browser_cases": 10,
+      "widths": [
+        320,
+        360,
+        390,
+        768,
+        1280
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "checks": "Bengali headings, no overflow, all images, seven icons, complete original logo, theme, menu/Escape, Bangla search, no page errors; JS/Python syntax; mobile visual reviewed",
+      "live_browser_cases": 10,
+      "http_hash_checks": 8,
+      "domains": [
+        "govoexpress.com",
+        "www.govoexpress.com"
+      ]
+    },
+    "backup": "/home/abu/govo-home-bn-20261006/backup",
+    "source_checkpoint": "/opt/govo-portal/public/releases/home-bn-20261006",
+    "deploy": "sudo python3 /home/abu/govo-home-bn-20261006/deploy.py",
+    "rollback": "sudo python3 /home/abu/govo-home-bn-20261006/rollback.py",
+    "backend_changes": false,
+    "installed_utc": "2026-10-06T23:40:53.569992+00:00",
+    "deployment_backup_archive": "/home/abu/govo-home-bn-20261006/public-homepage-deployed-20261007.tar.gz",
+    "backup_archive_sha256": "14b80b5a405c9b48af46fa7e9846f1230447860ec4b8e73a0ed19522989b9c47",
+    "github_backup_authorization": "User explicitly authorized all Git permissions and requested backup on 2026-10-07."
   }
 }
