@@ -357,6 +357,7 @@
     "backup": "/home/abu/govo-all-in-one-20261007",
     "source_checkpoint": "/opt/govo-portal/android/all-in-one-20261007",
     "homepage_deploy": "sudo python3 /home/abu/govo-all-in-one-20261007/deploy.py",
-    "backend_changes": false
+    "backend_changes": false,
+    "homepage_rollback": "sudo python3 /home/abu/govo-all-in-one-20261007/rollback.py"
   }
 }

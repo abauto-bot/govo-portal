@@ -235,3 +235,5 @@ User ran the administrator command; installed 2026-10-06T23:40:53Z. Ten live dar
 - Signed APK published to /assets/GOVO-Express-All-in-One-1.1.0.apk; both public domains returned exact expected hash. V2/V3 signature, package metadata, alignment and compiled role/switching code verified. 27 JVM navigation/security cases, 10 staged header/download layouts, 3 role browser pages and 10 read-only endpoints passed.
 - Physical device/emulator install and authenticated transaction workflows remain unverified; no market-ready/no-bug guarantee.
 - Homepage download links staged and hash guarded; public index requires administrator command: sudo python3 /home/abu/govo-all-in-one-20261007/deploy.py. Existing standalone role APKs retained. Source/APK/rollback index backed up under android/all-in-one-20261007. Signing keys/passwords remain outside Git.
+
+- Guarded homepage rollback script retained: sudo python3 /home/abu/govo-all-in-one-20261007/rollback.py. Published APK retained on rollback so existing download links continue working.
