@@ -245,3 +245,8 @@ User ran the administrator command; installed 2026-10-06T23:40:53Z. Ten live dar
 - Found rider entry page had login form but failed title-only auth detection, exposing workspace shortcuts and dashboard dock. Recognize role login form actions; omit workspace/dock for authentication pages. Authenticated dashboard navigation and form contracts preserved.
 - Deployed only role presentation module; protected server/customer/header/shop hashes unchanged. Future build source updated. 24 staged + 24 live mobile/theme cases, auth/dashboard contracts, 27 JVM URL-policy cases, font/selector APK contents and same signer verified. Published v1.1.1 APK hash checked on both public domains. Native dialog appearance still requires physical-device verification.
 - Backup/source checkpoint: android/ui-fix-1.1.1-20261007; local /home/abu/govo-apk-ui-fix-20261007/backup. Role rollback: python3 /home/abu/govo-apk-ui-fix-20261007/rollback-role.py. Homepage latest APK link staged; activate with sudo python3 /home/abu/govo-apk-ui-fix-20261007/deploy-home.py.
+
+
+## 2026-10-07 — Shared backend ownership and Admin APK
+
+Deployed session-bound legacy merchant actions, merchant-ID order matching, rider transition guards and merchant order audit events. Passed 38 isolated database-backed integration assertions. Built/published signed GOVO Admin 1.0.0, preserving private HTTP Basic access and PIN login; native HTTP authentication prompts collect credentials only at runtime. Live/future-build source backups retained. Physical Android testing and production payment/SMS delivery remain unverified.

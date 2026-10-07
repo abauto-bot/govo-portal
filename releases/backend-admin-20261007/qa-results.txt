@@ -1,0 +1,40 @@
+PASS Customer creates merchant-ID order without phone
+PASS anonymous merchant mutation blocked
+PASS cross-account merchant mutation blocked
+PASS Unauthorized writes leave DB unchanged
+PASS Merchant A sees ID-linked order /merchant/dashboard
+PASS Merchant B cannot see order /merchant/dashboard
+PASS Merchant A sees ID-linked order /merchant/orders
+PASS Merchant B cannot see order /merchant/orders
+PASS Merchant accepted
+PASS Merchant preparing
+PASS Merchant ready
+PASS Admin dispatch reaches DB
+PASS Assigned rider sees order
+PASS Other rider cannot see order
+PASS Wrong rider, skipped transition or invalid status blocked picked_up
+PASS Wrong rider, skipped transition or invalid status blocked delivered
+PASS Wrong rider, skipped transition or invalid status blocked garbage
+PASS Rider picked_up
+PASS Rider on_the_way
+PASS Rider delivered
+PASS Delivered order cannot regress
+PASS Merchant cannot reopen delivered order
+PASS Customer tracking reflects delivered
+PASS Shared audit history contains lifecycle events
+TOTAL 24 PASS
+PASS Admin authenticated page /admin/os
+PASS Admin authenticated page /admin/orders
+PASS Admin authenticated page /admin/dispatch
+PASS Admin authenticated page /admin/leads
+PASS Admin authenticated page /admin/riders
+PASS Admin authenticated page /admin/providers
+PASS Admin authenticated page /admin/service-requests
+PASS Admin authenticated page /admin/support
+PASS Admin authenticated page /admin/finance
+PASS Legacy merchant endpoint requires session /merchant/profile
+PASS Legacy merchant endpoint requires session /merchant/item
+PASS Legacy merchant endpoint requires session /merchant/orders
+PASS Legacy merchant endpoint rejects cross-account
+PASS Legacy rider endpoint protects delivered state
+TOTAL_EXTENDED 38 PASS

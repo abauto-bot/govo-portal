@@ -383,5 +383,16 @@
     "ui_fix_backup": "/home/abu/govo-apk-ui-fix-20261007/backup",
     "role_ui_rollback": "python3 /home/abu/govo-apk-ui-fix-20261007/rollback-role.py",
     "latest_source_checkpoint": "/opt/govo-portal/android/ui-fix-1.1.1-20261007"
+  },
+  "backend_admin_20261007": {
+    "backend": "deployed to active portal and future-build source",
+    "admin_apk": "https://govoexpress.com/assets/GOVO-Admin-1.0.0.apk",
+    "version": "1.0.0",
+    "package": "com.govo.express.admin",
+    "sha256": "bbd2c8ace4faec2170e53f3412e41d7bc1d29dcbc84d96423ce333303d0d04eb",
+    "isolated_integration_assertions": 38,
+    "android_device_tested": false,
+    "authentication": "existing HTTP Basic + Admin PIN preserved; runtime credentials only",
+    "backup": "/home/abu/govo-backend-admin-20261007/backup"
   }
 }
