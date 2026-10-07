@@ -227,3 +227,11 @@ User ran the prepared sudo deploy command. Both public domains serve the new sty
 ### Bengali homepage deployed and verified
 
 User ran the administrator command; installed 2026-10-06T23:40:53Z. Ten live dark/light browser cases passed at 320–1280px. Both public domains and all four release files matched expected hashes (8 HTTPS checks). Previous index retained for rollback; complete referenced public-asset snapshot saved at /home/abu/govo-home-bn-20261006/public-homepage-deployed-20261007.tar.gz. User explicitly authorized GitHub backup.
+
+
+## 2026-10-07 — GOVO all-in-one Android APK
+
+- Reused prior role-client source and existing protected signing configuration to build one package com.govo.express v1.1.0 (Android 8+, target 35). Persistent customer/merchant/rider selector, existing role-specific HTTPS UI and cookies/auth retained; runtime permissions restricted to active trusted origin. No database/backend changes.
+- Signed APK published to /assets/GOVO-Express-All-in-One-1.1.0.apk; both public domains returned exact expected hash. V2/V3 signature, package metadata, alignment and compiled role/switching code verified. 27 JVM navigation/security cases, 10 staged header/download layouts, 3 role browser pages and 10 read-only endpoints passed.
+- Physical device/emulator install and authenticated transaction workflows remain unverified; no market-ready/no-bug guarantee.
+- Homepage download links staged and hash guarded; public index requires administrator command: sudo python3 /home/abu/govo-all-in-one-20261007/deploy.py. Existing standalone role APKs retained. Source/APK/rollback index backed up under android/all-in-one-20261007. Signing keys/passwords remain outside Git.

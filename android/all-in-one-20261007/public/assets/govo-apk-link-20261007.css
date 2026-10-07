@@ -1,0 +1,6 @@
+/* GOVO Android entry point: preserves existing header and design. */
+.apk-top{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 8px;margin-top:8px}
+.apk-top .btn{font-size:13px;min-height:44px;padding:10px 16px;flex:0 1 auto}
+.apk-top small{color:var(--text);font-size:11px;line-height:1.6}
+@media(min-width:1101px){.apk-top{display:none}}
+@media(max-width:350px){.apk-top{gap:8px}.apk-top .btn{font-size:12px;padding:8px 10px}.apk-top small{font-size:10px}}
