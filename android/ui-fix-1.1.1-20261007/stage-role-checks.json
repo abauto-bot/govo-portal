@@ -1,0 +1,7 @@
+{
+  "cases": 24,
+  "authDashboardContracts": "PASS",
+  "roleSelector": "single insertion, secure native action",
+  "formButtons": "visible and unobscured",
+  "devicePopupTest": "No Android emulator or device connected"
+}

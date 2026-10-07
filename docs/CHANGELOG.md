@@ -237,3 +237,11 @@ User ran the administrator command; installed 2026-10-06T23:40:53Z. Ten live dar
 - Homepage download links staged and hash guarded; public index requires administrator command: sudo python3 /home/abu/govo-all-in-one-20261007/deploy.py. Existing standalone role APKs retained. Source/APK/rollback index backed up under android/all-in-one-20261007. Signing keys/passwords remain outside Git.
 
 - Guarded homepage rollback script retained: sudo python3 /home/abu/govo-all-in-one-20261007/rollback.py. Published APK retained on rollback so existing download links continue working.
+
+
+## 2026-10-07 — All-in-one APK v1.1.1 UI repair
+
+- Removed duplicate native brand toolbar. Role selector now joins the existing page header area and opens a GOVO dark/emerald rounded dialog with a bundled Noto Sans Bengali font; offline switching retained. Same package/signing certificate, incremented version code.
+- Found rider entry page had login form but failed title-only auth detection, exposing workspace shortcuts and dashboard dock. Recognize role login form actions; omit workspace/dock for authentication pages. Authenticated dashboard navigation and form contracts preserved.
+- Deployed only role presentation module; protected server/customer/header/shop hashes unchanged. Future build source updated. 24 staged + 24 live mobile/theme cases, auth/dashboard contracts, 27 JVM URL-policy cases, font/selector APK contents and same signer verified. Published v1.1.1 APK hash checked on both public domains. Native dialog appearance still requires physical-device verification.
+- Backup/source checkpoint: android/ui-fix-1.1.1-20261007; local /home/abu/govo-apk-ui-fix-20261007/backup. Role rollback: python3 /home/abu/govo-apk-ui-fix-20261007/rollback-role.py. Homepage latest APK link staged; activate with sudo python3 /home/abu/govo-apk-ui-fix-20261007/deploy-home.py.

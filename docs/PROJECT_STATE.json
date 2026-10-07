@@ -316,10 +316,10 @@
     "github_backup_authorization": "User explicitly authorized all Git permissions and requested backup on 2026-10-07."
   },
   "android_all_in_one": {
-    "status": "signed_apk_published_homepage_links_staged",
+    "status": "v1.1.1_apk_published_role_ui_deployed_homepage_link_pending",
     "date": "2026-10-07",
     "package": "com.govo.express",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "min_android": 8,
     "target_sdk": 35,
     "roles": [
@@ -327,8 +327,8 @@
       "merchant",
       "rider"
     ],
-    "download": "https://govoexpress.com/assets/GOVO-Express-All-in-One-1.1.0.apk",
-    "sha256": "8a5e6251c71ab483a9f3d1551609182f2a11fbaf89f27229bd0b6de9492a0721",
+    "download": "https://govoexpress.com/assets/GOVO-Express-All-in-One-1.1.1.apk",
+    "sha256": "0d5f1a146e7779c6a162fbf1303c0a88046f5c07614da98caf8508d27a27d4f6",
     "validation": {
       "jvm_navigation_security_cases": 27,
       "public_browser_cases": 10,
@@ -356,8 +356,32 @@
     ],
     "backup": "/home/abu/govo-all-in-one-20261007",
     "source_checkpoint": "/opt/govo-portal/android/all-in-one-20261007",
-    "homepage_deploy": "sudo python3 /home/abu/govo-all-in-one-20261007/deploy.py",
+    "homepage_deploy": "sudo python3 /home/abu/govo-apk-ui-fix-20261007/deploy-home.py",
     "backend_changes": false,
-    "homepage_rollback": "sudo python3 /home/abu/govo-all-in-one-20261007/rollback.py"
+    "homepage_rollback": "sudo python3 /home/abu/govo-all-in-one-20261007/rollback.py",
+    "native_ui_fixes": [
+      "duplicate native brand bar removed",
+      "role selector integrated into existing web header area",
+      "GOVO dark emerald role-choice dialog",
+      "bundled Bengali font independent of phone font setting",
+      "offline role-switch button retained"
+    ],
+    "role_ui_fixes": [
+      "login form reliably recognized as auth page",
+      "no dashboard dock or workspace shortcuts on login/registration pages",
+      "authenticated dashboard navigation retained"
+    ],
+    "ui_fix_validation": {
+      "staged_role_views": 24,
+      "live_role_views": 24,
+      "navigation_security_cases": 27,
+      "signing_certificate_matches_v1_1_0": true,
+      "font_and_selector_packaged": true,
+      "protected_server_customer_header_shop_hashes_unchanged": true,
+      "device_popup_visual_test": "Not run: no connected Android device/emulator"
+    },
+    "ui_fix_backup": "/home/abu/govo-apk-ui-fix-20261007/backup",
+    "role_ui_rollback": "python3 /home/abu/govo-apk-ui-fix-20261007/rollback-role.py",
+    "latest_source_checkpoint": "/opt/govo-portal/android/ui-fix-1.1.1-20261007"
   }
 }

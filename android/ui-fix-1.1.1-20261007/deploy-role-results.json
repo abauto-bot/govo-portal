@@ -1,0 +1,10 @@
+{
+  "status": "deployed_smoke_verified",
+  "protected_hashes": {
+    "server.js": "55730e751dd2186846bc78b240a59935f39d21e99007d4818b82a1c111af929d",
+    "govo_header_v28.js": "dc84e883a894193c49a30d0945cbad3098cede8867dd99c9d5ffb159f91810d9",
+    "govo_v20_pages.js": "f94a45a8c59ee8e654103512a65dc181ab9574dc239bbc151ceab17c5b1513c4",
+    "govo_v20_shops.js": "94fc858e58707727e25d6ac5c791f9800c8915a61abf0c6ae8a319aaf02eaf91"
+  },
+  "module_sha256": "432aded7f19e016d6fe53f2ce500983102ccb8dd0a7c5ec7aea366d42171d163"
+}

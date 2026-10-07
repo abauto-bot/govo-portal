@@ -1,0 +1,10 @@
+{
+  "version": "1.1.1",
+  "versionCode": 2026100702,
+  "package": "com.govo.express",
+  "sha256": "0d5f1a146e7779c6a162fbf1303c0a88046f5c07614da98caf8508d27a27d4f6",
+  "published_domains": 2,
+  "same_signing_certificate": true,
+  "bundled_bengali_font": true,
+  "native_device_test": "Not run: device offline"
+}
