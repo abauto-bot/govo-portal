@@ -3668,7 +3668,8 @@ app.post('/merchant/account/create', async (req, res, next) => {
     if (!r.rows.length) return res.status(404).send(accountCreatePage('merchant', phone, 'No registered merchant found for this phone. Please register first.'));
     if (normalizeStatus(r.rows[0].status) !== 'approved') return res.status(403).send(accountCreatePage('merchant', phone, 'Admin approval required before account creation.'));
     const hp = hashPassword(password);
-    await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
+    const activated = await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3 AND (password_hash IS NULL OR password_hash='') RETURNING id`, [hp.hash, hp.salt, r.rows[0].id]);
+    if (!activated.rows.length) return res.status(409).send(accountCreatePage('merchant', phone, 'Account already exists. Please login or request an Admin password reset.'));
     res.send(accountCreateSuccessPage('merchant', r.rows[0].phone || phone));
   } catch (e) { next(e); }
 });
@@ -3728,7 +3729,8 @@ app.post('/rider/account/create', async (req, res, next) => {
     if (!r.rows.length) return res.status(404).send(accountCreatePage('rider', phone, 'No registered rider found for this phone. Please register first.'));
     if (normalizeStatus(r.rows[0].status) !== 'approved') return res.status(403).send(accountCreatePage('rider', phone, 'Admin approval required before account creation.'));
     const hp = hashPassword(password);
-    await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
+    const activated = await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3 AND (password_hash IS NULL OR password_hash='') RETURNING id`, [hp.hash, hp.salt, r.rows[0].id]);
+    if (!activated.rows.length) return res.status(409).send(accountCreatePage('rider', phone, 'Account already exists. Please login or request an Admin password reset.'));
     res.send(accountCreateSuccessPage('rider', r.rows[0].phone || phone));
   } catch (e) { next(e); }
 });

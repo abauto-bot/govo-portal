@@ -9,4 +9,9 @@ r=request('merchant','/merchant/orders',{'phone':'QA-M-A','id':'1','status':'acc
 check(r.status_code==403,'Legacy merchant endpoint rejects cross-account')
 r=request('rider','/rider/dashboard',{'id':'1','status':'picked_up'},ra)
 check(r.status_code==409,'Legacy rider endpoint protects delivered state')
+for role,phone in [('merchant','QA-M-A'),('rider','QA-R-A')]:
+ r=request(role,'/'+role+'/account/create',{'phone':phone,'password':'QA-attacker-9876','confirm_password':'QA-attacker-9876'})
+ check(r.status_code==409,'Existing '+role+' password cannot be overwritten')
+ r=request(role,'/'+role+'/login',{'phone':phone,'password':'QA-password-8137'})
+ check(r.status_code==302,'Original '+role+' password remains valid')
 print('TOTAL_EXTENDED',count,'PASS',flush=True)

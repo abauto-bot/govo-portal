@@ -37,4 +37,8 @@ PASS Legacy merchant endpoint requires session /merchant/item
 PASS Legacy merchant endpoint requires session /merchant/orders
 PASS Legacy merchant endpoint rejects cross-account
 PASS Legacy rider endpoint protects delivered state
-TOTAL_EXTENDED 38 PASS
+PASS Existing merchant password cannot be overwritten
+PASS Original merchant password remains valid
+PASS Existing rider password cannot be overwritten
+PASS Original rider password remains valid
+TOTAL_EXTENDED 42 PASS

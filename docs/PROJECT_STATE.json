@@ -390,9 +390,10 @@
     "version": "1.0.0",
     "package": "com.govo.express.admin",
     "sha256": "bbd2c8ace4faec2170e53f3412e41d7bc1d29dcbc84d96423ce333303d0d04eb",
-    "isolated_integration_assertions": 38,
+    "isolated_integration_assertions": 42,
     "android_device_tested": false,
     "authentication": "existing HTTP Basic + Admin PIN preserved; runtime credentials only",
-    "backup": "/home/abu/govo-backend-admin-20261007/backup"
+    "backup": "/home/abu/govo-backend-admin-20261007/backup",
+    "account_activation": "Atomic first activation; existing passwords cannot be overwritten by public account-create"
   }
 }
