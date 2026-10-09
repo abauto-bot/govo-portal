@@ -24,21 +24,36 @@ check_body(){
     printf '%s %-14s body=FAIL needle=%s %s\n' "$TS" "$name" "$needle" "$url" >> "$LOG"
   fi
 }
+check_hash(){
+  local name="$1" file="$2" expected="$3"
+  local actual
+  actual=$(docker exec govo_portal_v20_live sha256sum "/app/$file" 2>/dev/null | awk '{print $1}')
+  if [ "$actual" = "$expected" ]; then
+    printf '%s %-14s hash=PASS %s\n' "$TS" "$name" "$actual" >> "$LOG"
+  else
+    fail=1
+    printf '%s %-14s hash=FAIL expected=%s actual=%s\n' "$TS" "$name" "$expected" "${actual:-missing}" >> "$LOG"
+  fi
+}
 check_url main https://govoexpress.com 200
 check_url app https://app.govoexpress.com/app 200
 check_url shops https://app.govoexpress.com/shops 200
 check_url services https://app.govoexpress.com/services 200
+check_url tracking https://app.govoexpress.com/track 200
+check_url join_status https://app.govoexpress.com/join-status 200
 check_url merchant https://merchant.govoexpress.com/merchant 200
 check_url rider https://rider.govoexpress.com/rider 200
 check_url admin https://add.govoexpress.com 401
 check_url api_health https://api.govoexpress.com/health 200
+check_url api_config https://api.govoexpress.com/api/govo-flow/order-config 200
 check_url api_notfound 'https://api.govoexpress.com/api/requests?code=NO-SUCH' 404
 check_body theme_green https://app.govoexpress.com/app '#39E75F'
 check_body theme_cyan https://app.govoexpress.com/app '#19CFF0'
+check_hash source_server server.js 8136dfac85ef61ee4ac0368f9516898ff4eb46feae124b129d0962104ea07850
+check_hash source_flow govo_flow_api_v17.js 6ba0639422b8cc821cf3c8204b7d1b33bee6b8f2813dd9f9a5d67a983d07de7e
 
 docker exec govo_postgres pg_isready >/dev/null 2>&1 || fail=1
 docker exec govo_pay_postgres pg_isready >/dev/null 2>&1 || fail=1
 printf 'checked_at=%q\nstatus=%q\n' "$TS" "$([ "$fail" -eq 0 ] && echo PASS || echo FAIL)" > "$STATE"
-# keep log bounded without root/logrotate dependency
 if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 12000 ]; then tail -6000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"; fi
 exit "$fail"
