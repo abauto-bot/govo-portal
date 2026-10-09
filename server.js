@@ -1,3 +1,5 @@
+const {enhanceCustomerPage}=require('./govo_customer_forms_v35');
+const {roleShell:govoRoleOsShell}=require('./govo_role_os_v34');
 const govoV20Pages = require("./govo_v20_pages");
 const govoPagesV12c = require("./govo_pages_v12c");
 const govoV12c = require("./govo_components_v12c");
@@ -19,6 +21,7 @@ loadEnv();
 
 const app = express();
 
+// GOVO ROLE FLOW CLEANUP 2026-10-04
 // GOVO_ROLE_ISOLATION_V1_START
 app.use((req, res, next) => {
   const host = String(req.headers.host || "")
@@ -102,7 +105,14 @@ app.get(["/__v20","/__v20/:page"], (req,res)=>{
 // GOVO_V20_PREVIEW_END
 
 // GOVO_V20_CUSTOMER_CORE_ROUTES_START
-app.get(["/ai", "/search", "/voice"], (req, res) => {
+app.get("/search", (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  res.setHeader("Cache-Control", "no-store");
+  return res.redirect(302, "/shops" + (params.size ? "?" + params.toString() : ""));
+});
+app.get(["/ai", "/voice"], (req, res) => {
   res.setHeader("X-GOVO-UI", "v20-ai-live");
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   return res.send(govoV20Pages.aiPage(String(req.query.q || "")));
@@ -120,7 +130,7 @@ app.get("/account", (req, res) => {
 app.get(["/map", "/tracking-map"], (req, res) => {
   res.setHeader("X-GOVO-UI", "phase12c-live-map");
   res.setHeader("Cache-Control", "no-store");
-  return res.send(govoPagesV12c.render("map", { base: "" }));
+  return res.redirect(302, "/track");
 });
 // GOVO_V20_CUSTOMER_CORE_ROUTES_END
 
@@ -148,6 +158,12 @@ app.get("/app", async (req, res) => {
 });
 // GOVO_V20_APP_LIVE_END
 
+// Customer orders must use the real request/lookup handlers below.
+app.get('/orders', (req,res)=>res.redirect(302,'/track'));
+app.get('/wallet', (req,res)=>res.redirect(302,'/account'));
+app.get('/shop', (req,res)=>res.redirect(302,'/shops'));
+app.get('/service', (req,res)=>res.redirect(302,'/services'));
+
 // GOVO_PHASE12C_LIVE_ROUTES_START
 const GOVO_V12C_LIVE_ROUTE_MAP = {
 
@@ -161,10 +177,6 @@ const GOVO_V12C_LIVE_ROUTE_MAP = {
   "/service": "service",
 
   "/shop": "shop",
-  "/order": "order",
-  "/track": "track",
-  "/orders": "orders",
-  "/wallet": "wallet",
   "/account": "account",
   "/voice": "ai",
   "/search": "ai",
@@ -1465,30 +1477,74 @@ function adminPasswordResetForm(type, x = {}) {
 }
 
 function merchantLoginPage(prefill = '', message = '') {
-  return page('Merchant Dashboard Login', `<section class="card app-hero"><h1>Merchant Dashboard</h1><p class="form-hint">Phone + password diye shop dashboard open korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/merchant/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/merchant/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Account</a><a class="btn secondary" href="/merchant/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="https://merchant.govoexpress.com/merchant">Register</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'merchant');
+  return page('Merchant Dashboard Login', `<section class='card govo-role-auth govo-merchant-auth'>
+    <div class='govo-auth-intro'>
+      <span class='govo-auth-kicker'>Merchant Portal</span>
+      <h1>Run your GOVO business.</h1>
+      <p>Manage orders, products and shop activity in one connected workspace.</p>
+      <div class='govo-auth-features'><span>${govoUiIcon('order')} Orders</span><span>${govoUiIcon('shops')} Products</span><span>${govoUiIcon('account')} Shop Profile</span></div>
+    </div>
+    <div class='govo-auth-panel'>
+      <h2>Merchant Login</h2><p class='form-hint'>Use your registered phone and password.</p>
+      ${message ? `<p class='govo-auth-message'>${esc(message)}</p>` : ''}
+      <form class='govo-auth-form' method='POST' action='/merchant/login'>
+        <label>Phone</label><input name='phone' value='${esc(prefill)}' required placeholder='01XXXXXXXXX' inputmode='tel' autocomplete='tel'>
+        <label>Password</label><input name='password' type='password' required autocomplete='current-password' placeholder='Enter password'>
+        <button type='submit'>Login</button>
+      </form>
+      <div class='govo-auth-links'>
+        <a class='btn secondary' href='/merchant/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}'>Create Account</a>
+        <a class='btn secondary' href='/merchant/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}'>Forgot Password</a>
+        <a class='btn secondary' href='https://merchant.govoexpress.com/merchant'>Register</a>
+        <a class='btn secondary' href='https://app.govoexpress.com/app'>Back to App</a>
+      </div>
+    </div>
+  </section>`, 'merchant');
 }
 
 function riderLoginPage(prefill = '', message = '') {
-  return page('Rider Login', `<section class="card app-hero"><h1>Rider Login</h1><p class="form-hint">Phone + password diye assigned delivery orders dekhun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="/rider/login"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" required><button>Login</button></form><div class="actions"><a class="btn secondary" href="/rider/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Create Account</a><a class="btn secondary" href="/rider/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}">Forgot Password</a><a class="btn secondary" href="https://rider.govoexpress.com/rider/register">Register</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'rider');
+  return page('Rider Login', `<section class='card govo-role-auth govo-rider-auth'>
+    <div class='govo-auth-intro'>
+      <span class='govo-auth-kicker'>Rider Portal</span>
+      <h1>Move with GOVO.</h1>
+      <p>See assigned jobs, active deliveries and delivery history from one workspace.</p>
+      <div class='govo-auth-features'><span>${govoUiIcon('order')} Jobs</span><span>${govoUiIcon('services')} Active</span><span>${govoUiIcon('history')} History</span></div>
+    </div>
+    <div class='govo-auth-panel'>
+      <h2>Rider Login</h2><p class='form-hint'>Use your registered phone and password.</p>
+      ${message ? `<p class='govo-auth-message'>${esc(message)}</p>` : ''}
+      <form class='govo-auth-form' method='POST' action='/rider/login'>
+        <label>Phone</label><input name='phone' value='${esc(prefill)}' required placeholder='01XXXXXXXXX' inputmode='tel' autocomplete='tel'>
+        <label>Password</label><input name='password' type='password' required autocomplete='current-password' placeholder='Enter password'>
+        <button type='submit'>Login</button>
+      </form>
+      <div class='govo-auth-links'>
+        <a class='btn secondary' href='/rider/account/create${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}'>Create Account</a>
+        <a class='btn secondary' href='/rider/forgot-password${prefill ? `?phone=${encodeURIComponent(prefill)}` : ''}'>Forgot Password</a>
+        <a class='btn secondary' href='https://rider.govoexpress.com/rider/register'>Register</a>
+        <a class='btn secondary' href='https://app.govoexpress.com/app'>Back to App</a>
+      </div>
+    </div>
+  </section>`, 'rider');
 }
 
 function accountCreatePage(type, prefill = '', message = '') {
   const title = type === 'merchant' ? 'Create Merchant Account' : 'Create Rider Account';
   const action = type === 'merchant' ? '/merchant/account/create' : '/rider/account/create';
   const register = type === 'merchant' ? '/merchant' : '/rider/register';
-  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Registered phone number diye password set korun. Notun ${type === 'merchant' ? 'shop' : 'rider'} hole age registration korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" minlength="6" required><label>Confirm Password</label><input name="confirm_password" type="password" minlength="6" required><button>Create Account</button></form><div class="actions"><a class="btn secondary" href="${register}">Register</a><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/dashboard' : 'rider'}">Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
+  return page(title, `<section class="card govo-flow-card"><h1>${esc(title)}</h1><p class="form-hint">Registered phone number diye password set korun. Notun ${type === 'merchant' ? 'shop' : 'rider'} hole age registration korun.</p>${message ? `<p style="color:var(--warning);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Password</label><input name="password" type="password" minlength="6" required><label>Confirm Password</label><input name="confirm_password" type="password" minlength="6" required><button>Create Account</button></form><div class="actions"><a class="btn secondary" href="${register}">Register</a><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/login' : 'rider/login'}">Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
 }
 
 function accountCreateSuccessPage(type, phone = '') {
   const title = type === 'merchant' ? 'Merchant Account Created' : 'Rider Account Created';
-  const login = type === 'merchant' ? '/merchant/dashboard' : '/rider';
-  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Password set hoyeche. Login kore dashboard open korun.</p><div class="actions"><a class="btn" href="${login}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Login</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, type);
+  const login = type === 'merchant' ? '/merchant/login' : '/rider/login';
+  return page(title, `<section class="card govo-flow-card"><h1>${esc(title)}</h1><p class="form-hint">Password set hoyeche. Login kore dashboard open korun.</p><div class="actions"><a class="btn" href="${login}${phone ? `?phone=${encodeURIComponent(phone)}` : ''}">Login</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, type);
 }
 
 function forgotPasswordPage(type, prefill = '', message = '') {
   const title = type === 'merchant' ? 'Merchant Password Reset' : 'Rider Password Reset';
   const action = type === 'merchant' ? '/merchant/forgot-password' : '/rider/forgot-password';
-  return page(title, `<section class="card app-hero"><h1>${esc(title)}</h1><p class="form-hint">Phone submit korun. Account thakle admin reset request peye jabe.</p>${message ? `<p style="color:var(--success);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Note <span style="color:var(--muted)">(optional)</span></label><textarea name="reset_note" placeholder="Example: password vule gechi"></textarea><button>Request Reset</button></form><div class="actions"><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/dashboard' : 'rider'}">Back to Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
+  return page(title, `<section class="card govo-flow-card"><h1>${esc(title)}</h1><p class="form-hint">Phone submit korun. Account thakle admin reset request peye jabe.</p>${message ? `<p style="color:var(--success);font-weight:900">${esc(message)}</p>` : ''}<form method="POST" action="${action}"><label>Phone</label><input name="phone" value="${esc(prefill)}" required placeholder="01XXXXXXXXX"><label>Note <span style="color:var(--muted)">(optional)</span></label><textarea name="reset_note" placeholder="Example: password vule gechi"></textarea><button>Request Reset</button></form><div class="actions"><a class="btn secondary" href="/${type === 'merchant' ? 'merchant/login' : 'rider/login'}">Back to Login</a></div></section>`, type === 'merchant' ? 'merchant' : 'rider');
 }
 
 function hasAdminCookie(req) {
@@ -1606,15 +1662,15 @@ function adminNav(active) {
 
 
 function themeHead() {
-  return `<script>(function(){try{var t=localStorage.getItem('govo_theme')||'dark';if(t!=='light')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>`;
+  return `<script>(function(){try{var m=localStorage.getItem('govo_theme')||'system';var t=m==='system'?(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):m;if(t!=='light')t='dark';document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-theme-mode',m);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>`;
 }
 
 function themeToggle() {
-  return `<button type="button" class="secondary theme-toggle" id="themeToggle" aria-label="Toggle theme" onclick="window.govoToggleTheme&&window.govoToggleTheme()">Dark</button>`;
+  return `<button type="button" class="secondary theme-toggle" id="themeToggle" aria-label="Toggle theme" onclick="window.govoToggleTheme&&window.govoToggleTheme()">◐</button>`;
 }
 
 function themeRuntimeScript() {
-  return `<script>(function(){function label(t){return t==='light'?'☀ Light':'☾ Dark'}function apply(t){if(t!=='light')t='dark';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('govo_theme',t)}catch(e){}var b=document.getElementById('themeToggle');if(b)b.textContent=label(t)}window.govoToggleTheme=function(){var cur=document.documentElement.getAttribute('data-theme')||'dark';apply(cur==='light'?'dark':'light')};apply(document.documentElement.getAttribute('data-theme')||'dark');})();</script>`;
+  return `<script>(function(){function apply(t,save){if(t!=='light')t='dark';document.documentElement.setAttribute('data-theme',t);if(save){try{localStorage.setItem('govo_theme',t)}catch(e){}}var b=document.getElementById('themeToggle');if(b){b.textContent=t==='light'?'☀':'☾';b.setAttribute('aria-label','Switch to '+(t==='light'?'dark':'light')+' theme')}}window.govoToggleTheme=function(){var cur=document.documentElement.getAttribute('data-theme')||'dark';apply(cur==='light'?'dark':'light',true)};apply(document.documentElement.getAttribute('data-theme')||'dark',false);})();</script>`;
 }
 
 function pageShell(title, content, options = {}) {
@@ -1835,7 +1891,7 @@ function homeStylePublicChromeV2() {
       serviceRequest: "https://app.govoexpress.com/service-request",
       support: "https://app.govoexpress.com/support",
       track: "https://app.govoexpress.com/track",
-      merchantLogin: "https://merchant.govoexpress.com/merchant/dashboard",
+      merchantLogin: "https://merchant.govoexpress.com/merchant/login",
       merchantJoin: "https://merchant.govoexpress.com/merchant",
       providerJoin: "https://merchant.govoexpress.com/provider",
       rider: "https://rider.govoexpress.com/rider"
@@ -2244,9 +2300,9 @@ function govoCleanPublicHeaderV5(isAdmin, nav) {
       <a href="https://app.govoexpress.com/services">🛠️ Services</a>
       <a href="https://app.govoexpress.com/track">🔎 Track</a>
       <a href="https://app.govoexpress.com/support">☎️ Support</a>
-      <a href="https://merchant.govoexpress.com/merchant/dashboard">🏬 Merchant Login</a>
+      <a href="https://merchant.govoexpress.com/merchant/login">🏬 Merchant Login</a>
       <a href="https://merchant.govoexpress.com/merchant">➕ Merchant Join</a>
-      <a href="https://rider.govoexpress.com/rider">🏍️ Rider</a>
+      <a href="https://rider.govoexpress.com/rider/login">🏍️ Rider</a>
     </nav>
   </header>`;
 }
@@ -2275,13 +2331,15 @@ function govoUiIcon(name) {
     camera:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h4l1.5-2h5L16 7h4v12H4V7Z"/><circle cx="12" cy="13" r="3.5"/></svg>`,
     tap:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10 13V8.5a2 2 0 1 1 4 0V12l1.4-.8a2 2 0 0 1 2.7.7l1 1.7a3 3 0 0 1 0 3L16.5 21H9l-4-6a2 2 0 0 1 3.2-2.4L10 14"/><path d="M12 2v3M6 5l2 2M18 5l-2 2"/></svg>`,
     search:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>`,
-    order:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7h12v10H3zM15 10h4l2 3v4h-6"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>`
+    order:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7h12v10H3zM15 10h4l2 3v4h-6"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg>`,
+    account:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.8-4.2 3.3-6.5 7.5-6.5s6.7 2.3 7.5 6.5"/></svg>`,
+    history:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>`
   };
   return icons[name] || icons.home;
 }
 
 function govoInlineLogoMark() {
-  return `<span class="govo-inline-logo" aria-hidden="true"><svg viewBox="0 0 64 64" role="img"><defs><linearGradient id="govoMarkGradient" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d7ff2f"/><stop offset="1" stop-color="#65d80f"/></linearGradient></defs><circle cx="35" cy="34" r="20" fill="none" stroke="url(#govoMarkGradient)" stroke-width="9"/><path d="M35 14v11h15" fill="none" stroke="#07130f" stroke-width="6" stroke-linecap="round"/><circle cx="35" cy="7" r="5" fill="#d7ff2f"/><path d="M5 27h15M2 36h18M8 45h14" stroke="#8ee719" stroke-width="4" stroke-linecap="round"/></svg></span>`;
+  return `<span class="govo-inline-logo" aria-hidden="true"><img src="/uploads/govo-symbol-official-v20261004.png" alt=""></span>`;
 }
 
 function page(title, body, active = '') {
@@ -2296,7 +2354,7 @@ function page(title, body, active = '') {
     role: headerRole,
     logo: govoInlineLogoMark(),
     adminNav: isAdmin ? adminNav(active) : '',
-    themeToggle: isAdmin ? themeToggle() : ''
+    themeToggle: themeToggle()
   });
 
   const roleCss = `
@@ -2305,7 +2363,7 @@ function page(title, body, active = '') {
     body.role-portal .govo-final-topbar,body.role-portal .govo-final-bottom,body.role-portal .govo-action-overlay{display:none!important}
     .govo-role-topbar{position:sticky;top:0;z-index:1200;margin:0 -1px 20px;padding:14px 16px;display:flex;flex-direction:column;align-items:stretch;gap:10px;background:rgba(4,18,12,.92);border:1px solid rgba(168,232,47,.18);border-radius:0 0 24px 24px;backdrop-filter:blur(18px);box-shadow:0 16px 50px rgba(0,0,0,.30)}
     .govo-v28-header-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px}
-    .govo-role-brand{display:flex;align-items:center;gap:11px;color:#fff!important;text-decoration:none!important}.govo-role-brand img{width:46px;height:46px;object-fit:contain}.govo-inline-logo{width:48px;height:48px;display:inline-grid;place-items:center;flex:0 0 auto;border-radius:15px;background:linear-gradient(145deg,#10291b,#06130d);border:1px solid rgba(168,232,47,.35);box-shadow:0 10px 28px rgba(0,0,0,.35),0 0 24px rgba(168,232,47,.12)}.govo-inline-logo svg{width:42px;height:42px;display:block}.govo-role-brand strong{display:block;font-size:18px;line-height:1}.govo-role-brand small{display:block;color:#a8e82f;font-size:9px;letter-spacing:.12em;margin-top:5px;font-weight:900}
+    .govo-role-brand{display:flex;align-items:center;gap:11px;color:#fff!important;text-decoration:none!important}.govo-role-brand img{object-fit:contain}.govo-inline-logo{width:66px;height:44px;display:inline-grid;place-items:center;flex:0 0 66px;background:transparent;border:0;box-shadow:none;overflow:visible}.govo-inline-logo img{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 5px 11px rgba(25,207,240,.14)) drop-shadow(0 0 10px rgba(57,231,95,.10))}.govo-role-brand strong{display:block;font-size:18px;line-height:1}.govo-role-brand small{display:block;color:#a8e82f;font-size:9px;letter-spacing:.12em;margin-top:5px;font-weight:900}
     .govo-role-actions{display:flex;gap:8px}.govo-role-actions a,.govo-role-actions button{width:42px;height:42px;min-height:42px;padding:0!important;display:grid;place-items:center;border-radius:14px!important;background:rgba(255,255,255,.055)!important;border:1px solid rgba(255,255,255,.12)!important;color:#fff!important;text-decoration:none!important;font-size:19px!important;box-shadow:none!important}
     .govo-role-menu{display:none;position:absolute;right:14px;top:70px;width:220px;padding:10px;border-radius:18px;background:#081a12;border:1px solid rgba(168,232,47,.25);box-shadow:0 24px 70px rgba(0,0,0,.48)}body.govo-role-menu-open .govo-role-menu{display:grid}.govo-role-menu a{padding:12px 13px;border-radius:12px;color:#fff!important;text-decoration:none!important;font-weight:800}.govo-role-menu a:hover{background:rgba(168,232,47,.10)}
     body.role-portal .card,body.role-portal .stat{background:linear-gradient(180deg,rgba(14,42,29,.88),rgba(7,27,18,.94))!important;border:1px solid rgba(168,232,47,.15)!important;border-radius:22px!important;box-shadow:0 16px 45px rgba(0,0,0,.20)!important}
@@ -2316,7 +2374,279 @@ function page(title, body, active = '') {
     body.role-portal .badge,body.role-portal .pill{background:rgba(168,232,47,.12)!important;color:#cfff63!important;border-color:rgba(168,232,47,.24)!important}
     body.role-portal .detail-grid div,body.role-portal .item-box{background:rgba(255,255,255,.035)!important;border-color:rgba(255,255,255,.09)!important}
     body.admin{background:linear-gradient(180deg,#06130e,#030b08)!important;color:#f7fff8!important}body.admin .govo-v28-header-admin{background:rgba(4,18,12,.94)!important;border:1px solid rgba(168,232,47,.18)!important}body.admin .card,body.admin .stat{background:linear-gradient(180deg,#0b2418,#07170f)!important;border-color:rgba(168,232,47,.14)!important}body.admin .nav a.active,body.admin button:not(.secondary),body.admin .btn:not(.secondary){background:linear-gradient(135deg,#c7ff2e,#8edb18)!important;color:#102000!important}body.admin input,body.admin select,body.admin textarea{background:#04120c!important;color:#fff!important;border-color:rgba(255,255,255,.13)!important}
-    @media(max-width:760px){body.role-portal .app{width:100%!important;padding:0 10px 84px!important}.govo-role-topbar{margin:0 -10px 12px;padding:12px 14px}.govo-role-brand img{width:40px;height:40px}.govo-role-brand strong{font-size:15px}.govo-role-brand small{font-size:7px}.govo-role-actions a,.govo-role-actions button{width:38px;height:38px;min-height:38px}.govo-role-menu{right:10px;top:62px}.role-portal .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.role-portal .card{padding:12px!important;border-radius:18px!important}}
+    @media(max-width:760px){body.role-portal .app{width:100%!important;padding:0 10px 84px!important}.govo-role-topbar{margin:0 -10px 12px;padding:12px 14px}.govo-inline-logo{width:58px;height:38px;flex-basis:58px}.govo-role-brand strong{font-size:15px}.govo-role-brand small{font-size:7px}.govo-role-actions a,.govo-role-actions button{width:38px;height:38px;min-height:38px}.govo-role-menu{right:10px;top:62px}.role-portal .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.role-portal .card{padding:12px!important;border-radius:18px!important}}
+  `;
+
+  const unifiedRoleBridgeCss = `
+  /* GOVO UNIFIED ROLE BRIDGE 2026-10-02 */
+  body.role-portal{--govo-green:#39E75F;--govo-cyan:#19CFF0;--govo-text:#F4FBFF;--govo-muted:#9FB5C1;background:radial-gradient(circle at 9% 0%,rgba(57,231,95,.11),transparent 30%),radial-gradient(circle at 91% 8%,rgba(25,207,240,.12),transparent 28%),linear-gradient(180deg,#031018,#020A0F)!important;color:var(--govo-text)!important}
+  body.role-portal .govo-role-topbar{background:rgba(3,16,24,.94)!important;border-color:rgba(25,207,240,.20)!important}
+  body.role-portal .govo-master-copy strong{color:var(--govo-text)!important}body.role-portal .govo-master-copy small{color:var(--govo-cyan)!important}
+  body.role-portal .govo-role-actions a,body.role-portal .govo-role-actions button{background:rgba(255,255,255,.05)!important;border-color:rgba(25,207,240,.19)!important;color:var(--govo-text)!important}
+  body.public.role-portal #themeToggle{display:grid!important;visibility:visible!important;pointer-events:auto!important;width:42px!important;height:42px!important;min-height:42px!important;padding:0!important;border-radius:14px!important;font-size:17px!important;line-height:1!important;opacity:1!important}
+  body.role-portal .govo-role-menu{background:#061821!important;border-color:rgba(25,207,240,.24)!important}
+  body.role-portal .govo-role-bottom{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;position:fixed!important;left:50%!important;bottom:8px!important;transform:translateX(-50%)!important;width:min(560px,calc(100% - 20px))!important;z-index:9999!important;background:rgba(3,16,24,.96)!important;border:1px solid rgba(25,207,240,.24)!important;border-radius:22px!important;padding:6px!important;box-shadow:0 18px 48px rgba(0,0,0,.30)!important;backdrop-filter:blur(16px)!important}
+  body.role-portal .govo-role-bottom>a{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;min-height:50px!important;padding:4px 2px!important;border-radius:14px!important;color:#d9e9ef!important;text-decoration:none!important;font-size:10px!important;font-weight:800!important}
+  body.role-portal .govo-role-bottom .govo-nav-icon{width:29px!important;height:29px!important;border-radius:10px!important;display:grid!important;place-items:center!important;background:linear-gradient(145deg,rgba(57,231,95,.12),rgba(25,207,240,.10))!important;border:1px solid rgba(25,207,240,.16)!important;color:#39E75F!important}
+  body.role-portal .govo-role-bottom>a:nth-child(even) .govo-nav-icon{color:#19CFF0!important}
+  body.role-portal .govo-role-bottom .govo-nav-icon svg{width:17px!important;height:17px!important}
+  body.role-portal .govo-role-bottom .govo-main-action{overflow:visible!important;background:transparent!important;border:0!important}
+  body.role-portal .govo-role-bottom .govo-main-orb{border-color:#031018!important;box-shadow:0 12px 34px rgba(25,207,240,.20),0 0 0 1px rgba(57,231,95,.24)!important}
+  body.role-portal .card,body.role-portal .stat{background:linear-gradient(180deg,rgba(15,45,58,.92),rgba(7,25,34,.96))!important;border-color:rgba(25,207,240,.17)!important}
+  body.role-portal .app-hero{background:radial-gradient(circle at 88% 0%,rgba(25,207,240,.16),transparent 38%),radial-gradient(circle at 8% 10%,rgba(57,231,95,.12),transparent 38%),linear-gradient(145deg,#08262B,#061922)!important}
+  body.role-portal .stat .value{color:var(--govo-green)!important}
+  body.role-portal input,body.role-portal select,body.role-portal textarea{background:#04131B!important;color:var(--govo-text)!important;border-color:rgba(25,207,240,.18)!important}
+  body.role-portal button:not(.secondary),body.role-portal .btn:not(.secondary){background:linear-gradient(135deg,var(--govo-green),var(--govo-cyan))!important;color:#00151A!important}
+  body.role-portal .btn.secondary,body.role-portal button.secondary{background:rgba(255,255,255,.05)!important;color:var(--govo-text)!important;border-color:rgba(25,207,240,.18)!important}
+  html[data-theme="light"] body.role-portal{--govo-text:#071827;--govo-muted:#60717D;background:radial-gradient(circle at 90% 2%,rgba(25,207,240,.08),transparent 29%),radial-gradient(circle at 5% 22%,rgba(57,231,95,.07),transparent 30%),linear-gradient(180deg,#F8FBFD,#F1F6F9)!important;color:var(--govo-text)!important}
+  html[data-theme="light"] body.role-portal .govo-role-topbar,html[data-theme="light"] body.role-portal .card,html[data-theme="light"] body.role-portal .stat,html[data-theme="light"] body.role-portal .govo-role-menu{background:#fff!important;color:#071827!important;border-color:rgba(7,24,39,.11)!important;box-shadow:0 12px 30px rgba(7,24,39,.07)!important}
+  html[data-theme="light"] body.role-portal .govo-master-copy strong,html[data-theme="light"] body.role-portal h1,html[data-theme="light"] body.role-portal h2,html[data-theme="light"] body.role-portal .govo-role-menu a{color:#071827!important}
+  html[data-theme="light"] body.role-portal .govo-master-copy small{color:#0C9DBA!important}
+  html[data-theme="light"] body.role-portal .card p,html[data-theme="light"] body.role-portal .form-hint,html[data-theme="light"] body.role-portal .footer{color:#60717D!important}
+  html[data-theme="light"] body.role-portal .govo-role-bottom{background:rgba(255,255,255,.96)!important;border-color:rgba(15,169,199,.18)!important;box-shadow:0 14px 36px rgba(7,24,39,.10)!important}
+  html[data-theme="light"] body.role-portal .govo-role-bottom>a{color:#536875!important}
+  html[data-theme="light"] body.role-portal .govo-role-bottom .govo-main-orb{border-color:#fff!important}
+  html[data-theme="light"] body.role-portal .govo-role-actions a,html[data-theme="light"] body.role-portal .govo-role-actions button,html[data-theme="light"] body.role-portal input,html[data-theme="light"] body.role-portal select,html[data-theme="light"] body.role-portal textarea,html[data-theme="light"] body.role-portal .btn.secondary,html[data-theme="light"] body.role-portal button.secondary{background:#fff!important;color:#071827!important;border-color:rgba(7,24,39,.12)!important}
+
+  /* GOVO ROLE DASHBOARD POLISH 2026-10-02 */
+  body.role-portal .app{max-width:1120px!important}
+  body.role-portal .card{border-radius:20px!important;box-shadow:0 16px 42px rgba(0,0,0,.16)!important}
+  body.role-portal .card h1{font-size:clamp(28px,4.4vw,46px)!important;letter-spacing:-.035em!important}
+  body.role-portal .card h2{font-size:18px!important;letter-spacing:-.015em!important}
+  body.role-portal .app-hero{display:grid!important;grid-template-columns:96px minmax(0,1fr)!important;gap:14px 18px!important;align-items:start!important;padding:18px!important}
+  body.role-portal .app-hero>h1{grid-column:1/-1!important;margin-bottom:2px!important}
+  body.role-portal .app-hero>.listing-thumb.large,
+  body.role-portal .app-hero>.image-placeholder.large{grid-column:1!important;width:96px!important;height:96px!important;max-height:96px!important;margin:0!important;border-radius:20px!important}
+  body.role-portal .app-hero>.detail-grid{grid-column:2!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;margin:0!important;align-self:stretch!important}
+  body.role-portal .app-hero>.actions{grid-column:1/-1!important;margin:2px 0 0!important}
+  body.role-portal .detail-grid div,
+  body.role-portal .item-box{background:linear-gradient(145deg,rgba(57,231,95,.045),rgba(25,207,240,.04))!important;border:1px solid rgba(25,207,240,.14)!important;border-radius:14px!important;padding:11px!important}
+  body.role-portal .detail-grid b,
+  body.role-portal .item-box b{font-size:10px!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#7dd8e6!important}
+  body.role-portal .detail-grid span,
+  body.role-portal .item-box span{font-size:13px!important;color:var(--govo-text)!important}
+  body.role-portal .section-head{gap:12px!important;margin-bottom:4px!important}
+  body.role-portal .cards{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))!important;gap:12px!important}
+  body.role-portal .cards>.card{margin-bottom:0!important;position:relative!important;overflow:hidden!important}
+  body.role-portal .cards>.card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--govo-green),var(--govo-cyan));opacity:.85}
+  body.role-portal #profile{border-color:rgba(25,207,240,.22)!important}
+  body.role-portal #orders{border-color:rgba(57,231,95,.22)!important}
+  body.role-portal form{gap:8px!important}
+  body.role-portal label{font-size:12px!important;color:var(--govo-muted)!important}
+  body.role-portal input,body.role-portal select,body.role-portal textarea{border-radius:13px!important;min-height:44px!important;padding:11px 12px!important}
+  body.role-portal textarea{min-height:88px!important}
+  body.role-portal .actions{gap:8px!important}
+  body.role-portal .actions .btn,
+  body.role-portal .actions button{min-height:38px!important;border-radius:12px!important}
+  html[data-theme="light"] body.role-portal .detail-grid div,
+  html[data-theme="light"] body.role-portal .item-box{background:linear-gradient(145deg,rgba(57,231,95,.05),rgba(25,207,240,.045))!important;border-color:rgba(15,169,199,.14)!important}
+  html[data-theme="light"] body.role-portal .detail-grid b,
+  html[data-theme="light"] body.role-portal .item-box b{color:#0C8EAA!important}
+  html[data-theme="light"] body.role-portal .detail-grid span,
+  html[data-theme="light"] body.role-portal .item-box span{color:#071827!important}
+  @media(max-width:760px){
+    body.role-portal .app-hero{grid-template-columns:72px minmax(0,1fr)!important;padding:13px!important;gap:10px 12px!important}
+    body.role-portal .app-hero>.listing-thumb.large,
+    body.role-portal .app-hero>.image-placeholder.large{width:72px!important;height:72px!important;max-height:72px!important;border-radius:16px!important}
+    body.role-portal .app-hero>.detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    body.role-portal .cards{grid-template-columns:1fr!important}
+    body.role-portal .detail-grid div,body.role-portal .item-box{padding:9px!important}
+    body.role-portal .detail-grid span,body.role-portal .item-box span{font-size:12px!important}
+  }
+  `;
+
+  const roleUnifiedFinalCss = `
+  /* GOVO OFFICIAL MERCHANT + RIDER UNIFIED UI 2026-10-03 */
+  body:is(.merchant-portal,.rider-portal){--role-green:#39E75F;--role-cyan:#19CFF0;--role-text:#F4FBFF;--role-muted:#9FB5C1}
+  body:is(.merchant-portal,.rider-portal) .govo-role-topbar{background:linear-gradient(135deg,rgba(3,16,24,.98),rgba(5,34,42,.95))!important;border-color:rgba(25,207,240,.22)!important;box-shadow:0 16px 44px rgba(0,0,0,.22)!important}
+  body:is(.merchant-portal,.rider-portal) .govo-inline-logo{width:70px!important;height:46px!important;flex-basis:70px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-inline-logo img{filter:drop-shadow(0 5px 12px rgba(25,207,240,.15)) drop-shadow(0 0 12px rgba(57,231,95,.12))!important}
+  body:is(.merchant-portal,.rider-portal) .govo-master-copy strong{color:var(--role-text)!important;font-size:16px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-master-copy small{color:var(--role-cyan)!important;font-size:7px!important;letter-spacing:.12em!important}
+  body:is(.merchant-portal,.rider-portal) .govo-role-auth{display:grid!important;grid-template-columns:minmax(0,.95fr) minmax(320px,1.05fr)!important;gap:18px!important;max-width:920px!important;margin:18px auto 110px!important;padding:18px!important;border-radius:28px!important;background:radial-gradient(circle at 8% 0%,rgba(57,231,95,.13),transparent 34%),radial-gradient(circle at 92% 8%,rgba(25,207,240,.14),transparent 32%),linear-gradient(145deg,#061b25,#04131b)!important;border:1px solid rgba(25,207,240,.22)!important;box-shadow:0 24px 70px rgba(0,0,0,.28)!important;overflow:hidden!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-intro{padding:24px 22px;border-radius:22px;background:linear-gradient(145deg,rgba(57,231,95,.08),rgba(25,207,240,.06));border:1px solid rgba(25,207,240,.13);display:flex;flex-direction:column;justify-content:center}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-kicker{display:inline-flex;align-self:flex-start;padding:7px 10px;border-radius:999px;background:rgba(57,231,95,.10);border:1px solid rgba(57,231,95,.25);color:var(--role-green);font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-intro h1{margin:16px 0 10px!important;font-size:clamp(34px,5vw,52px)!important;line-height:.98!important;letter-spacing:-.045em!important;color:var(--role-text)!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-intro p{margin:0!important;color:var(--role-muted)!important;font-size:14px!important;line-height:1.6!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:20px}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-features span{padding:10px 7px;border-radius:14px;border:1px solid rgba(25,207,240,.15);background:rgba(255,255,255,.035);display:flex;flex-direction:column;align-items:center;gap:6px;color:#DDF7FA;font-size:10px;font-weight:800;text-align:center}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-features svg{width:22px;height:22px;color:var(--role-cyan)}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-features span:nth-child(odd) svg{color:var(--role-green)}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-panel{padding:24px;border-radius:22px;background:rgba(3,16,24,.82);border:1px solid rgba(25,207,240,.16)}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-panel h2{margin:0 0 4px!important;color:var(--role-text)!important;font-size:24px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-panel .form-hint{margin:0 0 16px!important;color:var(--role-muted)!important;font-size:12px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-form{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;margin:0!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-form label{margin:6px 0 0!important;color:#CDE7EC!important;font-size:12px!important;font-weight:850!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-form input{width:100%!important;min-height:48px!important;border-radius:14px!important;padding:12px 14px!important;background:#03141d!important;border:1px solid rgba(25,207,240,.20)!important;color:var(--role-text)!important;font-size:16px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-form input:focus{border-color:var(--role-cyan)!important;box-shadow:0 0 0 3px rgba(25,207,240,.10)!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-form button{width:100%!important;min-height:48px!important;margin-top:9px!important;border-radius:14px!important;background:linear-gradient(100deg,var(--role-green),var(--role-cyan))!important;color:#00151A!important;font-weight:950!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-links{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:12px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-links .btn{width:100%!important;min-height:40px!important;margin:0!important;border-radius:12px!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:9px 10px!important;font-size:11px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-auth-message{border:1px solid rgba(248,113,113,.30);background:rgba(127,29,29,.18);color:#FECACA!important;border-radius:12px;padding:10px 12px;font-size:12px!important;font-weight:800}
+  body:is(.merchant-portal,.rider-portal) .card:not(.govo-role-auth){border-color:rgba(25,207,240,.16)!important;background:linear-gradient(155deg,rgba(7,32,43,.96),rgba(3,17,24,.98))!important}
+  body:is(.merchant-portal,.rider-portal) .card:not(.govo-role-auth) h1,body:is(.merchant-portal,.rider-portal) .card:not(.govo-role-auth) h2{color:var(--role-text)!important}
+  body:is(.merchant-portal,.rider-portal) .detail-grid div,body:is(.merchant-portal,.rider-portal) .item-box{background:linear-gradient(145deg,rgba(57,231,95,.045),rgba(25,207,240,.04))!important;border-color:rgba(25,207,240,.14)!important}
+  body:is(.merchant-portal,.rider-portal) .detail-grid b,body:is(.merchant-portal,.rider-portal) .item-box b{color:#4EDDF2!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-role-auth{background:linear-gradient(145deg,#FFFFFF,#F3F9FC)!important;border-color:rgba(7,24,39,.10)!important;box-shadow:0 22px 60px rgba(7,24,39,.10)!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-intro,html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-panel{background:#FFFFFF!important;border-color:rgba(7,24,39,.10)!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-intro h1,html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-panel h2{color:#071827!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-intro p,html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-panel .form-hint{color:#60717D!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-form label{color:#294552!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-auth-form input{background:#F8FBFD!important;color:#071827!important;border-color:rgba(7,24,39,.13)!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .card:not(.govo-role-auth){background:#FFFFFF!important;border-color:rgba(7,24,39,.10)!important}
+  @media(max-width:760px){
+    body:is(.merchant-portal,.rider-portal) .app{width:100%!important;padding:0 10px 92px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-role-auth{grid-template-columns:1fr!important;gap:10px!important;margin:12px 0 100px!important;padding:10px!important;border-radius:22px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-auth-intro{padding:18px 16px!important;border-radius:18px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-auth-intro h1{font-size:34px!important;margin:12px 0 8px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-auth-intro p{font-size:13px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-auth-features{margin-top:14px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-auth-panel{padding:17px 15px!important;border-radius:18px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-auth-panel h2{font-size:21px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-role-topbar{margin:0 -10px 10px!important;padding:11px 12px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-inline-logo{width:58px!important;height:38px!important;flex-basis:58px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-master-copy strong{font-size:14px!important}
+  }
+  `;
+
+
+  const roleFlowCompletionCss = `
+  /* GOVO ROLE FLOW COMPLETION 2026-10-04 */
+  body:is(.merchant-portal,.rider-portal) .govo-main-orb{
+    width:76px!important;height:54px!important;margin-top:-34px!important;margin-bottom:2px!important;
+    border-radius:19px!important;padding:3px!important;overflow:visible!important;
+    background:linear-gradient(145deg,rgba(57,231,95,.11),rgba(25,207,240,.10))!important;
+    border:1px solid rgba(25,207,240,.30)!important;
+    box-shadow:0 14px 32px rgba(25,207,240,.14),0 0 24px rgba(57,231,95,.12)!important
+  }
+  body:is(.merchant-portal,.rider-portal) .govo-main-orb .govo-inline-logo{
+    width:68px!important;height:46px!important;flex:0 0 68px!important;border:0!important;background:transparent!important;box-shadow:none!important
+  }
+  body:is(.merchant-portal,.rider-portal) .govo-main-orb .govo-inline-logo img{
+    width:100%!important;height:100%!important;object-fit:contain!important;display:block!important;
+    filter:drop-shadow(0 4px 8px rgba(25,207,240,.16)) drop-shadow(0 0 8px rgba(57,231,95,.10))!important
+  }
+  body:is(.merchant-portal,.rider-portal) .govo-role-main-action small{
+    background:linear-gradient(100deg,#39E75F,#19CFF0);-webkit-background-clip:text;background-clip:text;color:transparent!important
+  }
+  body:is(.merchant-portal,.rider-portal) .govo-flow-card{
+    display:block!important;max-width:720px!important;margin:18px auto 110px!important;padding:22px!important;
+    border-radius:24px!important;background:linear-gradient(150deg,rgba(7,32,43,.98),rgba(3,17,24,.99))!important;
+    border:1px solid rgba(25,207,240,.18)!important
+  }
+  body:is(.merchant-portal,.rider-portal) .govo-flow-card form{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;margin-top:16px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-public-page{width:min(1120px,calc(100% - 24px))!important;color:#F4FBFF!important}
+  body:is(.merchant-portal,.rider-portal) .govo-premium-hero,
+  body:is(.merchant-portal,.rider-portal) .govo-premium-panel{
+    border-color:rgba(25,207,240,.20)!important;
+    background:radial-gradient(circle at 10% 0%,rgba(57,231,95,.12),transparent 34%),radial-gradient(circle at 94% 5%,rgba(25,207,240,.13),transparent 30%),linear-gradient(145deg,#08262b,#04131b)!important;
+    box-shadow:0 22px 62px rgba(0,0,0,.24)!important
+  }
+  body:is(.merchant-portal,.rider-portal) .govo-kicker{color:#39E75F!important;background:rgba(57,231,95,.09)!important;border-color:rgba(57,231,95,.24)!important}
+  body:is(.merchant-portal,.rider-portal) .govo-display,
+  body:is(.merchant-portal,.rider-portal) .govo-premium-panel h2{color:#F4FBFF!important}
+  body:is(.merchant-portal,.rider-portal) .govo-display .dot{color:#19CFF0!important}
+  body:is(.merchant-portal,.rider-portal) .govo-lead,
+  body:is(.merchant-portal,.rider-portal) .govo-form-note{color:#9FB5C1!important}
+  body:is(.merchant-portal,.rider-portal) .govo-public-page .govo-btn,
+  body:is(.merchant-portal,.rider-portal) .govo-public-page button{background:linear-gradient(100deg,#39E75F,#19CFF0)!important;color:#00151A!important;border-radius:14px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-public-page .govo-btn.secondary{background:rgba(255,255,255,.045)!important;color:#F4FBFF!important;border:1px solid rgba(25,207,240,.18)!important;box-shadow:none!important}
+  body:is(.merchant-portal,.rider-portal) .govo-form-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important}
+  body:is(.merchant-portal,.rider-portal) .govo-form-grid .full{grid-column:1/-1!important}
+  body:is(.merchant-portal,.rider-portal) .govo-form-grid label{display:grid!important;gap:6px!important;color:#CDE7EC!important;font-size:12px!important;font-weight:800!important}
+  body:is(.merchant-portal,.rider-portal) .govo-form-grid input,
+  body:is(.merchant-portal,.rider-portal) .govo-form-grid select,
+  body:is(.merchant-portal,.rider-portal) .govo-form-grid textarea{width:100%!important;background:#03141d!important;color:#F4FBFF!important;border:1px solid rgba(25,207,240,.18)!important;border-radius:13px!important;padding:11px 12px!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) h1,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) h2,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .card:not(.govo-role-auth) h1,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .card:not(.govo-role-auth) h2{color:#071827!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .form-hint{color:#60717D!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-flow-card,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-premium-hero,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-premium-panel{background:#FFFFFF!important;color:#071827!important;border-color:rgba(7,24,39,.10)!important;box-shadow:0 16px 42px rgba(7,24,39,.08)!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-display,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-premium-panel h2{color:#071827!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-lead,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-form-note{color:#60717D!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-form-grid label{color:#294552!important}
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-form-grid input,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-form-grid select,
+  html[data-theme='light'] body:is(.merchant-portal,.rider-portal) .govo-form-grid textarea{background:#F8FBFD!important;color:#071827!important;border-color:rgba(7,24,39,.13)!important}
+  @media(max-width:760px){
+    body:is(.merchant-portal,.rider-portal) .govo-flow-card{margin:12px 0 96px!important;padding:16px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-form-grid{grid-template-columns:1fr!important}
+    body:is(.merchant-portal,.rider-portal) .govo-form-grid .full{grid-column:auto!important}
+    body:is(.merchant-portal,.rider-portal) .govo-public-page{width:100%!important;padding-left:0!important;padding-right:0!important}
+    body:is(.merchant-portal,.rider-portal) .govo-premium-hero,
+    body:is(.merchant-portal,.rider-portal) .govo-premium-panel{border-radius:20px!important;padding:17px!important}
+  }
+
+  `;
+
+  const roleDesktopCss = `
+  /* GOVO MERCHANT / RIDER DESKTOP EXPERIENCE 2026-10-02 */
+  @media(min-width:1024px){
+    body:is(.merchant-portal,.rider-portal).govo-premium-flow-v2{padding-top:0!important;padding-bottom:0!important;background:radial-gradient(circle at 8% 0%,rgba(57,231,95,.11),transparent 30%),linear-gradient(180deg,#031018,#020a0f)!important}
+    body:is(.merchant-portal,.rider-portal).govo-premium-flow-v2 :is(.govo-premium-topbar,.govo-premium-bottomnav,.govo-premium-drawer){display:none!important}
+    body:is(.merchant-portal,.rider-portal).govo-premium-flow-v2 header.govo-role-topbar{display:flex!important}
+    body:is(.merchant-portal,.rider-portal).govo-premium-flow-v2 .govo-role-topbar nav.govo-role-menu{display:flex!important}
+    body:is(.merchant-portal,.rider-portal) :is(.govo-premium-hero,.govo-premium-panel){background:linear-gradient(145deg,#08262b,#061922)!important;border-color:rgba(25,207,240,.22)!important;border-radius:24px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-premium-panel{padding:24px!important;border:1px solid rgba(25,207,240,.22)}
+    body:is(.merchant-portal,.rider-portal) .govo-display{font-size:clamp(36px,3.4vw,52px)!important;line-height:1.08;letter-spacing:-.035em;margin:18px 0}
+    body:is(.merchant-portal,.rider-portal) .govo-lead{line-height:1.7}
+    body:is(.merchant-portal,.rider-portal) :is(.govo-actions,.govo-section-head){display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    body:is(.merchant-portal,.rider-portal) .govo-section-head{justify-content:space-between;margin-bottom:12px}
+    body:is(.merchant-portal,.rider-portal) .govo-btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:12px;font-weight:800;text-decoration:none!important}
+    body:is(.merchant-portal,.rider-portal) .govo-btn.secondary{background:rgba(255,255,255,.05)!important;color:var(--govo-text)!important;border:1px solid rgba(25,207,240,.22)}
+    body:is(.merchant-portal,.rider-portal) .govo-btn:not(.secondary){background:linear-gradient(135deg,var(--govo-green),var(--govo-cyan))!important;color:#00151a!important}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal).govo-premium-flow-v2{background:linear-gradient(180deg,#f8fbfd,#f1f6f9)!important}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal) :is(.govo-premium-hero,.govo-premium-panel){background:#fff!important;color:#071827!important}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal) :is(.govo-lead,.govo-form-note){color:#60717d!important}
+    body:is(.merchant-portal,.rider-portal) .app{width:calc(100% - 64px)!important;max-width:1320px!important;padding:0 0 32px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-role-topbar{padding:20px 24px!important;margin:0 0 24px!important;gap:16px!important;border-radius:0 0 24px 24px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-role-menu{display:flex!important;position:static!important;width:100%!important;flex-wrap:wrap;gap:8px;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
+    body:is(.merchant-portal,.rider-portal) .govo-role-menu a{min-height:44px;padding:11px 20px!important;border:1px solid rgba(25,207,240,.18);background:rgba(25,207,240,.04);font-size:14px;border-radius:12px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-role-menu a:hover{background:rgba(57,231,95,.12)!important;border-color:var(--govo-green)}
+    body:is(.merchant-portal,.rider-portal) .govo-role-menu a:focus-visible{outline:2px solid var(--govo-cyan);outline-offset:3px}
+    body:is(.merchant-portal,.rider-portal) .govo-role-actions button[aria-label="Menu"],body:is(.merchant-portal,.rider-portal) .govo-role-bottom{display:none!important}
+    body:is(.merchant-portal,.rider-portal) .card{padding:24px!important}
+    body:is(.merchant-portal,.rider-portal) .app-hero{padding:28px!important;gap:18px 24px!important}
+    body:is(.merchant-portal,.rider-portal) .app-hero>.detail-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    body:is(.merchant-portal,.rider-portal) .app-hero>.detail-grid>div{padding:16px!important}
+    body:is(.merchant-portal,.rider-portal) :is(.card,.govo-premium-panel,.govo-premium-hero){min-width:0}
+    body:is(.merchant-portal,.rider-portal) :is(input,select,textarea){max-width:100%;min-width:0}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile)>:is(header,.app-hero,.footer,.cards){grid-column:1/-1;margin-bottom:0!important}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile)>#profile{grid-column:1;margin:0!important;scroll-margin-top:176px}
+    body.merchant-portal .app:has(>#profile)>#profile+.card{grid-column:2;margin:0!important}
+    body.rider-portal .app:has(>#profile)>#profile+.card{grid-column:2;margin:0!important}
+    body.rider-portal .app:has(>#profile)>.cards{grid-column:2;grid-row:4;grid-template-columns:1fr!important}
+    body.rider-portal .app:has(>#profile)>#profile{grid-row:3/span 2}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile)>.card>form{grid-template-columns:140px minmax(0,1fr);gap:12px 16px!important;align-items:start}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile)>.card>form>label{grid-column:1;padding-top:12px}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile)>.card>form>:is(input:not([type=hidden]),textarea,select){grid-column:2}
+    body:is(.merchant-portal,.rider-portal) .app:has(>#profile)>.card>form>:is(button,label:has(input[type=checkbox])){grid-column:1/-1}
+    body:is(.merchant-portal,.rider-portal) label:has(input[type=checkbox]){display:flex;align-items:center;gap:10px}
+    body:is(.merchant-portal,.rider-portal) input[type=checkbox]{width:18px!important;height:18px!important;min-height:18px!important;padding:0!important;flex:none}
+    body:is(.merchant-portal,.rider-portal) #orders{scroll-margin-top:176px;grid-column:1/-1;margin-bottom:0!important}
+    body:is(.merchant-portal,.rider-portal) .cards{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:20px!important}
+    body:is(.merchant-portal,.rider-portal) .app-hero:has(>form){grid-template-columns:minmax(0,1fr) minmax(360px,.8fr)!important;grid-template-rows:auto auto 1fr;gap:12px 48px!important;min-height:360px;align-items:start}
+    body:is(.merchant-portal,.rider-portal) .app-hero:has(>form)>h1{grid-column:1!important;grid-row:1;margin:12px 0 0!important;max-width:520px}
+    body:is(.merchant-portal,.rider-portal) .app-hero:has(>form)>p{grid-column:1;max-width:480px;line-height:1.7}
+    body:is(.merchant-portal,.rider-portal) .app-hero:has(>form)>form{grid-column:2;grid-row:1/span 4;padding:24px;border:1px solid rgba(25,207,240,.22);border-radius:20px;background:rgba(3,16,24,.28);align-self:start}
+    body:is(.merchant-portal,.rider-portal) .app-hero:has(>form)>.actions{grid-column:1!important;align-self:start;margin-top:16px!important}
+    body:is(.merchant-portal,.rider-portal) .app:has(>.govo-premium-hero){display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:24px;align-items:start}
+    body:is(.merchant-portal,.rider-portal) .app:has(>.govo-premium-hero)>:is(header,.footer){grid-column:1/-1}
+    body:is(.merchant-portal,.rider-portal) .app:has(>.govo-premium-hero)>.govo-premium-hero{padding:32px!important}
+    body:is(.merchant-portal,.rider-portal) .app:has(>.govo-premium-hero)>.govo-grid{display:grid!important;grid-template-columns:1fr!important;margin:0!important;gap:20px}
+    body:is(.merchant-portal,.rider-portal) .govo-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:16px!important}
+    body:is(.merchant-portal,.rider-portal) .govo-form-grid>.full{grid-column:1/-1!important}
+    body:is(.merchant-portal,.rider-portal) .govo-form-grid label:has(textarea){grid-column:1/-1}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal) .govo-role-menu a{color:#071827!important;background:#f6fafc!important;border-color:rgba(7,24,39,.12)}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal) .app-hero:has(>form)>form{background:#fff;border-color:rgba(15,169,199,.18)}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal) .actions .btn.secondary{color:#071827!important;opacity:1!important}
+  }
   `;
 
   const publicCss = isAdmin ? '' : `
@@ -2516,40 +2846,43 @@ function page(title, body, active = '') {
   }
   `;
 
-  const bottom = isAdmin ? '' : `<nav class="bottom-nav govo-final-bottom">
+  const roleBottom = isMerchant ? `<nav class="bottom-nav govo-role-bottom">
+    <a href="/merchant/dashboard"><span class="govo-nav-icon">${govoUiIcon('home')}</span><small>Dashboard</small></a>
+    <a href="/merchant/dashboard#orders"><span class="govo-nav-icon">${govoUiIcon('order')}</span><small>Orders</small></a>
+    <a class="govo-main-action govo-role-main-action" href="/merchant/dashboard"><span class="govo-main-orb">${govoInlineLogoMark()}</span><small>GOVO</small></a>
+    <a href="/merchant/products"><span class="govo-nav-icon">${govoUiIcon('shops')}</span><small>Products</small></a>
+    <a href="/merchant/dashboard#profile"><span class="govo-nav-icon">${govoUiIcon('account')}</span><small>Account</small></a>
+  </nav>` : isRider ? `<nav class="bottom-nav govo-role-bottom">
+    <a href="/rider/dashboard"><span class="govo-nav-icon">${govoUiIcon('home')}</span><small>Dashboard</small></a>
+    <a href="/rider/jobs"><span class="govo-nav-icon">${govoUiIcon('order')}</span><small>Jobs</small></a>
+    <a class="govo-main-action govo-role-main-action" href="/rider/dashboard"><span class="govo-main-orb">${govoInlineLogoMark()}</span><small>GOVO</small></a>
+    <a href="/rider/active"><span class="govo-nav-icon">${govoUiIcon('services')}</span><small>Active</small></a>
+    <a href="/rider/history"><span class="govo-nav-icon">${govoUiIcon('history')}</span><small>History</small></a>
+  </nav>` : '';
+
+  const bottom = isAdmin ? '' : roleBottom || `<nav class="bottom-nav govo-final-bottom">
     <a class="${active === 'app' ? 'active' : ''}" href="/app">
       <span class="govo-nav-icon">${govoUiIcon('home')}</span><small>Home</small>
     </a>
-
     <a class="${active === 'shops' ? 'active' : ''}" href="/shops">
       <span class="govo-nav-icon">${govoUiIcon('shops')}</span><small>Shops</small>
     </a>
-
-    <button type="button" class="govo-main-action"
-      onclick="event.stopPropagation();document.body.classList.toggle('govo-action-open')">
-      <span class="govo-main-orb">${govoInlineLogoMark()}</span>
-      <small>GOVO</small>
+    <button type="button" class="govo-main-action" onclick="event.stopPropagation();document.body.classList.toggle('govo-action-open')">
+      <span class="govo-main-orb">${govoInlineLogoMark()}</span><small>GOVO</small>
     </button>
-
     <a class="${active === 'services' ? 'active' : ''}" href="/services">
       <span class="govo-nav-icon">${govoUiIcon('services')}</span><small>Services</small>
     </a>
-
     <a class="${active === 'support' || active === 'track' ? 'active' : ''}" href="/support">
       <span class="govo-nav-icon">${govoUiIcon('help')}</span><small>Help</small>
     </a>
   </nav>
-
   <div class="govo-action-overlay" onclick="if(event.target===this)document.body.classList.remove('govo-action-open')">
     <section class="govo-action-sheet">
       <div class="govo-action-head">
-        <div>
-          <b>What do you need?</b>
-          <small>Say it, show it, or choose the fastest GOVO flow.</small>
-        </div>
+        <div><b>What do you need?</b><small>Say it, show it, or choose the fastest GOVO flow.</small></div>
         <button type="button" class="govo-action-close" onclick="document.body.classList.remove('govo-action-open')">×</button>
       </div>
-
       <div class="govo-action-grid">
         <a href="/order?mode=voice">${govoUiIcon('voice')}<span><b>Voice Need</b><small>Tell GOVO</small></span></a>
         <a href="/order?mode=image">${govoUiIcon('camera')}<span><b>Photo Need</b><small>Show GOVO</small></span></a>
@@ -2569,7 +2902,7 @@ function page(title, body, active = '') {
     });
   </script>`;
 
-  return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${themeHead()}<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23071d14'/%3E%3Cpath d='M44 20a18 18 0 1 0 2 23' fill='none' stroke='%23b7ff21' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E"><title>${esc(title)} | GOVO Express</title><style>${css}${publicCss}${roleCss}${govoBrandCss}</style></head><body class="${roleClass}"><main class="app">${header}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${publicJs}<script>document.addEventListener('change',function(e){if(e.target.matches('input[type=file][accept*=image]')&&e.target.files&&e.target.files[0]){let p=e.target.parentElement.querySelector('.upload-preview');if(!p){p=document.createElement('img');p.className='upload-preview';e.target.parentElement.appendChild(p)}p.src=URL.createObjectURL(e.target.files[0]);p.style.display='block'}});</script></body></html>`;
+  return govoRoleOsShell(`<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${themeHead()}<link rel="icon" href="/uploads/govo-symbol-official-v20261004.png"><title>${esc(title)} | GOVO Express</title><style>${css}${publicCss}${roleCss}${unifiedRoleBridgeCss}${govoBrandCss}${(isMerchant || isRider) ? roleDesktopCss : ''}${(isMerchant || isRider) ? roleUnifiedFinalCss : ''}${(isMerchant || isRider) ? roleFlowCompletionCss : ''}</style></head><body class="${roleClass}"><main class="app">${header}${body}<div class="footer">GOVO Express v1.0 Clean Release</div>${bottom}</main>${themeRuntimeScript()}${publicJs}<script>document.addEventListener('change',function(e){if(e.target.matches('input[type=file][accept*=image]')&&e.target.files&&e.target.files[0]){let p=e.target.parentElement.querySelector('.upload-preview');if(!p){p=document.createElement('img');p.className='upload-preview';e.target.parentElement.appendChild(p)}p.src=URL.createObjectURL(e.target.files[0]);p.style.display='block'}});</script></body></html>`, headerRole, title);
 }
 
 function badge(status) {
@@ -2632,10 +2965,10 @@ function publicApprovedSql(alias = '') {
   return `LOWER(TRIM(COALESCE(${prefix}status,'')))='approved' AND ${publicVisibilitySql(alias)}`;
 }
 
-// Public marketplace accepts approved and operational legacy records, while blocking rejected/suspended entries.
+// Public marketplace only exposes approved, visible, non-demo partners.
 function publicListingSql(alias = '') {
   const prefix = alias ? `${alias}.` : '';
-  return `${publicVisibilitySql(alias)} AND LOWER(TRIM(COALESCE(${prefix}status,''))) NOT IN ('rejected','blocked','suspended','deleted','hidden')`;
+  return publicApprovedSql(alias);
 }
 
 function visibilityBadges(x) {
@@ -2891,7 +3224,7 @@ app.get('/', (req, res) => {
     <section class="card"><h2>Join GOVO</h2><div class="quick-grid">
       <a class="btn secondary" href="https://merchant.govoexpress.com/merchant">Merchant</a>
       <a class="btn secondary" href="https://merchant.govoexpress.com/provider">Provider</a>
-      <a class="btn secondary" href="https://rider.govoexpress.com/rider">Rider</a>
+      <a class="btn secondary" href="https://rider.govoexpress.com/rider/login">Rider</a>
     </div></section>
     <section class="card social-footer"><h2>Contact</h2><div class="toolbar">${publicContactLinks()}</div></section>
   `, 'app'));
@@ -2927,7 +3260,7 @@ function govoDirectPublicCss() {
       border:1px solid rgba(167,255,206,.14);
       background:
         radial-gradient(circle at 18% 0%, rgba(58,255,173,.18), transparent 34%),
-        radial-gradient(circle at 100% 10%, rgba(255,218,121,.11), transparent 28%),
+        radial-gradient(circle at 100% 10%, rgba(25,207,240,.12), transparent 28%),
         linear-gradient(135deg, rgba(6,38,31,.92), rgba(5,15,24,.95));
       box-shadow:0 24px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.06);
       border-radius:28px;
@@ -2961,7 +3294,7 @@ function govoDirectPublicCss() {
       border-radius:999px;
       border:1px solid rgba(167,255,206,.18);
       background:rgba(255,255,255,.06);
-      color:#a7ffce;
+      color:#39E75F;
       font-weight:800;
       letter-spacing:.08em;
       text-transform:uppercase;
@@ -2977,7 +3310,7 @@ function govoDirectPublicCss() {
     }
     .govo-display .dot,
     .govo-brand-inline .dot{
-      color:#74ffaf;
+      color:#19CFF0;
     }
     .govo-lead{
       max-width:760px;
@@ -3006,7 +3339,7 @@ function govoDirectPublicCss() {
       border-radius:16px;
       font-weight:900;
       color:#052018;
-      background:linear-gradient(135deg, #79ffb2, #d6ff8f);
+      background:linear-gradient(100deg, #39E75F, #19CFF0);
       box-shadow:0 16px 34px rgba(70,255,154,.18);
       cursor:pointer;
     }
@@ -3049,7 +3382,7 @@ function govoDirectPublicCss() {
       border-radius:999px;
       border:1px solid rgba(167,255,206,.15);
       background:rgba(255,255,255,.06);
-      color:#a7ffce;
+      color:#39E75F;
       font-weight:800;
       text-decoration:none;
     }
@@ -3132,6 +3465,21 @@ function govoDirectPublicCss() {
         width:100%;
       }
     }
+
+    html[data-theme="light"] .govo-public-page{color:#071827}
+    html[data-theme="light"] .govo-premium-hero,
+    html[data-theme="light"] .govo-premium-panel{background:#fff;border-color:rgba(7,24,39,.10);box-shadow:0 16px 42px rgba(7,24,39,.08)}
+    html[data-theme="light"] .govo-display,
+    html[data-theme="light"] .govo-premium-panel h2{color:#071827}
+    html[data-theme="light"] .govo-lead,
+    html[data-theme="light"] .govo-form-note{color:#60717D}
+    html[data-theme="light"] .govo-btn.secondary,
+    html[data-theme="light"] .govo-public-page .btn.secondary{color:#071827;background:#fff;border-color:rgba(7,24,39,.12)}
+    html[data-theme="light"] body:is(.merchant-portal,.rider-portal) .govo-public-page .govo-btn.secondary{color:#071827!important;background:#fff!important;border-color:rgba(7,24,39,.14)!important;opacity:1!important}
+    html[data-theme="light"] .govo-form-grid label{color:#294552}
+    html[data-theme="light"] .govo-form-grid input,
+    html[data-theme="light"] .govo-form-grid select,
+    html[data-theme="light"] .govo-form-grid textarea{background:#F8FBFD;color:#071827;border-color:rgba(7,24,39,.13)}
   </style>`;
 }
 
@@ -3145,8 +3493,8 @@ function govoDirectRiderPage(phoneValue = '') {
         <h1 class="govo-display">Earn with GOVO<span class="dot">.</span></h1>
         <p class="govo-lead">Join GOVO rider network and take local delivery requests with a clean, trusted operating system.</p>
         <div class="govo-actions">
-          <a class="govo-btn" href="https://rider.govoexpress.com/rider">Rider Portal</a>
-          <a class="govo-btn secondary" href="https://app.govoexpress.com/support">Need Help?</a>
+          <a class="govo-btn" href="/rider/login">Rider Login</a>
+          <a class="govo-btn secondary" href="/rider/support">Need Help?</a>
         </div>
       </section>
 
@@ -3160,6 +3508,9 @@ function govoDirectRiderPage(phoneValue = '') {
             <label class="full">Phone
               <input name="phone" value="${phone}" required placeholder="01XXXXXXXXX">
             </label>
+            <label class="full">Password
+              <input name="password" type="password" required placeholder="Enter password" autocomplete="current-password">
+            </label>
             <div class="govo-actions full">
               <button type="submit">Login Rider</button>
             </div>
@@ -3172,18 +3523,18 @@ function govoDirectRiderPage(phoneValue = '') {
             <span class="pill">Apply</span>
           </div>
           <p class="govo-form-note">Submit basic info. GOVO team will approve active riders.</p>
-          <form method="POST" action="/rider/register" class="govo-form-grid">
+          <form method="POST" action="/rider" enctype="multipart/form-data" class="govo-form-grid">
             <label>Name
-              <input name="name" required placeholder="Your name">
+              <input name="rider_name" required placeholder="Your name">
             </label>
             <label>Phone
               <input name="phone" value="${phone}" required placeholder="01XXXXXXXXX">
             </label>
             <label>Area
-              <input name="area" required placeholder="Meherpur / Gangni">
+              <input name="location" required placeholder="Meherpur / Gangni">
             </label>
             <label>Vehicle
-              <select name="vehicle">
+              <select name="vehicle_type">
                 <option>Bike</option>
                 <option>Cycle</option>
                 <option>Auto</option>
@@ -3210,7 +3561,7 @@ app.get('/merchant', (req, res) => {
         <h1 class="govo-display">Grow with GOVO<span class="dot">.</span></h1>
         <p class="govo-lead">Register your shop. GOVO admin approve korle customer app-e show korbe.</p>
         <div class="govo-actions">
-          <a class="govo-btn" href="https://merchant.govoexpress.com/merchant/dashboard">Merchant Login</a>
+          <a class="govo-btn" href="https://merchant.govoexpress.com/merchant/login">Merchant Login</a>
           <a class="govo-btn secondary" href="https://app.govoexpress.com/shops">View Shops</a>
         </div>
       </section>
@@ -3266,7 +3617,7 @@ app.get('/merchant', (req, res) => {
             </label>
             <div class="govo-actions full">
               <button type="submit">Submit Merchant Info</button>
-              <a class="govo-btn secondary" href="https://merchant.govoexpress.com/merchant/dashboard">Already registered?</a>
+              <a class="govo-btn secondary" href="https://merchant.govoexpress.com/merchant/login">Already registered?</a>
             </div>
           </form>
         </div>
@@ -3290,7 +3641,7 @@ app.get('/rider', (req, res) => {
 });
 
 app.get('/rider/register', (req, res) => {
-  res.send(page('Rider Registration', `<section class="card"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider" enctype="multipart/form-data"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><label>NID Number</label><input name="nid_number"><label>Driving License</label><input name="driving_license"><label>Rider Photo</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp" capture="user" required><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="https://rider.govoexpress.com/rider">Rider Login</a></div></section>`, 'rider'));
+  res.send(page('Rider Registration', `<section class="card"><h1>GOVO Rider Registration</h1><p class="form-hint">Delivery rider hisebe join korte basic info submit korun.</p><form method="POST" action="/rider" enctype="multipart/form-data"><label>Rider Name</label><input name="rider_name" required><label>Phone</label><input name="phone" required><label>Location</label><input name="location" required><label>Vehicle Type</label><select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select><label>Experience</label><textarea name="experience"></textarea><label>NID Number</label><input name="nid_number"><label>Driving License</label><input name="driving_license"><label>Rider Photo</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp" capture="user" required><button>Submit Rider Info</button></form><div class="actions"><a class="btn secondary" href="/rider/login">Rider Login</a></div></section>`, 'rider'));
 });
 
 app.post('/rider', imageUpload.single('rider_image'), async (req, res, next) => {
@@ -3317,7 +3668,8 @@ app.post('/merchant/account/create', async (req, res, next) => {
     if (!r.rows.length) return res.status(404).send(accountCreatePage('merchant', phone, 'No registered merchant found for this phone. Please register first.'));
     if (normalizeStatus(r.rows[0].status) !== 'approved') return res.status(403).send(accountCreatePage('merchant', phone, 'Admin approval required before account creation.'));
     const hp = hashPassword(password);
-    await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
+    const activated = await pool.query(`UPDATE govo_merchant_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3 AND (password_hash IS NULL OR password_hash='') RETURNING id`, [hp.hash, hp.salt, r.rows[0].id]);
+    if (!activated.rows.length) return res.status(409).send(accountCreatePage('merchant', phone, 'Account already exists. Please login or request an Admin password reset.'));
     res.send(accountCreateSuccessPage('merchant', r.rows[0].phone || phone));
   } catch (e) { next(e); }
 });
@@ -3377,7 +3729,8 @@ app.post('/rider/account/create', async (req, res, next) => {
     if (!r.rows.length) return res.status(404).send(accountCreatePage('rider', phone, 'No registered rider found for this phone. Please register first.'));
     if (normalizeStatus(r.rows[0].status) !== 'approved') return res.status(403).send(accountCreatePage('rider', phone, 'Admin approval required before account creation.'));
     const hp = hashPassword(password);
-    await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3`, [hp.hash, hp.salt, r.rows[0].id]);
+    const activated = await pool.query(`UPDATE govo_rider_leads SET password_hash=$1, password_salt=$2, password_set_at=NOW(), updated_at=NOW() WHERE id=$3 AND (password_hash IS NULL OR password_hash='') RETURNING id`, [hp.hash, hp.salt, r.rows[0].id]);
+    if (!activated.rows.length) return res.status(409).send(accountCreatePage('rider', phone, 'Account already exists. Please login or request an Admin password reset.'));
     res.send(accountCreateSuccessPage('rider', r.rows[0].phone || phone));
   } catch (e) { next(e); }
 });
@@ -4260,7 +4613,7 @@ async function approvedMerchants() {
            COALESCE(string_agg(COALESCE(p.product_name,'') || ' ' || COALESCE(p.category,'') || ' ' || COALESCE(p.description,''), ' '), '') AS product_search
     FROM govo_merchant_leads l
     LEFT JOIN govo_shop_products p ON (p.merchant_lead_id=l.id OR p.merchant_phone=l.phone) AND COALESCE(p.is_deleted,false)=false
-    WHERE ${publicListingSql('l')}
+    WHERE ${publicListingSql('l')} AND NULLIF(BTRIM(l.shop_name),'') IS NOT NULL
     GROUP BY l.id, l.shop_name, l.owner_name, l.phone, l.whatsapp, l.location, l.category, l.delivery_needed, l.status, l.shop_description, l.shop_address, l.products, l.image_url, l.is_verified, l.is_trusted, l.is_available, l.emergency_available, l.rating_avg, l.rating_count, l.public_visible, l.is_demo, l.created_at
     ORDER BY l.id DESC
     LIMIT 500
@@ -4353,7 +4706,7 @@ async function visibleShopProducts(merchantId, merchantPhone = '') {
 
 app.get('/shop/:id', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, owner_name, phone, whatsapp, location, category, delivery_needed, COALESCE(status,'pending') AS status, shop_description, shop_address, products, image_url, COALESCE(is_verified,false) AS is_verified, COALESCE(is_trusted,false) AS is_trusted, COALESCE(is_available,true) AS is_available, COALESCE(emergency_available,false) AS emergency_available, COALESCE(rating_avg,0) AS rating_avg, COALESCE(rating_count,0) AS rating_count, created_at FROM govo_merchant_leads WHERE id=$1 AND ${publicListingSql()} AND NULLIF(BTRIM(shop_name),'') IS NOT NULL LIMIT 1`, [req.params.id]);
     const x = shop.rows[0];
     if (!x) return res.status(404).send(v20Browse.messagePage({ title: 'Shop Not Found', message: 'This shop is not public right now.', backHref: '/shops', backLabel: 'Back to Shops', active: 'shops' }));
     const productsRaw = await visibleShopProducts(x.id, x.phone || x.whatsapp || '');
@@ -4366,7 +4719,7 @@ app.get('/shop/:id', async (req, res, next) => {
 
 app.post('/shop/:id/order', async (req, res, next) => {
   try {
-    const shop = await pool.query(`SELECT id, shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE id=$1 AND ${publicListingSql()} LIMIT 1`, [req.params.id]);
+    const shop = await pool.query(`SELECT id, shop_name, phone, whatsapp, location, shop_address FROM govo_merchant_leads WHERE id=$1 AND ${publicListingSql()} AND NULLIF(BTRIM(shop_name),'') IS NOT NULL LIMIT 1`, [req.params.id]);
     const m = shop.rows[0];
     if (!m) return res.status(404).send(v20Browse.messagePage({ title: 'Shop Not Found', message: 'This shop is not public right now.', backHref: '/shops', backLabel: 'Back to Shops', active: 'shops' }));
     const selected = Array.isArray(req.body.product_keys) ? req.body.product_keys : req.body.product_keys ? [req.body.product_keys] : [];
@@ -4393,7 +4746,7 @@ app.post('/shop/:id/order', async (req, res, next) => {
 
 function orderForm(data = {}, error = '') {
   const partner = data.merchant_name || data.provider_name || data.shop_name || '';
-  return page('Place GOVO Order', `${error ? `<section class="card"><h1>Check order details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><span class="pill">Order Dispatch</span><h1>Place GOVO Order</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Submit a delivery, shop, service, or general request. GOVO admin will review and dispatch a rider when needed.</p><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track Order</a></div></section><section class="card"><h2>Order Details</h2><form method="POST" action="/order"><input type="hidden" name="shop_id" value="${esc(data.shop_id || '')}"><input type="hidden" name="merchant_id" value="${esc(data.merchant_id || data.shop_id || '')}"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}" required><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || data.area || '')}" placeholder="Meherpur / Mujibnagar"><label>Delivery / Service Address</label><input name="customer_address" value="${esc(data.customer_address || data.delivery_address || data.drop_location || '')}" required><label>Order Type</label><select name="order_type"><option value="delivery" ${data.order_type === 'delivery' ? 'selected' : ''}>delivery</option><option value="shop" ${data.order_type === 'shop' ? 'selected' : ''}>shop</option><option value="service" ${data.order_type === 'service' ? 'selected' : ''}>service</option><option value="general" ${data.order_type === 'general' ? 'selected' : ''}>general</option></select><label>Merchant / Provider <span style="color:var(--muted)">(optional)</span></label><input name="merchant_name" value="${esc(partner)}" placeholder="Shop or provider name"><label>Items / Request Details</label><textarea name="items" required placeholder="Example: 2 burgers, 1 cola / AC repair request">${esc(data.items || data.item_details || data.item || '')}</textarea><label>Payment Method</label><select name="payment_method"><option value="cash">cash</option><option value="bKash">bKash</option><option value="Nagad">Nagad</option><option value="card">card</option></select><label>Notes</label><textarea name="note" placeholder="Any extra instruction for GOVO">${esc(data.note || data.notes || '')}</textarea><input type="hidden" name="merchant_phone" value="${esc(data.merchant_phone || '')}"><input type="hidden" name="pickup_location" value="${esc(data.pickup_location || data.pickup_address || '')}"><button>Submit Order</button></form></section>`, 'track');
+  return enhanceCustomerPage(page('Place GOVO Order', `${error ? `<section class="card"><h1>Check order details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><span class="pill">Order Dispatch</span><h1>Place GOVO Order</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Submit a delivery, shop, service, or general request. GOVO admin will review and dispatch a rider when needed.</p><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track Order</a></div></section><section class="card"><h2>Order Details</h2><form method="POST" action="/order"><input type="hidden" name="shop_id" value="${esc(data.shop_id || '')}"><input type="hidden" name="merchant_id" value="${esc(data.merchant_id || data.shop_id || '')}"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}" required><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || data.area || '')}" placeholder="Meherpur / Mujibnagar"><label>Delivery / Service Address</label><input name="customer_address" value="${esc(data.customer_address || data.delivery_address || data.drop_location || '')}" required><label>Order Type</label><select name="order_type"><option value="delivery" ${data.order_type === 'delivery' ? 'selected' : ''}>delivery</option><option value="shop" ${data.order_type === 'shop' ? 'selected' : ''}>shop</option><option value="service" ${data.order_type === 'service' ? 'selected' : ''}>service</option><option value="general" ${data.order_type === 'general' ? 'selected' : ''}>general</option></select><label>Merchant / Provider <span style="color:var(--muted)">(optional)</span></label><input name="merchant_name" value="${esc(partner)}" placeholder="Shop or provider name"><label>Items / Request Details</label><textarea name="items" required placeholder="Example: 2 burgers, 1 cola / AC repair request">${esc(data.items || data.item_details || data.item || '')}</textarea><label>Payment Method</label><select name="payment_method"><option value="cash">cash</option><option value="bKash">bKash</option><option value="Nagad">Nagad</option><option value="card">card</option></select><label>Notes</label><textarea name="note" placeholder="Any extra instruction for GOVO">${esc(data.note || data.notes || '')}</textarea><input type="hidden" name="merchant_phone" value="${esc(data.merchant_phone || '')}"><input type="hidden" name="pickup_location" value="${esc(data.pickup_location || data.pickup_address || '')}"><button>Submit Order</button></form></section>`, 'track'));
 }
 
 function normalizeOrderBody(body = {}) {
@@ -4499,29 +4852,18 @@ function timelineHtml(type, status) {
   }).join('') + '</div>';
 }
 
-function trackingOrderCard(x) {
-  const code = x.order_code || orderCodeFromId(x.id);
-  const riderName = x.assigned_rider_name || x.rider_name || 'Not assigned';
-  const riderPhone = x.assigned_rider_phone || x.rider_phone || '';
-  const merchantState = x.merchant_status || (['confirmed', 'accepted', 'preparing', 'ready', 'rejected'].includes(String(x.status || '').toLowerCase()) ? x.status : 'waiting');
+// Public tracking shows progress only; never customer details or private notes.
+function trackingPublicCard(kind, x) {
+  const code = kind === 'order' ? (x.order_code || orderCodeFromId(x.id)) : kind === 'service' ? (x.request_code || serviceRequestCodeFromId(x.id, x.created_at)) : (x.ticket_code || supportTicketCodeFromId(x.id, x.created_at));
+  const title = {order:'Delivery Order',service:'Service Request',support:'Support Ticket'}[kind];
+  const status = String(x.status || (kind === 'support' ? 'open' : 'new'));
   const events = Array.isArray(x._events) ? x._events : [];
-  const eventHtml = events.length ? `<div class="activity-list">${events.map((e) => `<div class="activity-row"><b>${esc(e.event_type || 'status')}</b><span>${esc(e.status || '')} ${esc(bdTime(e.created_at))}</span>${e.note ? `<small>${esc(e.note)}</small>` : ''}</div>`).join('')}</div>` : '';
-  return `<div class="card"><div class="section-head"><h2>Delivery Order ${esc(code)}</h2><span class="badge big-status ${esc(String(x.status || 'new').toLowerCase())}">${esc(x.status || 'new')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('order', x.status)}<div class="detail-grid"><div><b>Tracking Code</b><span>${esc(code)}</span></div><div><b>Type</b><span>${esc(x.order_type || 'delivery')}</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Partner</b><span>${esc(x.provider_name || x.merchant_name || x.shop_name || 'GOVO Order')}</span></div><div><b>Partner Status</b><span>${esc(merchantState)}<br>${esc(x.merchant_note || 'No partner update')}</span></div><div><b>Delivery Address</b><span>${esc(x.customer_address || x.drop_location)}</span></div><div><b>Items / Details</b><span>${esc(x.items || x.item_details)}</span></div><div><b>Rider</b><span>${esc(riderName)}<br>${esc(riderPhone)}<br>${esc(x.rider_note || 'No rider update')}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Payment</b><span>${esc(x.payment_method || 'cash')} / ${esc(x.payment_status || 'unpaid')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div>${eventHtml}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Open Tracking Link</a></div></div>`;
+  const eventHtml = events.length ? '<div class="activity-list">' + events.map(e => '<div class="activity-row"><b>' + esc(e.event_type || 'status') + '</b><span>' + esc(e.status || '') + ' ' + esc(bdTime(e.created_at)) + '</span></div>').join('') + '</div>' : '';
+  return `<div class="card"><div class="section-head"><h2>${esc(title)} ${esc(code)}</h2><span class="badge big-status ${esc(status.toLowerCase())}">${esc(status)}</span></div><p style="color:var(--muted);font-weight:900">${kind === 'support' ? 'GOVO support is reviewing this message.' : esc(statusMeaning(status))}</p>${kind === 'support' ? '' : timelineHtml(kind,status)}<div class="detail-grid"><div><b>Tracking Code</b><span>${esc(code)}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div>${eventHtml}<p style="color:var(--muted)">For request details, contact GOVO support with your tracking code.</p><div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Open Tracking Link</a><a class="btn secondary" href="/support?related_type=${kind}&related_code=${encodeURIComponent(code)}">Contact Support</a></div></div>`;
 }
-
-function trackingServiceCard(x) {
-  const code = x.request_code || serviceRequestCodeFromId(x.id, x.created_at);
-  const events = Array.isArray(x._events) ? x._events : [];
-  const eventHtml = events.length ? `<div class="activity-list">${events.map((e) => `<div class="activity-row"><b>${esc(e.event_type || 'status')}</b><span>${esc(e.status || '')} ${esc(bdTime(e.created_at))}</span>${e.note ? `<small>${esc(e.note)}</small>` : ''}</div>`).join('')}</div>` : '';
-  return `<div class="card"><div class="section-head"><h2>Service Request ${esc(code)}</h2><span class="badge big-status ${esc(String(x.status || 'new').toLowerCase())}">${esc(x.status || 'new')}</span></div><p style="color:var(--muted);font-weight:900">${esc(statusMeaning(x.status))}</p>${timelineHtml('service', x.status)}<div class="detail-grid"><div><b>Request Code</b><span>${esc(code)}</span></div><div><b>Type</b><span>Service</span></div><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Provider</b><span>${esc(x.provider_name || 'GOVO Provider')}<br>${esc(x.provider_phone || '')}</span></div><div><b>Provider Status</b><span>${esc(x.status || 'new')}<br>${esc(x.provider_note || 'No provider update')}</span></div><div><b>Service Address</b><span>${esc(x.customer_address || x.service_address)}</span></div><div><b>Problem Details</b><span>${esc(x.problem_details)}</span></div><div><b>Customer Note</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div>${eventHtml}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Open Tracking Link</a></div></div>`;
-}
-
-function trackingSupportCard(x) {
-  const code = x.ticket_code || supportTicketCodeFromId(x.id, x.created_at);
-  const events = Array.isArray(x._events) ? x._events : [];
-  const eventHtml = events.length ? `<div class="activity-list">${events.map((e) => `<div class="activity-row"><b>${esc(e.event_type || 'status')}</b><span>${esc(e.status || '')} ${esc(bdTime(e.created_at))}</span></div>`).join('')}</div>` : '';
-  return `<div class="card"><div class="section-head"><h2>Support Ticket ${esc(code)}</h2><span class="badge big-status ${esc(String(x.status || 'open').toLowerCase())}">${esc(x.status || 'open')}</span></div><p style="color:var(--muted);font-weight:900">GOVO support is reviewing this message.</p><div class="detail-grid"><div><b>Ticket Code</b><span>${esc(code)}</span></div><div><b>Customer</b><span>${esc(x.customer_name || 'Customer')}<br>${esc(x.customer_phone || '')}</span></div><div><b>Area</b><span>${esc(x.customer_area || 'Not provided')}</span></div><div><b>Subject</b><span>${esc(x.subject || 'Support')}</span></div><div><b>Message</b><span>${esc(x.message || '')}</span></div><div><b>Related</b><span>${esc(x.related_type || 'general')}<br>${esc(x.related_code || 'No related code')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Updated</b><span>${esc(bdTime(x.updated_at || x.created_at))}</span></div></div>${eventHtml}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(code)}">Open Tracking Link</a><a class="btn secondary" href="https://app.govoexpress.com/support">Contact Support</a></div></div>`;
-}
+function trackingOrderCard(x) { return trackingPublicCard('order',x); }
+function trackingServiceCard(x) { return trackingPublicCard('service',x); }
+function trackingSupportCard(x) { return trackingPublicCard('support',x); }
 
 async function fetchTrackingResults({ id = '', phone = '', type = '', code = '' }) {
   const out = { orders: [], services: [], support: [] };
@@ -4581,7 +4923,7 @@ function renderTrackPage({ id = '', phone = '', code = '', orders = [], services
   const serviceHtml = services.map(trackingServiceCard).join('');
   const supportHtml = support.map(trackingSupportCard).join('');
   const empty = searched && !orders.length && !services.length && !support.length ? `<section class="card"><h2>No tracking found</h2><p style="color:var(--muted)">Check your order/request/ticket ID or phone number. Contact GOVO if you need help.</p><div class="actions"><a class="btn" href="https://app.govoexpress.com/app">Home</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/support">Support</a></div></section>` : '';
-  return page('Track GOVO', `<section class="card app-hero"><span class="pill">Unified Tracking</span><h1>Track order, service request or support ticket</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Search by tracking ID, request ID, support ticket code, or phone number.</p><form method="GET" action="/track"><label>Tracking Code</label><input name="code" value="${esc(code)}" placeholder="GOVO-000001 / SRV-YYYYMMDD-0001 / SUP-YYYYMMDD-0001"><label>Order / Request / Ticket ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Phone Number</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/app">Home</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/support">Support</a></div></section>${orderHtml ? `<section class="card"><div class="section-head"><h2>Delivery Orders</h2><span class="pill">${orders.length}</span></div></section><section class="cards">${orderHtml}</section>` : ''}${serviceHtml ? `<section class="card"><div class="section-head"><h2>Service Requests</h2><span class="pill">${services.length}</span></div></section><section class="cards">${serviceHtml}</section>` : ''}${supportHtml ? `<section class="card"><div class="section-head"><h2>Support Tickets</h2><span class="pill">${support.length}</span></div></section><section class="cards">${supportHtml}</section>` : ''}${empty}`, 'track');
+  return enhanceCustomerPage(page('Track GOVO', `<section class="card app-hero"><span class="pill">Unified Tracking</span><h1>Track order, service request or support ticket</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Search by tracking ID, request ID, support ticket code, or phone number.</p><form method="GET" action="/track"><label>Tracking Code</label><input name="code" value="${esc(code)}" placeholder="GOVO-000001 / SRV-YYYYMMDD-0001 / SUP-YYYYMMDD-0001"><label>Order / Request / Ticket ID</label><input name="id" value="${esc(id)}" placeholder="Example: 12"><label>Phone Number</label><input name="phone" value="${esc(phone)}" placeholder="017xxxxxxxx"><button>Check Status</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/app">Home</a><a class="btn secondary" href="https://app.govoexpress.com/shops">Shops</a><a class="btn secondary" href="https://app.govoexpress.com/services">Services</a><a class="btn secondary" href="https://app.govoexpress.com/support">Support</a></div></section>${orderHtml ? `<section class="card"><div class="section-head"><h2>Delivery Orders</h2><span class="pill">${orders.length}</span></div></section><section class="cards">${orderHtml}</section>` : ''}${serviceHtml ? `<section class="card"><div class="section-head"><h2>Service Requests</h2><span class="pill">${services.length}</span></div></section><section class="cards">${serviceHtml}</section>` : ''}${supportHtml ? `<section class="card"><div class="section-head"><h2>Support Tickets</h2><span class="pill">${support.length}</span></div></section><section class="cards">${supportHtml}</section>` : ''}${empty}`, 'track'));
 }
 
 // GOVO_PHASE5D_TRACKING_ASSIGNED_INFO
@@ -4908,6 +5250,8 @@ function govoTrackInjectAssignedInfo(html) {
 
 app.use('/track', (req, res, next) => {
   if (req.method !== 'GET') return next();
+  res.setHeader('Cache-Control','private, no-store');
+  res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');
 
   const originalSend = res.send.bind(res);
 
@@ -4985,14 +5329,34 @@ app.get('/merchant/dashboard', async (req, res, next) => {
     if (merchantStatus !== 'approved') return res.send(page('Merchant Dashboard', `<section class="card"><h1>Merchant Pending</h1><p>Merchant status is ${esc(m.status || 'pending')}.</p><div class="actions"><a class="btn secondary" href="/merchant/logout">Logout</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'merchant'));
     const phone = String(m.phone || m.whatsapp || '').trim();
     const prof = (await pool.query(`SELECT * FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone])).rows[0] || {};
-    const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_id=$1 OR merchant_lead_id=$1 OR merchant_phone=$2 OR merchant_phone=$3 OR shop_name=$4 OR merchant_name=$4 ORDER BY id DESC LIMIT 100`, [m.id, m.phone || '', m.whatsapp || '', m.shop_name || '']);
+    const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_id=$1 OR merchant_lead_id=$1 OR (merchant_id IS NULL AND merchant_lead_id IS NULL AND (($2<>'' AND merchant_phone=$2) OR ($3<>'' AND merchant_phone=$3))) ORDER BY id DESC LIMIT 100`, [m.id, m.phone || '', m.whatsapp || '']);
     const orderActions = (x) => `<form method="POST" action="/merchant/order/status"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="merchant_note" value="${esc(x.merchant_note || '')}" placeholder="Merchant note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="preparing">Preparing</button><button name="status" value="ready">Ready</button></div><div class="actions"><button class="reject" name="status" value="rejected">Reject</button></div></form>`;
     const orderCards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.customer_name || 'Customer')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Merchant Status</b><span>${esc(x.merchant_status || 'No update')}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${orderActions(x)}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track</a></div></div>`).join('');
     const items = await pool.query(`SELECT id, item_name, price, details FROM govo_shop_items WHERE merchant_phone=$1 AND COALESCE(is_active,true)=true ORDER BY id DESC LIMIT 50`, [phone]);
     const itemHtml = items.rows.map((i) => `<div class="item-box"><b>${esc(i.item_name || '')}</b><span>${esc(i.price || '')}</span><br><span>${esc(i.details || '')}</span><div class="actions"><a class="btn secondary" href="/merchant/item/${encodeURIComponent(i.id)}/delete?phone=${encodeURIComponent(phone)}">Remove</a></div></div>`).join('');
     const menuProducts = await pool.query(`SELECT id, name, category, price, stock_status, image_url FROM govo_products WHERE merchant_id=$1 ORDER BY CASE stock_status WHEN 'available' THEN 1 WHEN 'out_of_stock' THEN 2 ELSE 3 END, id DESC LIMIT 12`, [m.id]);
     const menuProductHtml = menuProducts.rows.map((p) => `<div class="item-box"><b>${esc(p.name || '')}</b><span>৳${esc(p.price || 0)} - ${esc(p.stock_status || 'available')}</span><br><span>${esc(p.category || 'Menu')}</span></div>`).join('');
-    res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1>${listingImage(m.image_url || prof.logo_image, m.shop_name, true)}<div class="detail-grid"><div><b>Shop</b><span>${esc(m.shop_name || '')}</span></div><div><b>Phone</b><span>${esc(m.whatsapp || m.phone || phone)}</span></div><div><b>Category</b><span>${esc(m.category || '')}</span></div><div><b>Status</b><span>${badge(m.status)}</span></div><div><b>Trust</b><span>${trustBadges(m)}</span></div><div><b>Rating</b><span>${esc(ratingText(m))}</span></div></div><div class="actions"><a class="btn" href="/merchant/products">Products</a><a class="btn secondary" href="#orders">Orders</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Shop Profile</h2><form method="POST" action="/merchant/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || m.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || m.owner_name || '')}"><label>Area</label><input name="location" value="${esc(prof.location || m.location || '')}"><label>Address</label><textarea name="shop_address">${esc(m.shop_address || '')}</textarea><label>Category</label><input name="category" value="${esc(prof.category || m.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label><input type="checkbox" name="is_available" ${boolish(m.is_available) ? 'checked' : ''}> Shop Available</label><label><input type="checkbox" name="delivery_available" ${boolish(m.delivery_available) ? 'checked' : ''}> Delivery Available</label><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || m.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || m.shop_description || '')}</textarea><label>Shop Image / Logo</label><input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(m.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><div class="section-head"><h2>Product / Menu</h2><span class="pill">${esc(menuProducts.rows.length)} shown</span></div><form method="POST" action="/merchant/products/create" enctype="multipart/form-data"><label>Product/Menu Name</label><input name="name" required><label>Price</label><input name="price" placeholder="120"><label>Category</label><input name="category"><label>Description</label><textarea name="description"></textarea><label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><button>Add Product</button></form><div class="actions"><a class="btn secondary" href="/merchant/products">Open Full Product Manager</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Public Shop</a></div><h2>Current Menu</h2><div class="item-grid">${menuProductHtml || '<p>No product added yet.</p>'}</div>${itemHtml ? `<details><summary>Legacy Items</summary><div class="item-grid">${itemHtml}</div></details>` : ''}</section><section class="card" id="orders"><div class="section-head"><h2>Incoming Orders</h2><span class="pill">${esc(orders.rows.length)} orders</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, prepare, mark ready, or reject.</p></section><section class="cards">${orderCards || '<div class="card"><h2>No orders yet</h2><p style="color:var(--muted);font-weight:900">Customer orders from your shop will appear here.</p></div>'}</section>`, 'merchant'));
+    res.send(page('Merchant Dashboard', `<section class="card app-hero"><h1>Merchant Dashboard</h1>${listingImage(m.image_url || prof.logo_image, m.shop_name, true)}<div class="detail-grid"><div><b>Shop</b><span>${esc(m.shop_name || '')}</span></div><div><b>Phone</b><span>${esc(m.whatsapp || m.phone || phone)}</span></div><div><b>Category</b><span>${esc(m.category || '')}</span></div><div><b>Status</b><span>${badge(m.status)}</span></div><div><b>Trust</b><span>${trustBadges(m)}</span></div><div><b>Rating</b><span>${esc(ratingText(m))}</span></div></div><div class="actions govo-role-quick"><a class="btn" href="/merchant/products">Products</a><a class="btn secondary" href="#orders">Orders</a><a class="btn secondary" href="#profile">Profile</a><a class="btn secondary" href="/merchant/support">Support</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card" id="profile"><h2>Shop Profile</h2><form method="POST" action="/merchant/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Shop Name</label><input name="shop_name" value="${esc(prof.shop_name || m.shop_name || '')}" required><label>Owner Name</label><input name="owner_name" value="${esc(prof.owner_name || m.owner_name || '')}"><label>Area</label><input name="location" value="${esc(prof.location || m.location || '')}"><label>Address</label><textarea name="shop_address">${esc(m.shop_address || '')}</textarea><label>Category</label><input name="category" value="${esc(prof.category || m.category || '')}"><label>Opening Hours</label><input name="opening_hours" value="${esc(prof.opening_hours || '')}"><label>Delivery Area</label><input name="delivery_area" value="${esc(prof.delivery_area || '')}"><label><input type="checkbox" name="is_available" ${boolish(m.is_available) ? 'checked' : ''}> Shop Available</label><label><input type="checkbox" name="delivery_available" ${boolish(m.delivery_available) ? 'checked' : ''}> Delivery Available</label><label>WhatsApp</label><input name="whatsapp" value="${esc(prof.whatsapp || m.whatsapp || '')}"><label>Description</label><textarea name="description">${esc(prof.description || m.shop_description || '')}</textarea><label>Shop Image / Logo</label><input type="file" name="shop_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(m.image_url || prof.logo_image || '')}" placeholder="Optional existing image URL"><button>Save Shop Info</button></form></section><section class="card"><div class="section-head"><h2>Product / Menu</h2><span class="pill">${esc(menuProducts.rows.length)} shown</span></div><form method="POST" action="/merchant/products/create" enctype="multipart/form-data"><label>Product/Menu Name</label><input name="name" required><label>Price</label><input name="price" placeholder="120"><label>Category</label><input name="category"><label>Description</label><textarea name="description"></textarea><label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><button>Add Product</button></form><div class="actions"><a class="btn secondary" href="/merchant/products">Open Full Product Manager</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Public Shop</a></div><h2>Current Menu</h2><div class="item-grid">${menuProductHtml || '<p>No product added yet.</p>'}</div>${itemHtml ? `<details><summary>Legacy Items</summary><div class="item-grid">${itemHtml}</div></details>` : ''}</section><section class="card" id="orders"><div class="section-head"><h2>Incoming Orders</h2><span class="pill">${esc(orders.rows.length)} orders</span></div><p style="color:var(--muted);font-weight:900">Next action: accept, prepare, mark ready, or reject.</p></section><section class="cards">${orderCards || '<div class="card"><h2>No orders yet</h2><p style="color:var(--muted);font-weight:900">Customer orders from your shop will appear here.</p></div>'}</section>`, 'merchant'));
+  } catch (e) { next(e); }
+});
+
+// Bind legacy merchant actions to the authenticated approved account.
+app.use('/merchant', async (req, res, next) => {
+  const protectedPath = ['/profile','/profile/update','/order/status','/item','/orders'].includes(req.path) || /^\/item\/[^/]+\/delete$/.test(req.path);
+  if (!protectedPath) return next();
+  try {
+    const id = readPortalSession(req, 'merchant');
+    if (!id) return res.status(403).send(merchantLoginPage('', 'Please login first.'));
+    const result = await pool.query("SELECT id,phone,whatsapp,status FROM govo_merchant_leads WHERE id=$1", [id]);
+    const m = result.rows[0];
+    if (!m || normalizeStatus(m.status) !== 'approved') return res.status(403).send('Approved merchant account required.');
+    const phones = [m.phone,m.whatsapp].filter(Boolean);
+    const claimed = [req.body && req.body.phone,req.query && req.query.phone].filter(Boolean);
+    if (claimed.some(phone => !phones.includes(String(phone).trim()))) return res.status(403).send('Account mismatch.');
+    req.body = req.body || {};
+    req.body.phone = m.phone || m.whatsapp;
+    req.query.phone = m.phone || m.whatsapp;
+    return next();
   } catch (e) { next(e); }
 });
 
@@ -5021,10 +5385,12 @@ app.post('/merchant/order/status', async (req, res, next) => {
     const m = check.lead;
     const allowed = ['accepted', 'preparing', 'ready', 'rejected'];
     let status = String(req.body.status || '').trim().toLowerCase();
-    if (!allowed.includes(status)) status = 'accepted';
-    const updated = await pool.query(`UPDATE govo_orders SET status=$1, merchant_status=$1, merchant_note=$2, updated_at=NOW() WHERE id=$3 AND (merchant_lead_id=$4 OR merchant_phone=$5 OR merchant_phone=$6 OR shop_name=$7) RETURNING *`, [status, String(req.body.merchant_note || ''), String(req.body.id || ''), m.id, m.phone || '', m.whatsapp || '', m.shop_name || '']);
+    if (!allowed.includes(status)) return res.status(400).send('Invalid merchant status.');
+    const updated = await pool.query(`UPDATE govo_orders SET status=$1, merchant_status=$1, merchant_note=$2, updated_at=NOW() WHERE id=$3 AND (merchant_id=$4 OR merchant_lead_id=$4 OR (merchant_id IS NULL AND merchant_lead_id IS NULL AND (($5<>'' AND merchant_phone=$5) OR ($6<>'' AND merchant_phone=$6)))) AND status NOT IN ('picked_up','on_the_way','delivered','cancelled','rejected','completed') RETURNING *`, [status, String(req.body.merchant_note || ''), String(req.body.id || ''), m.id, m.phone || '', m.whatsapp || '']);
+    if (!updated.rows.length) return res.status(409).send('Order unavailable, not owned by your account, or action no longer valid.');
     if (updated.rows.length) {
       const x = updated.rows[0];
+      await recordOrderEvent(x.id, 'merchant_status', status, String(req.body.merchant_note || ''), 'merchant', m.shop_name || 'Merchant');
       await sendTelegram(['GOVO Merchant Order Update', '', `Order ID: #${x.id}`, `Shop: ${x.shop_name || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Merchant Note: ${x.merchant_note || 'N/A'}`, `Customer: ${x.customer_name || ''}`, `Customer Phone: ${x.customer_phone || ''}`, `Delivery: ${x.drop_location || ''}`, `Item: ${x.item_details || ''}`].join('\n'));
     }
     res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(phone)}#orders`);
@@ -5089,7 +5455,7 @@ app.get('/merchant/products', async (req, res, next) => {
     const filterLink = (label, value) => `<a class="btn ${filter === value ? '' : 'secondary'}" href="/merchant/products?filter=${encodeURIComponent(value)}">${esc(label)}</a>`;
     const stockSelect = (x) => ['available', 'out_of_stock', 'hidden'].map((v) => `<option value="${v}" ${x.stock_status === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('');
     const rows = products.rows.map((x) => `<div class="card" style="padding:14px"><div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start"><div style="min-width:0"><span class="pill">${esc(x.category || 'Menu')}</span><h2 style="font-size:22px;margin-top:10px">${esc(x.name || '')}</h2><p style="font-weight:1000;color:#bbf7d0;margin:6px 0">৳${esc(x.price || 0)}</p></div>${x.image_url ? `<img src="${esc(x.image_url)}" alt="${esc(x.name || 'Product')}" style="width:82px;height:82px;object-fit:cover;border-radius:14px;border:1px solid rgba(34,197,94,.45)">` : ''}</div><p>${esc(x.description || '')}</p><div class="actions trust-row">${badge(x.stock_status)}<span class="pill">${boolish(x.public_visible) ? 'Public Visible' : 'Hidden'}</span></div><form method="POST" action="/merchant/products/update" enctype="multipart/form-data" style="margin-top:12px"><input type="hidden" name="id" value="${esc(x.id)}"><label>Name</label><input name="name" value="${esc(x.name || '')}" required><label>Price</label><input name="price" value="${esc(x.price || 0)}"><label>Category</label><input name="category" value="${esc(x.category || '')}"><label>Description</label><textarea name="description">${esc(x.description || '')}</textarea><label>Status</label><select name="stock_status">${stockSelect(x)}</select><label>Current Image URL</label><input name="image_url" value="${esc(x.image_url || '')}"><label>Upload New Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><button>Save Product</button></form><form method="POST" action="/merchant/products/hide"><input type="hidden" name="id" value="${esc(x.id)}"><button class="reject">Hide Product</button></form></div>`).join('');
-    res.send(page('Product / Menu Manager', `<section class="card app-hero"><h1>Product / Menu Manager</h1><p>Shop: ${esc(m.shop_name || '')}</p><div class="actions"><a class="btn secondary" href="https://merchant.govoexpress.com/merchant/dashboard">Dashboard</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Public Shop</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Add Product</h2><form method="POST" action="/merchant/products/create" enctype="multipart/form-data"><label>Product/Menu Name</label><input name="name" required><label>Price</label><input name="price" placeholder="120"><label>Category</label><input name="category" placeholder="Food / Grocery / Service"><label>Description</label><textarea name="description"></textarea><label>Status</label><select name="stock_status"><option>available</option><option>out_of_stock</option><option>hidden</option></select><label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Image URL</label><input name="image_url" placeholder="Optional image URL"><button>Add Product</button></form></section><section class="card"><div class="toolbar">${filterLink(`All ${c.total || 0}`, 'all')}${filterLink(`Available ${c.available || 0}`, 'available')}${filterLink(`Out ${c.out_of_stock || 0}`, 'out_of_stock')}${filterLink(`Hidden ${c.hidden || 0}`, 'hidden')}</div></section><section class="cards">${rows || '<div class="card"><h2>No product found</h2></div>'}</section>`, 'merchant'));
+    res.send(page('Product / Menu Manager', `<section class="card app-hero"><h1>Product / Menu Manager</h1><p>Shop: ${esc(m.shop_name || '')}</p><div class="actions"><a class="btn secondary" href="https://merchant.govoexpress.com/merchant/login">Dashboard</a><a class="btn secondary" href="/shop/${encodeURIComponent(m.id)}">View Public Shop</a><a class="btn secondary" href="/merchant/logout">Logout</a></div></section><section class="card"><h2>Add Product</h2><form method="POST" action="/merchant/products/create" enctype="multipart/form-data"><label>Product/Menu Name</label><input name="name" required><label>Price</label><input name="price" placeholder="120"><label>Category</label><input name="category" placeholder="Food / Grocery / Service"><label>Description</label><textarea name="description"></textarea><label>Status</label><select name="stock_status"><option>available</option><option>out_of_stock</option><option>hidden</option></select><label>Upload Image</label><input type="file" name="product_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Image URL</label><input name="image_url" placeholder="Optional image URL"><button>Add Product</button></form></section><section class="card"><div class="toolbar">${filterLink(`All ${c.total || 0}`, 'all')}${filterLink(`Available ${c.available || 0}`, 'available')}${filterLink(`Out ${c.out_of_stock || 0}`, 'out_of_stock')}${filterLink(`Hidden ${c.hidden || 0}`, 'hidden')}</div></section><section class="cards">${rows || '<div class="card"><h2>No product found</h2></div>'}</section>`, 'merchant'));
   } catch (e) { next(e); }
 });
 
@@ -5152,15 +5518,17 @@ app.all('/merchant/orders', async (req, res, next) => {
     if (req.method === 'POST') {
       let status = String(req.body.status || 'accepted').trim().toLowerCase();
       if (status === 'merchant_confirmed') status = 'accepted';
-      if (!['accepted', 'preparing', 'ready', 'rejected'].includes(status)) status = 'accepted';
-      const updated = await pool.query(`UPDATE govo_orders SET status=$1, merchant_status=$1, merchant_note=$2, updated_at=NOW() WHERE id=$3 AND (merchant_lead_id=$4 OR merchant_phone=$5 OR merchant_phone=$6 OR shop_name=$7) RETURNING *`, [status, String(req.body.merchant_note || ''), String(req.body.id || ''), m.id, m.phone || '', m.whatsapp || '', m.shop_name || '']);
+      if (!['accepted', 'preparing', 'ready', 'rejected'].includes(status)) return res.status(400).send('Invalid merchant status.');
+      const updated = await pool.query(`UPDATE govo_orders SET status=$1, merchant_status=$1, merchant_note=$2, updated_at=NOW() WHERE id=$3 AND (merchant_id=$4 OR merchant_lead_id=$4 OR (merchant_id IS NULL AND merchant_lead_id IS NULL AND (($5<>'' AND merchant_phone=$5) OR ($6<>'' AND merchant_phone=$6)))) AND status NOT IN ('picked_up','on_the_way','delivered','cancelled','rejected','completed') RETURNING *`, [status, String(req.body.merchant_note || ''), String(req.body.id || ''), m.id, m.phone || '', m.whatsapp || '']);
+      if (!updated.rows.length) return res.status(409).send('Order unavailable, not owned by your account, or action no longer valid.');
       if (updated.rows.length) {
         const x = updated.rows[0];
+      await recordOrderEvent(x.id, 'merchant_status', status, String(req.body.merchant_note || ''), 'merchant', m.shop_name || 'Merchant');
         sendTelegram(['GOVO Merchant Order Update', '', `Order ID: #${x.id}`, `Shop: ${x.shop_name || ''}`, `Status: ${String(x.status || '').toUpperCase()}`, `Merchant Note: ${x.merchant_note || 'N/A'}`, `Customer: ${x.customer_name || ''}`, `Drop: ${x.drop_location || ''}`, `Item: ${x.item_details || ''}`].join('\n')).catch(() => {});
       }
       return res.redirect(`/merchant/orders?phone=${encodeURIComponent(phone)}`);
     }
-    const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_phone=$1 OR merchant_phone=$2 OR shop_name=$3 ORDER BY id DESC LIMIT 100`, [m.phone || '', m.whatsapp || '', m.shop_name || '']);
+    const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_id=$3 OR merchant_lead_id=$3 OR (merchant_id IS NULL AND merchant_lead_id IS NULL AND (($1<>'' AND merchant_phone=$1) OR ($2<>'' AND merchant_phone=$2))) ORDER BY id DESC LIMIT 100`, [m.phone || '', m.whatsapp || '', m.id]);
     const cards = orders.rows.map((x) => `<div class="card"><div class="actions" style="justify-content:space-between"><h2>#${esc(x.id)} ${esc(x.customer_name || '')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Phone</b><span>${esc(x.customer_phone)}</span></div><div><b>Drop</b><span>${esc(x.drop_location)}</span></div><div><b>Item</b><span>${esc(x.item_details)}</span></div><div><b>Rider</b><span>${esc(x.rider_name || 'Not assigned')}</span></div></div><form method="POST" action="/merchant/orders"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="merchant_note" placeholder="Merchant note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="preparing">Preparing</button><button name="status" value="ready">Ready</button></div></form></div>`).join('');
     res.send(page('Merchant Orders', `<section class="card"><h1>Merchant Orders</h1><p>Shop: ${esc(m.shop_name || '')}</p></section><section class="cards">${cards || '<div class="card"><h2>No orders found</h2></div>'}</section>`, 'merchant'));
   } catch (e) { next(e); }
@@ -5185,7 +5553,8 @@ app.all('/rider/dashboard', async (req, res, next) => {
       const status = String(req.body.status || '').trim().toLowerCase();
       if (!isApproved) return res.status(403).send(page('Rider Pending', `<section class="card"><h1>Approval Required</h1><p>Your rider profile is ${esc(rd.status)}. GOVO admin must approve the rider before order updates.</p><a class="btn secondary" href="/rider/dashboard?phone=${encodeURIComponent(phone)}">Back Dashboard</a></section>`, 'rider'));
       if (!allowed.includes(status)) return res.status(400).send(page('Invalid Status', `<section class="card"><h1>Invalid rider action</h1><a class="btn secondary" href="/rider/dashboard?phone=${encodeURIComponent(phone)}">Back Dashboard</a></section>`, 'rider'));
-      const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_id=$4 OR assigned_rider_id=$4 OR rider_phone=$5 OR assigned_rider_phone=$5) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), rd.id, phone]);
+      const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_id=$4 OR assigned_rider_id=$4 OR ($5<>'' AND (rider_phone=$5 OR assigned_rider_phone=$5))) AND (($1='picked_up' AND status IN ('assigned','ready')) OR ($1='on_the_way' AND status='picked_up') OR ($1='delivered' AND status='on_the_way')) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), rd.id, phone]);
+      if (!updated.rows.length) return res.status(409).send('Order unavailable, not owned by your account, or action no longer valid.');
       if (updated.rows.length) {
         const o = updated.rows[0];
         await recordOrderEvent(o.id, 'rider_status', status, String(req.body.rider_note || ''), 'rider', rd.rider_name || rd.phone || 'Rider');
@@ -5196,7 +5565,7 @@ app.all('/rider/dashboard', async (req, res, next) => {
     const orders = await pool.query(`SELECT * FROM govo_orders WHERE rider_id=$1 OR assigned_rider_id=$1 OR rider_phone=$2 OR assigned_rider_phone=$2 ORDER BY CASE COALESCE(status,'new') WHEN 'assigned' THEN 1 WHEN 'picked_up' THEN 2 WHEN 'on_the_way' THEN 3 WHEN 'delivered' THEN 4 ELSE 5 END, id DESC LIMIT 100`, [rd.id, phone]);
     const actionButtons = (x) => `<form method="POST" action="/rider/orders/update-status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="rider_note" value="${esc(x.rider_note || '')}" placeholder="Rider note optional"><div class="three"><button name="status" value="picked_up">Picked Up</button><button name="status" value="on_the_way">On The Way</button><button name="status" value="delivered">Delivered</button></div></form>`;
     const cards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Tracking</b><span>${esc(x.order_code || orderCodeFromId(x.id))}</span></div><div><b>Order Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div></div>${isApproved ? actionButtons(x) : '<p style="color:var(--muted);font-weight:900">Rider actions unlock after admin approval.</p>'}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track Order</a></div></div>`).join('');
-    res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1>${listingImage(rd.image_url, rd.rider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(rd.rider_name || 'Rider')}</span></div><div><b>Phone</b><span>${esc(rd.whatsapp || rd.phone)}</span></div><div><b>Area</b><span>${esc(rd.area || rd.location || 'Not set')}</span></div><div><b>Status</b><span>${badge(rd.status)}</span></div><div><b>Vehicle</b><span>${esc(rd.vehicle_type || 'Not set')}</span></div><div><b>Orders</b><span>${esc(orders.rows.length)}</span></div></div><div class="actions"><a class="btn secondary" href="/rider/logout">Logout</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section><section class="card"><h2>Rider Profile</h2><form method="POST" action="/rider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Rider Name</label><input name="rider_name" value="${esc(rd.rider_name || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(rd.whatsapp || '')}"><label>Area</label><input name="area" value="${esc(rd.area || rd.location || '')}"><label>Address</label><textarea name="address">${esc(rd.address || '')}</textarea><label>Vehicle Type</label><input name="vehicle_type" value="${esc(rd.vehicle_type || '')}"><label>NID</label><input name="nid" value="${esc(rd.nid || '')}"><label><input type="checkbox" name="is_available" ${boolish(rd.is_available) ? 'checked' : ''}> Available</label><label>Profile Image</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(rd.image_url || '')}"><button>Save Profile</button></form></section><section class="card"><h2>Assigned Orders</h2><p style="color:var(--muted);font-weight:900">Next action: accept, pick up, deliver, or mark failed.</p></section><section class="cards">${cards || '<div class="card"><h2>No assigned orders</h2><p style="color:var(--muted);font-weight:900">New orders will appear here after admin dispatch.</p></div>'}</section>`, 'rider'));
+    res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1>${listingImage(rd.image_url, rd.rider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(rd.rider_name || 'Rider')}</span></div><div><b>Phone</b><span>${esc(rd.whatsapp || rd.phone)}</span></div><div><b>Area</b><span>${esc(rd.area || rd.location || 'Not set')}</span></div><div><b>Status</b><span>${badge(rd.status)}</span></div><div><b>Vehicle</b><span>${esc(rd.vehicle_type || 'Not set')}</span></div><div><b>Orders</b><span>${esc(orders.rows.length)}</span></div></div><div class="actions govo-role-quick"><a class="btn" href="/rider/jobs">Jobs</a><a class="btn secondary" href="/rider/active">Active</a><a class="btn secondary" href="/rider/history">History</a><a class="btn secondary" href="#profile">Profile</a><a class="btn secondary" href="/rider/support">Support</a><a class="btn secondary" href="/rider/logout">Logout</a><a class="btn secondary" href="https://app.govoexpress.com/app">Customer App</a></div></section><section class="card" id="profile"><h2>Rider Profile</h2><form method="POST" action="/rider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Rider Name</label><input name="rider_name" value="${esc(rd.rider_name || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(rd.whatsapp || '')}"><label>Area</label><input name="area" value="${esc(rd.area || rd.location || '')}"><label>Address</label><textarea name="address">${esc(rd.address || '')}</textarea><label>Vehicle Type</label><input name="vehicle_type" value="${esc(rd.vehicle_type || '')}"><label>NID</label><input name="nid" value="${esc(rd.nid || '')}"><label><input type="checkbox" name="is_available" ${boolish(rd.is_available) ? 'checked' : ''}> Available</label><label>Profile Image</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(rd.image_url || '')}"><button>Save Profile</button></form></section><section class="card"><h2>Assigned Orders</h2><p style="color:var(--muted);font-weight:900">Next action: accept, pick up, deliver, or mark failed.</p></section><section class="cards">${cards || '<div class="card"><h2>No assigned orders</h2><p style="color:var(--muted);font-weight:900">New orders will appear here after admin dispatch.</p></div>'}</section>`, 'rider'));
   } catch (e) { next(e); }
 });
 
@@ -5212,9 +5581,10 @@ app.post('/rider/orders/update-status', async (req, res, next) => {
       return res.status(401).send(riderLoginPage('', 'Session expired. Please login again.'));
     }
     if (String(rd.status || '').toLowerCase() !== 'approved') return res.status(403).send(page('Rider Pending', `<section class="card"><h1>Approval Required</h1><a class="btn secondary" href="/rider/dashboard">Back Dashboard</a></section>`, 'rider'));
-    const status = cleanOrderStatus(req.body.status, 'picked_up');
+    const status = String(req.body.status || '').trim().toLowerCase();
     if (!['picked_up', 'on_the_way', 'delivered'].includes(status)) return res.status(400).send(page('Invalid Status', `<section class="card"><h1>Invalid rider action</h1><a class="btn secondary" href="/rider/dashboard">Back Dashboard</a></section>`, 'rider'));
-    const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_id=$4 OR assigned_rider_id=$4 OR rider_phone=$5 OR assigned_rider_phone=$5) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), rd.id, rd.phone || '']);
+    const updated = await pool.query(`UPDATE govo_orders SET status=$1, rider_note=$2, updated_at=NOW() WHERE id=$3 AND (rider_id=$4 OR assigned_rider_id=$4 OR ($5<>'' AND (rider_phone=$5 OR assigned_rider_phone=$5))) AND (($1='picked_up' AND status IN ('assigned','ready')) OR ($1='on_the_way' AND status='picked_up') OR ($1='delivered' AND status='on_the_way')) RETURNING *`, [status, String(req.body.rider_note || ''), String(req.body.id || ''), rd.id, rd.phone || '']);
+    if (!updated.rows.length) return res.status(409).send('Order unavailable, not owned by your account, or action no longer valid.');
     if (updated.rows.length) {
       const o = updated.rows[0];
       await recordOrderEvent(o.id, 'rider_status', status, String(req.body.rider_note || ''), 'rider', rd.rider_name || rd.phone || 'Rider');
@@ -5453,8 +5823,9 @@ function supportContactActions() {
 
 function supportForm(data = {}, error = '') {
   const related = cleanSupportRelatedType(data.related_type || 'general');
+  const roleActive = related === 'merchant' ? 'merchant' : related === 'rider' ? 'rider' : 'track';
   const opt = (v, label) => `<option value="${v}" ${related === v ? 'selected' : ''}>${label}</option>`;
-  return page('GOVO Support', `${error ? `<section class="card"><h1>Check support details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card app-hero"><h1>GOVO Support</h1><p style="color:var(--muted)">Send order questions, service issues, complaints or follow-up messages to GOVO support.</p><form method="POST" action="/support"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}"><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || '')}"><label>Subject</label><input name="subject" value="${esc(data.subject || '')}" placeholder="Order question / complaint / follow-up"><label>Message</label><textarea name="message" required>${esc(data.message || '')}</textarea><label>Related Type</label><select name="related_type">${opt('general','general')}${opt('order','order')}${opt('service','service')}${opt('merchant','merchant')}${opt('rider','rider')}</select><label>Related Code <span style="color:var(--muted)">(optional)</span></label><input name="related_code" value="${esc(data.related_code || '')}" placeholder="GOVO-000001 / SRV-YYYYMMDD-0001"><button>Submit Support Ticket</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, 'track');
+  return page('GOVO Support', `${error ? `<section class="card"><h1>Check support details</h1><p style="color:#fecaca;font-weight:900">${esc(error)}</p></section>` : ''}<section class="card govo-flow-card"><h1>GOVO Support</h1><p style="color:var(--muted)">Send order questions, service issues, complaints or follow-up messages to GOVO support.</p><form method="POST" action="/support"><label>Your Name</label><input name="customer_name" value="${esc(data.customer_name || '')}"><label>Your Phone</label><input name="customer_phone" value="${esc(data.customer_phone || '')}" required><label>Your Area</label><input name="customer_area" value="${esc(data.customer_area || '')}"><label>Subject</label><input name="subject" value="${esc(data.subject || '')}" placeholder="Order question / complaint / follow-up"><label>Message</label><textarea name="message" required>${esc(data.message || '')}</textarea><label>Related Type</label><select name="related_type">${opt('general','general')}${opt('order','order')}${opt('service','service')}${opt('merchant','merchant')}${opt('rider','rider')}</select><label>Related Code <span style="color:var(--muted)">(optional)</span></label><input name="related_code" value="${esc(data.related_code || '')}" placeholder="GOVO-000001 / SRV-YYYYMMDD-0001"><button>Submit Support Ticket</button></form><div class="actions"><a class="btn secondary" href="https://app.govoexpress.com/track">Track</a><a class="btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section>`, roleActive);
 }
 
 app.get('/support', (req, res) => {
@@ -5594,7 +5965,7 @@ function pilotContact() {
 }
 
 app.get('/pilot', (req, res) => {
-  res.send(page('GOVO Pilot', `<section class="card app-hero"><span class="pill">Pilot Launch</span><h1>GOVO Express Pilot — Meherpur Super App</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Customers can order from shops, request services, and track status. Merchants can list products, providers can receive jobs, and riders can handle delivery.</p><div class="actions"><a class="btn" href="https://app.govoexpress.com/app">Open App</a><a class="btn secondary" href="https://merchant.govoexpress.com/merchant">Join Merchant</a><a class="btn secondary" href="https://merchant.govoexpress.com/provider">Join Provider</a><a class="btn secondary" href="https://rider.govoexpress.com/rider">Join Rider</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track Order</a>${pilotContact()}</div></section><section class="grid"><div class="card"><h2>Customers</h2><p>Order food/products, request services, and track delivery/service status from one GOVO app.</p></div><div class="card"><h2>Merchants</h2><p>Create shop profile, add products, receive orders, and update order status.</p></div><div class="card"><h2>Providers</h2><p>Show service profile, trust badges, emergency availability, and receive requests.</p></div><div class="card"><h2>Riders</h2><p>Get assigned orders and update accept, picked up, delivered or failed status.</p></div></section>${shareCards()}`, 'app'));
+  res.send(page('GOVO Pilot', `<section class="card app-hero"><span class="pill">Pilot Launch</span><h1>GOVO Express Pilot — Meherpur Super App</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Customers can order from shops, request services, and track status. Merchants can list products, providers can receive jobs, and riders can handle delivery.</p><div class="actions"><a class="btn" href="https://app.govoexpress.com/app">Open App</a><a class="btn secondary" href="https://merchant.govoexpress.com/merchant">Join Merchant</a><a class="btn secondary" href="https://merchant.govoexpress.com/provider">Join Provider</a><a class="btn secondary" href="https://rider.govoexpress.com/rider/register">Join Rider</a><a class="btn secondary" href="https://app.govoexpress.com/track">Track Order</a>${pilotContact()}</div></section><section class="grid"><div class="card"><h2>Customers</h2><p>Order food/products, request services, and track delivery/service status from one GOVO app.</p></div><div class="card"><h2>Merchants</h2><p>Create shop profile, add products, receive orders, and update order status.</p></div><div class="card"><h2>Providers</h2><p>Show service profile, trust badges, emergency availability, and receive requests.</p></div><div class="card"><h2>Riders</h2><p>Get assigned orders and update accept, picked up, delivered or failed status.</p></div></section>${shareCards()}`, 'app'));
 });
 
 app.get('/pilot/merchant', (req, res) => {
@@ -5606,7 +5977,7 @@ app.get('/pilot/provider', (req, res) => {
 });
 
 app.get('/pilot/rider', (req, res) => {
-  res.send(page('Rider Pilot', `<section class="card app-hero"><h1>GOVO Rider Pilot</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Earn from delivery work with assigned orders and simple mobile status updates.</p><div class="actions"><a class="btn" href="https://rider.govoexpress.com/rider">Register Rider</a><a class="btn secondary" href="/pilot">Pilot Home</a></div></section><section class="card"><h2>Benefits</h2>${steps([['Delivery Earning','Receive delivery assignments from GOVO admin.'],['Assigned Orders','See pickup, delivery, customer and item details.'],['Simple Updates','Accept, picked up, delivered or failed buttons.']])}</section><section class="card"><h2>Required Info</h2><p>Name, phone, area, vehicle type.</p></section><section class="card"><h2>How It Works</h2>${steps([['Register','Submit rider details.'],['Admin Approve','GOVO approves rider profile.'],['Receive Assigned Orders','Admin dispatches orders to rider.'],['Deliver','Update delivery status from mobile dashboard.']])}</section>${shareCards()}`, 'rider'));
+  res.send(page('Rider Pilot', `<section class="card app-hero"><h1>GOVO Rider Pilot</h1><p style="color:var(--muted);font-size:16px;line-height:1.55">Earn from delivery work with assigned orders and simple mobile status updates.</p><div class="actions"><a class="btn" href="https://rider.govoexpress.com/rider/register">Register Rider</a><a class="btn secondary" href="/pilot">Pilot Home</a></div></section><section class="card"><h2>Benefits</h2>${steps([['Delivery Earning','Receive delivery assignments from GOVO admin.'],['Assigned Orders','See pickup, delivery, customer and item details.'],['Simple Updates','Accept, picked up, delivered or failed buttons.']])}</section><section class="card"><h2>Required Info</h2><p>Name, phone, area, vehicle type.</p></section><section class="card"><h2>How It Works</h2>${steps([['Register','Submit rider details.'],['Admin Approve','GOVO approves rider profile.'],['Receive Assigned Orders','Admin dispatches orders to rider.'],['Deliver','Update delivery status from mobile dashboard.']])}</section>${shareCards()}`, 'rider'));
 });
 
 app.get('/app', async (req, res, next) => {
@@ -5864,7 +6235,6 @@ function publicServiceTrackingPayload(request) {
     status: e.status ? serviceStatusPublicKey(e.status) : '',
     label: e.status ? serviceStatusLabel(e.status) : String(e.event_type || 'Event'),
     bangla: e.status ? serviceStatusBangla(e.status) : '',
-    note: e.note || '',
     timestamp: e.created_at || null}));
   return {
     code,
@@ -6616,7 +6986,7 @@ app.get('/admin/dispatch', async (req, res, next) => {
     res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
     res.set('Cache-Control', 'private, no-store');
     const items = await govoDispatchReadOnlyRequests();
-    res.send(govoDispatchRender(items));
+    res.send(govoRoleOsShell(govoDispatchRender(items), 'admin', 'Dispatch Inbox', {header:renderV28Header({role:'admin',logo:govoInlineLogoMark(),adminNav:adminNav('admin'),themeToggle:themeToggle()})}));
   } catch (err) {
     next(err);
   }
@@ -6891,7 +7261,7 @@ app.get('/admin/merchant-jobs-preview', async (req, res, next) => {
     res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
     res.set('Cache-Control', 'private, no-store');
     const items = await govoRoleReadOnlyRequests();
-    res.send(govoRoleRenderJobs('merchant', items));
+    res.send(govoRoleOsShell(govoRoleRenderJobs('merchant', items), 'admin', 'Merchant Jobs Preview', {header:renderV28Header({role:'admin',logo:govoInlineLogoMark(),adminNav:adminNav('admin'),themeToggle:themeToggle()})}));
   } catch (err) {
     next(err);
   }
@@ -6934,7 +7304,7 @@ app.get('/admin/rider-jobs-preview', async (req, res, next) => {
     res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
     res.set('Cache-Control', 'private, no-store');
     const items = await govoRoleReadOnlyRequests();
-    res.send(govoRoleRenderJobs('rider', items));
+    res.send(govoRoleOsShell(govoRoleRenderJobs('rider', items), 'admin', 'Rider Jobs Preview', {header:renderV28Header({role:'admin',logo:govoInlineLogoMark(),adminNav:adminNav('admin'),themeToggle:themeToggle()})}));
   } catch (err) {
     next(err);
   }
@@ -7063,33 +7433,9 @@ function govoOpsTemplateSet() {
 }
 
 function govoOpsShell(title, inner) {
-  return `<!doctype html>
-<html lang="bn">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${govoOpsSafe(title)}</title>
-<style>
-  :root{--green:#073f32;--green2:#0b5a46;--gold:#d8b46a;--ivory:#fffaf0;--ink:#10231d;--muted:#66756e}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Noto Sans Bengali,sans-serif;background:linear-gradient(135deg,#061512,#0b3d31);color:var(--ivory)}
-  .wrap{max-width:1100px;margin:auto;padding:22px}
-  .hero{border:1px solid rgba(216,180,106,.35);border-radius:24px;padding:22px;background:rgba(255,255,255,.06);box-shadow:0 18px 50px rgba(0,0,0,.25)}
-  .hero h1{margin:0 0 8px;font-size:28px}
-  .hero p{margin:0;color:#dce8df}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:18px}
-  .card{background:var(--ivory);color:var(--ink);border-radius:22px;padding:16px;border:1px solid rgba(216,180,106,.5)}
-  .card h2,.card h3{margin:0 0 8px;color:var(--green)}
-  .metric{font-size:32px;font-weight:1000;color:var(--green)}
-  .muted{color:var(--muted)}
-  pre{white-space:pre-wrap;background:#f4efe3;border-radius:14px;padding:12px;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  table{width:100%;border-collapse:collapse;margin-top:10px;background:var(--ivory);color:var(--ink);border-radius:18px;overflow:hidden}
-  th,td{padding:11px;border-bottom:1px solid #eadfca;text-align:left}
-  th{background:#f4efe3;color:var(--green)}
-  a.btn{display:inline-block;background:var(--green);color:white;text-decoration:none;padding:11px 14px;border-radius:14px;font-weight:900;margin-top:12px}
-</style>
-</head>
-<body><main class="wrap">${inner}</main></body></html>`;
+  return page(title, inner, 'admin');
 }
+
 
 function govoOpsRenderTemplates() {
   const templates = govoOpsTemplateSet();
@@ -7600,7 +7946,7 @@ function merchantOnboardingPage() {
         <h1 class="govo-display">Grow with GOVO<span class="dot">.</span></h1>
         <p class="govo-lead">Register your shop. GOVO admin approve korle customer app-e show korbe.</p>
         <div class="govo-actions">
-          <a class="govo-btn" href="/dashboard">Merchant Login</a>
+          <a class="govo-btn" href="/merchant/login">Merchant Login</a>
           <a class="govo-btn secondary" href="https://app.govoexpress.com/shops">View Shops</a>
         </div>
       </section>
@@ -7618,7 +7964,7 @@ function merchantOnboardingPage() {
             <label>Location <input name="location" required placeholder="Meherpur / Gangni"></label>
             <label>Category <select name="category"><option>Restaurant</option><option>Grocery</option><option>Pharmacy</option><option>Fashion</option><option>Electronics</option><option>Service Provider</option><option>Other</option></select></label>
             <label>Delivery Needed? <select name="delivery_needed"><option>Yes</option><option>No</option><option>Later</option></select></label>
-            <div class="govo-actions full"><button type="submit">Submit Merchant Info</button><a class="govo-btn secondary" href="/dashboard">Already registered?</a></div>
+            <div class="govo-actions full"><button type="submit">Submit Merchant Info</button><a class="govo-btn secondary" href="/merchant/login">Already registered?</a></div>
           </form>
         </div>
       </section>
@@ -7635,7 +7981,7 @@ app.get('/merchant/onboarding', (req, res) => {
 });
 
 app.get('/merchant/support', (req, res) => {
-  res.send(supportForm({ ...(req.query || {}), related_type: 'merchant' }));
+  res.send(govoRoleOsShell(supportForm({ ...(req.query || {}), related_type: 'merchant' }), 'merchant', 'Merchant Support', {header:renderV28Header({role:'merchant',logo:govoInlineLogoMark(),themeToggle:themeToggle()})}));
 });
 
 app.get('/merchant/not-found', (req, res) => {
@@ -7647,7 +7993,7 @@ app.get('/rider/login', (req, res) => {
 });
 
 app.get('/rider/onboarding', (req, res) => {
-      res.send(govoPremiumFlowShellInject(page('Rider Onboarding', `<section class="govo-premium-hero"><span class="govo-kicker">Rider Network</span><h1 class="govo-display">Join GOVO Today<span class="dot">.</span></h1><p class="govo-lead">Become a GOVO rider and start earning. Fill in your details and we will get back to you.</p><div class="govo-actions"><a class="govo-btn" href="/rider/login">Rider Login</a><a class="govo-btn secondary" href="/app">Back to App</a></div></section><section class="govo-grid"><div class="govo-premium-panel"><div class="govo-section-head"><h2>GOVO Rider Registration</h2><span class="pill">Apply</span></div><p class="govo-form-note">Your delivery information</p><form method="POST" action="/rider" enctype="multipart/form-data" class="govo-form-grid"><label>Rider Name <input name="rider_name" required placeholder="Rider name"></label><label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label><label>Location <select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select></label><label>Vehicle Type <select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select></label><label>Experience <textarea name="experience" placeholder="Previous delivery experience"></textarea></label><label>NID Number <input name="nid_number" inputmode="numeric" placeholder="NID number"></label><label>Driving License <input name="driving_license" placeholder="License number (optional)"></label><label>Rider Photo <input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp" capture="user" required><small class="govo-form-note">Camera ba Gallery theke clear face photo upload korun. Max 3MB.</small></label><div class="govo-actions full"><button type="submit">Submit Rider Info</button><a class="govo-btn secondary" href="/rider/login">Already registered?</a></div></form></div></div></section>`, 'rider')));
+      res.send(govoPremiumFlowShellInject(page('Rider Onboarding', `<section class="govo-premium-hero"><span class="govo-kicker">Rider Network</span><h1 class="govo-display">Join GOVO Today<span class="dot">.</span></h1><p class="govo-lead">Become a GOVO rider and start earning. Fill in your details and we will get back to you.</p><div class="govo-actions"><a class="govo-btn" href="/rider/login">Rider Login</a><a class="govo-btn secondary" href="https://app.govoexpress.com/app">Back to App</a></div></section><section class="govo-grid"><div class="govo-premium-panel"><div class="govo-section-head"><h2>GOVO Rider Registration</h2><span class="pill">Apply</span></div><p class="govo-form-note">Your delivery information</p><form method="POST" action="/rider" enctype="multipart/form-data" class="govo-form-grid"><label>Rider Name <input name="rider_name" required placeholder="Rider name"></label><label>Phone <input name="phone" required placeholder="01XXXXXXXXX"></label><label>Location <select name="location"><option>Meherpur</option><option>Gangni</option><option>Bamundi</option><option>Mujibnagar</option><option>Amjhupi</option></select></label><label>Vehicle Type <select name="vehicle_type"><option>Bike</option><option>Cycle</option><option>Auto</option><option>Other</option></select></label><label>Experience <textarea name="experience" placeholder="Previous delivery experience"></textarea></label><label>NID Number <input name="nid_number" inputmode="numeric" placeholder="NID number"></label><label>Driving License <input name="driving_license" placeholder="License number (optional)"></label><label>Rider Photo <input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp" capture="user" required><small class="govo-form-note">Camera ba Gallery theke clear face photo upload korun. Max 3MB.</small></label><div class="govo-actions full"><button type="submit">Submit Rider Info</button><a class="govo-btn secondary" href="/rider/login">Already registered?</a></div></form></div></div></section>`, 'rider')));
 
 });
 
@@ -7669,12 +8015,12 @@ app.get(['/rider/jobs', '/rider/active', '/rider/history'], async (req, res, nex
     const selected = (statusMap[cleanPath] || []).map((s) => s.toLowerCase());
     const orders = allOrders.rows.filter((x) => !selected.length || selected.includes(String(x.status || '').toLowerCase()));
     const cards = orders.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery</b><span>${esc(x.drop_location)}</span></div><div><b>Tracking</b><span>${esc(x.order_code || orderCodeFromId(x.id))}</span></div></div></div>`).join('');
-    res.send(page(titleMap[cleanPath] || 'Rider Jobs', `<section class="card app-hero"><h1>${esc(titleMap[cleanPath] || 'Rider Jobs')}</h1><p class="form-hint">Rider: ${esc(rd.rider_name || 'Rider')} (${esc(rd.status || 'pending')})</p><div class="actions"><a class="btn secondary" href="/dashboard">Dashboard</a><a class="btn secondary" href="/jobs">Jobs</a><a class="btn secondary" href="/active">Active</a><a class="btn secondary" href="/history">History</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider records found</h2><p style="color:var(--muted);font-weight:900">Assigned work will appear here.</p></div>'}</section>`, 'rider'));
+    res.send(page(titleMap[cleanPath] || 'Rider Jobs', `<section class="card app-hero"><h1>${esc(titleMap[cleanPath] || 'Rider Jobs')}</h1><p class="form-hint">Rider: ${esc(rd.rider_name || 'Rider')} (${esc(rd.status || 'pending')})</p><div class="actions"><a class="btn secondary" href="/rider/dashboard">Dashboard</a><a class="btn secondary" href="/rider/jobs">Jobs</a><a class="btn secondary" href="/rider/active">Active</a><a class="btn secondary" href="/rider/history">History</a><a class="btn secondary" href="/rider/dashboard#profile">Profile</a><a class="btn secondary" href="/rider/support">Support</a></div></section><section class="cards">${cards || '<div class="card"><h2>No rider records found</h2><p style="color:var(--muted);font-weight:900">Assigned work will appear here.</p></div>'}</section>`, 'rider'));
   } catch (e) { next(e); }
 });
 
 app.get('/rider/support', (req, res) => {
-  res.send(supportForm({ ...(req.query || {}), related_type: 'rider' }));
+  res.send(govoRoleOsShell(supportForm({ ...(req.query || {}), related_type: 'rider' }), 'rider', 'Rider Support', {header:renderV28Header({role:'rider',logo:govoInlineLogoMark(),themeToggle:themeToggle()})}));
 });
 
 app.get('/rider/not-found', (req, res) => {
@@ -7693,17 +8039,27 @@ app.get('/admin/not-found', (req, res) => {
 // GOVO flow API v17: shops/services/orders + delivery, merchant/rider join, join-status, cancel (market-ready 2026-07-18)
 require("./govo_flow_api_v17")(app, { pool, sendTelegram, requireAdmin });
 
+// GOVO V32 customer UI error boundary; API methods and role authentication are untouched.
+app.use((req, res, next) => {
+  if (req.hostname !== 'app.govoexpress.com' || !['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+  const planned = {'/login':'Customer Sign In','/register':'Customer Registration','/profile':'Customer Profile','/addresses':'Saved Addresses','/payments':'Payment Methods','/refer':'Refer & Earn','/about':'About GOVO','/privacy':'Privacy Policy','/terms':'Terms & Conditions'};
+  const title = planned[req.path] || 'Page Not Found';
+  const message = planned[req.path] ? 'This page is not available yet. You can browse local shops, track an existing request or contact support.' : 'We could not find this page. Choose a service from GOVO Home or ask support for help.';
+  return res.status(404).send(govoV20Pages.shell(title, '', `<section class="v20-hero"><span class="v20-kicker">${planned[req.path]?'Not available yet':'404'}</span><h1>${esc(title)}</h1><p>${message}</p><div class="v20-actions"><a class="v20-btn" href="/app">Back to Home</a><a class="v20-btn secondary" href="/support">Get Help</a></div></section>`));
+});
+
 app.use((err, req, res, next) => {
   console.error('GOVO error:', err);
   res.status(500).send(page('Server Error', `<section class="card"><h1>Server Error</h1><p>${esc(err.message || 'Unknown error')}</p></section>`));
 });
 
-ensureSchema().then(() => {
+// Existing production schema can be preserved during a code-only rollout.
+(process.env.GOVO_SKIP_SCHEMA_INIT === '1' ? Promise.resolve() : ensureSchema()).then(() => {
 
 
 
 
-
+  
 
 app.listen(PORT, () => console.log('GOVO Express v1.0 clean running on', PORT));
 }).catch((e) => {
