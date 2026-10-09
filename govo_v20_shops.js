@@ -28,7 +28,7 @@ function trustLine(x) {
 }
 
 function loadingScript() {
-  return `<script>(function(){document.querySelectorAll('form[data-v20-loading]').forEach(function(f){f.addEventListener('submit',function(){var b=f.querySelector('button[type="submit"],button:not([type])');if(b){b.disabled=true;b.textContent='Searching…';}});});})();</script>`;
+  return `<script>(function(){document.querySelectorAll('form[method="GET"][data-v20-loading]').forEach(function(f){var button=f.querySelector('button[type="submit"],button:not([type])');var text=button&&button.textContent;addEventListener('pageshow',function(){if(button){button.disabled=false;button.textContent=text;}});f.addEventListener('submit',function(){var b=f.querySelector('button[type="submit"],button:not([type])');if(b){b.disabled=true;b.textContent='Searching…';}});});})();</script>`;
 }
 
 function searchHero(kicker, title, sub, action, q, placeholder, extraButtons) {
@@ -120,6 +120,17 @@ function filterSelect(name, label, value, options) {
   return `<label class="v20-filter-field"><span>${esc(label)}</span><select name="${esc(name)}">${options.map(([v,t]) => `<option value="${esc(v)}"${String(value) === String(v) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
 }
 
+const SHOPS_FIRST_CSS = "html body.govo-v32-ui .v33-marketplace.v33-marketplace .v33-market-head.v20-hero{padding:16px!important;margin-bottom:12px;border-radius:22px!important}\nhtml body.govo-v32-ui .v33-marketplace.v33-marketplace .v33-market-head.v20-hero h1{font-size:28px!important;line-height:1.2!important;margin:0 0 5px!important;letter-spacing:-.025em!important}\nhtml body.govo-v32-ui .v33-marketplace .v33-market-head p{font-size:14px;margin:0 0 12px;line-height:1.45;color:var(--muted)}\n.v33-market-head .v33-search-line{display:flex;gap:8px;align-items:stretch}.v33-market-head .v20-search{flex:1;min-width:0;margin:0!important;padding:9px 12px!important;border-radius:14px!important;gap:9px!important}.v33-market-head .v20-search input{min-height:26px!important;padding:0!important;border:0!important;background:transparent!important;width:100%;font-size:14px!important}.v33-market-head .v20-search svg{width:23px;height:23px;flex:none}.v33-search-line .v20-btn{padding:10px 14px!important;min-width:74px}\n.v33-market-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;position:relative;margin:0 0 10px}.v33-market-tools .v20-tabs{gap:6px;padding:0;overflow:visible}.v33-market-tools .v20-tabs a{padding:10px 13px;font-size:13px;min-height:42px;display:flex;align-items:center}\n.v33-filters>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);font-weight:800;font-size:13px;white-space:nowrap}.v33-filters>summary::-webkit-details-marker{display:none}.v33-filters>summary svg{width:20px;height:20px}.v33-filter-count{min-width:18px;height:18px;padding:0 4px;border-radius:6px;background:#39E75F;color:#073525;display:grid;place-items:center;font-size:11px}\nhtml body.govo-v32-ui .v33-marketplace .v33-filters .v20-filter-panel{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:45;grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:16px;margin:0;background:#102b34!important;border:1px solid var(--line);box-shadow:0 14px 32px #0006;border-radius:20px;gap:12px}.v33-filter-actions{grid-column:1/-1;display:flex;gap:8px}.v33-filters label span{font-size:12px}.v33-filters select{width:100%;padding:10px 8px}.v33-filters summary:focus-visible{outline:3px solid #19CFF0;outline-offset:3px}\n.v33-marketplace>.v20-section{margin:12px 0 10px}.v33-marketplace .v20-section h2{font-size:18px}\n.v33-shop-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:20px}\nhtml body.govo-v32-ui .v33-marketplace .v33-shop-card.v20-rowcard{display:flex;flex-direction:column;gap:0!important;padding:0!important;overflow:hidden;border-radius:22px!important;align-items:stretch}\n.v33-shop-cover{display:flex;flex-direction:column;justify-content:center;align-items:center;height:180px;position:relative;background:linear-gradient(135deg,#164b40,#0d354b);border-bottom:1px solid var(--line);text-decoration:none;overflow:hidden}\nhtml body.govo-v32-ui .v33-marketplace .v33-shop-cover .v20-thumb{width:100%!important;height:180px!important;min-height:180px;border:0!important;border-radius:0!important;object-fit:cover!important;background:transparent!important;margin:0!important}\nhtml body.govo-v32-ui .v33-marketplace .v33-shop-cover span.v20-thumb{height:126px!important;min-height:126px;font-size:24px;font-weight:850;color:var(--text)}\n.v33-shop-cover .v20-thumb svg{width:82px!important;height:82px!important}.v33-photo-empty{color:#a8c8c9;font-size:12px;position:absolute;bottom:16px;pointer-events:none}\n.v33-shop-card .v20-rowbody{padding:14px 16px 16px;width:100%;min-width:0}.v33-shop-card .v20-rowtitle{align-items:flex-start;gap:8px}.v33-shop-card .v20-rowtitle h3{white-space:normal;overflow:visible;overflow-wrap:anywhere;font-size:18px!important;line-height:1.3;margin:0}.v33-shop-card .v20-pill{flex:none;max-width:42%;white-space:normal;text-align:center;font-size:11px}\n.v33-shop-card .v20-meta{font-size:13px;line-height:1.5;overflow-wrap:anywhere;margin-top:5px}.v33-shop-card .v20-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.v33-shop-card .v20-actions .v20-btn{min-height:44px;font-size:13px!important;padding:9px 13px!important}.v33-shop-card .v20-actions .v20-btn:first-child{flex:1}.v33-marketplace .v20-market-stats{margin:18px 0}.v33-marketplace .v20-market-stats a{min-height:60px}.v33-marketplace .v20-market-stats b{font-size:20px}\nhtml[data-theme=light] body.govo-v32-ui .v33-marketplace .v33-filters .v20-filter-panel{background:#fafffd!important;box-shadow:0 12px 28px #245b4226}\nhtml[data-theme=light] .v33-shop-cover{background:linear-gradient(135deg,#d6f4e8,#d9eef5)}html[data-theme=light] .v33-photo-empty{color:#56706c}\n@media(max-width:350px){html body.govo-v32-ui .v33-marketplace.v33-marketplace .v33-market-head.v20-hero h1{font-size:26px!important}.v33-market-tools .v20-tabs a{padding:10px 10px;font-size:12px}.v33-filters>summary{padding:10px 9px;gap:4px}.v33-search-line .v20-btn{padding:10px 12px!important;min-width:68px}}\n@media(min-width:600px){.v33-shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.v33-shop-cover,html body.govo-v32-ui .v33-marketplace .v33-shop-cover .v20-thumb{height:210px!important;min-height:210px}.v33-market-tools .v20-tabs a{padding:10px 18px}}\n@media(min-width:1000px){.v33-shop-grid{grid-template-columns:repeat(3,minmax(0,1fr))}html body.govo-v32-ui .v33-marketplace .v33-filters .v20-filter-panel{grid-template-columns:repeat(5,minmax(0,1fr))!important}.v33-shop-cover,html body.govo-v32-ui .v33-marketplace .v33-shop-cover .v20-thumb{height:190px!important;min-height:190px}}\n";
+
+function marketplaceMerchantCard(x, index) {
+  const phone = String(x.whatsapp || x.phone || '').trim();
+  const detail = '/shop/' + encodeURIComponent(x.id);
+  let photo = imgThumb(x.image_url, x.shop_name, 'shops');
+  const noPhoto = photo.startsWith('<span');
+  if(index === 0) photo = photo.replace('loading="lazy"', 'loading="eager" fetchpriority="high"');
+  return `<article class="v20-rowcard v33-shop-card"><a class="v33-shop-cover" href="${detail}" aria-label="View ${esc(x.shop_name || 'GOVO Shop')}">${photo}${noPhoto ? '<small class="v33-photo-empty">Shop photo coming soon</small>' : ''}</a><div class="v20-rowbody"><div class="v20-rowtitle"><h3>${esc(x.shop_name || 'GOVO Shop')}</h3><span class="v20-pill">${esc(x.category || 'Shop')}</span></div><div class="v20-meta">${esc(x.shop_address || x.location || 'Meherpur')}${phone ? ` · ${esc(phone)}` : ''}</div>${trustLine(x)}<div class="v20-actions"><a class="v20-btn" href="${detail}">View Shop</a><a class="v20-btn secondary" href="/order?shop=${encodeURIComponent(x.shop_name || '')}">Order</a>${phone ? `<a class="v20-btn secondary" href="tel:${esc(phone)}">Call</a>` : ''}</div></div></article>`;
+}
+
 function shopsPage(opts) {
   const q = String((opts && opts.q) || '');
   const type = String((opts && opts.type) || 'all');
@@ -137,47 +148,48 @@ function shopsPage(opts) {
     .concat(cats.map((c) => [String(c.title || ''), `${c.icon || ''} ${c.title || ''}`]))
     .concat(serviceCats.map((c) => [String(c.title || ''), `${c.icon || ''} ${c.title || ''}`]));
   const areaOptions = [['','All areas']].concat(areas.map((x) => [x,x]));
-  const body = `
-<section class="v20-hero">
-  <span class="v20-kicker">GOVO Marketplace</span>
+  const activeFilters = [category, area, availability, sort !== 'newest' ? sort : ''].filter(Boolean).length;
+  const body = `<style>${SHOPS_FIRST_CSS}</style><div class="v33-marketplace">
+<section class="v20-hero v33-market-head">
   <h1>Shops & Services</h1>
-  <p>Find every approved local shop, product and trusted service provider from one public marketplace.</p>
+  <p>Browse approved local shops and trusted services.</p>
   <form method="GET" action="/shops" data-v20-loading>
-    <div class="v20-search">${icon('search')}<input name="q" value="${esc(q)}" placeholder="Search shops, products, services or areas" autocomplete="off"></div>
+    <div class="v33-search-line"><div class="v20-search">${icon('search')}<input name="q" value="${esc(q)}" placeholder="Search shops" autocomplete="off"></div>
     <input type="hidden" name="type" value="${esc(type)}">
-    <div class="v20-actions"><button class="v20-btn" type="submit">Search Marketplace</button><a class="v20-btn secondary" href="/service-request">Request Anything</a></div>
+    <button class="v20-btn" type="submit">Search</button></div>
   </form>
 </section>
-<section class="v20-market-stats">
-  <a href="${esc(marketplaceQuery(filters,{type:'shops'}))}"><b>${rows.length}</b><span>Shops</span></a>
-  <a href="${esc(marketplaceQuery(filters,{type:'services'}))}"><b>${providers.length}</b><span>Services</span></a>
-  <a href="${esc(marketplaceQuery(filters,{type:'all'}))}"><b>${rows.length + providers.length}</b><span>All listings</span></a>
-</section>
-<div class="v20-tabs">
+
+<div class="v33-market-tools"><div class="v20-tabs">
   <a class="${type === 'all' ? 'active' : ''}" href="${esc(marketplaceQuery(filters,{type:'all'}))}">All</a>
   <a class="${type === 'shops' ? 'active' : ''}" href="${esc(marketplaceQuery(filters,{type:'shops'}))}">Shops</a>
   <a class="${type === 'services' ? 'active' : ''}" href="${esc(marketplaceQuery(filters,{type:'services'}))}">Services</a>
 </div>
-<form class="v20-filter-panel" method="GET" action="/shops" data-v20-loading>
+<details class="v33-filters" id="marketplace-filters"><summary>${icon('menu')}<span>Filters</span>${activeFilters ? `<span class="v33-filter-count">${activeFilters}</span>` : ''}</summary><form class="v20-filter-panel" method="GET" action="/shops" data-v20-loading>
   <input type="hidden" name="q" value="${esc(q)}">
   ${filterSelect('type','Listing type',type,[['all','All listings'],['shops','Shops only'],['services','Services only']])}
   ${filterSelect('category','Category',category,categoryOptions)}
   ${filterSelect('area','Area',area,areaOptions)}
   ${filterSelect('availability','Status',availability,[['','Any status'],['available','Available now'],['verified','Verified / trusted'],['emergency','Emergency available']])}
   ${filterSelect('sort','Sort by',sort,[['newest','Newest first'],['name','Name A–Z'],['rating','Highest rating']])}
-  <div class="v20-filter-actions"><button class="v20-btn" type="submit">Apply Filters</button><a class="v20-btn secondary" href="/shops">Clear</a></div>
-</form>
+  <div class="v20-filter-actions v33-filter-actions"><button class="v20-btn" type="submit">Apply Filters</button><a class="v20-btn secondary" href="/shops">Clear</a></div>
+</form></details></div>
 ${(type === 'all' || type === 'shops') ? `
 <div class="v20-section"><h2>Approved shops</h2><span class="v20-count">${rows.length}</span></div>
-<div class="v20-list">${rows.map(merchantRow).join('')}</div>
+<div class="v33-shop-grid">${rows.map(marketplaceMerchantCard).join('')}</div>
 ${rows.length ? '' : emptyState('No shops matched', 'Change the search or filters to see more approved shops.', 'Clear Filters', '/shops')}` : ''}
 ${(type === 'all' || type === 'services') ? `
 <div class="v20-section"><h2>Trusted services</h2><span class="v20-count">${providers.length}</span></div>
 <div class="v20-list">${providers.map(providerRow).join('')}</div>
 ${providers.length ? '' : emptyState('No services matched', 'Change the search or filters, or request the service directly.', 'Request a Service', '/service-request')}` : ''}
+<section class="v20-market-stats">
+  <a href="${esc(marketplaceQuery(filters,{type:'shops'}))}"><b>${rows.length}</b><span>Shops</span></a>
+  <a href="${esc(marketplaceQuery(filters,{type:'services'}))}"><b>${providers.length}</b><span>Services</span></a>
+  <a href="${esc(marketplaceQuery(filters,{type:'all'}))}"><b>${rows.length + providers.length}</b><span>All listings</span></a>
+</section>
 <section class="v20-card v20-market-cta"><h2>Cannot find what you need?</h2><p>Send one request and GOVO will match a local shop or service provider.</p><div class="v20-actions"><a class="v20-btn" href="/service-request">Request Anything</a><a class="v20-btn secondary" href="/support">Contact Support</a></div></section>
 ${(opts && opts.error) ? errorState() : ''}
-${loadingScript()}`;
+${loadingScript()}</div>`;
   return shell('GOVO Marketplace', 'shops', body);
 }
 

@@ -1,3 +1,5 @@
+const {renderHeader:renderPatternHeader}=require('./govo_header_v28');
+const {glyph}=require('./govo_ui_pattern_v32');
 const ui = require("./govo_components_v12c");
 const BRAND = require("./govo_brand_v12c");
 const DATA = require("./govo_data_v12c");
@@ -284,7 +286,7 @@ function bottomNav(active, base) {
   const nav = [
     ["home","Home","app","home"],
     ["shops","Shops","shops","shops"],
-    ["go","GOVO","ai","bolt"],
+    ["go","GOVO AI","ai","bolt"],
     ["services","Services","services","services"],
     ["account","Account","account","account"]
   ];
@@ -326,20 +328,8 @@ function shell(title, active, body, base = "") {
 </html>`;
 }
 
-function top(base, title, sub) {
-  return `
-  <header class="govo-topbar">
-    <a class="govo-icon-btn" href="${href(base,"app")}">←</a>
-    ${VISUAL.logo()}
-    <a class="govo-icon-btn" href="${href(base,"support")}">⌁</a>
-  </header>
-  <section class="flow-head">
-    <div>
-      <h1 class="flow-title">${esc(title)}</h1>
-      <p class="flow-sub">${esc(sub)}</p>
-    </div>
-  </section>`;
-}
+function patternHeader(base,back=false){return renderPatternHeader({role:'customer',surface:'v20',logo:'<img src="/uploads/govo-logo.png" alt="GOVO">',actions:(back?`<a class="v20-icon-btn" href="${href(base,'app')}" aria-label="Back to Home">←</a>`:`<a class="v20-icon-btn" href="/account#notifications" aria-label="Notifications">${glyph('bell')}</a>`)+`<a class="v20-icon-btn" href="${href(base,'more')}" aria-label="Menu">${glyph('menu')}</a>`});}
+function top(base,title,sub){return `${patternHeader(base,true)}<section class="flow-head"><div><h1 class="flow-title">${esc(title)}</h1><p class="flow-sub">${esc(sub)}</p></div></section>`;}
 
 function app(base) {
   const serviceCards = BRAND.services.map(s => `
@@ -677,15 +667,7 @@ function serviceDetailPage(base) {
 
 
 
-function appTopbar(base) {
-  return `
-    <header class="govo-topbar">
-      <a class="govo-icon-btn" href="${href(base,"more")}" aria-label="Menu">☰</a>
-      ${VISUAL.logo()}
-      <a class="govo-icon-btn" href="${href(base,"ai")}" aria-label="AI Assistant">AI</a>
-    </header>
-  `;
-}
+function appTopbar(base){return patternHeader(base);}
 
 function appScript(base) {
   const b = base || "";

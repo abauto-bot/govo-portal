@@ -22,8 +22,8 @@ function renderSupportPage(data, error) {
   const topics = [
     ['Delivery Help', 'Orders, parcels and delivery', '/order', 'delivery'],
     ['Service Help', 'Technicians and local services', '/service-request', 'services'],
-    ['Merchant Help', 'Shop registration and products', '/merchant', 'shops'],
-    ['Rider Help', 'Rider onboarding and trips', '/rider', 'account']
+    ['Merchant Help', 'Shop registration and products', 'https://merchant.govoexpress.com/merchant', 'shops'],
+    ['Rider Help', 'Rider onboarding and trips', 'https://rider.govoexpress.com/rider', 'account']
   ];
   const body = `
 <section class="v20-hero">
@@ -31,7 +31,7 @@ function renderSupportPage(data, error) {
   <h1>Need Help?</h1>
   <p>We are here to help with orders, services and anything GOVO.</p>
 </section>
-${error ? `<section class="v20-card" style="border-color:rgba(248,113,113,.5)"><h3 style="margin:0 0 4px">Check support details</h3><p style="color:#fecaca;margin:0">${esc(error)}</p></section>` : ''}
+${error ? `<section class="v20-card" role="alert" style="border-color:rgba(248,113,113,.5)"><h3 style="margin:0 0 4px">Check support details</h3><p style="color:#fecaca;margin:0">${esc(error)}</p></section>` : ''}
 <section class="v20-cta" style="margin-top:14px">
   <div style="min-width:0">
     <h3 style="margin:0 0 6px">Talk to GOVO Support</h3>

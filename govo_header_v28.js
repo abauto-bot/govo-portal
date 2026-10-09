@@ -1,3 +1,4 @@
+const {patternMarkup}=require('./govo_ui_pattern_v32');
 'use strict';
 
 const ROLE_CONFIG = Object.freeze({
@@ -36,10 +37,10 @@ function renderBrand(role, logo) {
 
 function roleLinks(role) {
   if (role === 'merchant') {
-    return '<a href="/merchant/dashboard">Dashboard</a><a href="/merchant/products">Products</a><a href="/merchant/dashboard#orders">Orders</a><a href="/merchant/logout">Logout</a>';
+    return '<a href="/merchant/dashboard">Dashboard</a><a href="/merchant/dashboard#orders">Orders</a><a href="/merchant/products">Products</a><a href="/merchant/dashboard#profile">Profile</a><a href="/merchant/support">Support</a><a href="/merchant/logout">Logout</a>';
   }
   if (role === 'rider') {
-    return '<a href="/rider/dashboard">Dashboard</a><a href="/rider/jobs">Jobs</a><a href="/rider/active">Active</a><a href="/rider/history">History</a><a href="/rider/support">Support</a>';
+    return '<a href="/rider/dashboard">Dashboard</a><a href="/rider/jobs">Jobs</a><a href="/rider/active">Active</a><a href="/rider/history">History</a><a href="/rider/dashboard#profile">Profile</a><a href="/rider/support">Support</a><a href="/rider/logout">Logout</a>';
   }
   if (role === 'provider') {
     return '<a href="/provider/dashboard">Dashboard</a><a href="/provider/dashboard#requests">Requests</a><a href="/services">Public Services</a><a href="/support">Support</a>';
@@ -53,7 +54,7 @@ function renderPortalHeader({ role, logo, adminNav = '', themeToggle = '' }) {
     <div class="govo-v28-header-row">
       ${renderBrand(role, logo)}
       <div class="govo-role-actions">
-        ${isAdmin ? themeToggle : '<a href="/support" aria-label="Support">?</a>'}
+        ${isAdmin ? themeToggle : (themeToggle + '<a href="/support" aria-label="Support">?</a>')}
         <button type="button" onclick="document.body.classList.toggle('govo-role-menu-open')" aria-label="Menu">☰</button>
       </div>
     </div>
@@ -96,11 +97,11 @@ function renderV20CustomerHeader({ logo, actions = '' }) {
 function renderHeader(options) {
   const role = ROLE_CONFIG[options.role] ? options.role : 'customer';
   if (role === 'customer' && options.surface === 'v20') {
-    return renderV20CustomerHeader(options);
+    return renderV20CustomerHeader(options)+patternMarkup();
   }
-  return role === 'customer'
+  return (role === 'customer'
     ? renderCustomerHeader(options)
-    : renderPortalHeader({ ...options, role });
+    : renderPortalHeader({ ...options, role }))+patternMarkup();
 }
 
 module.exports = {
