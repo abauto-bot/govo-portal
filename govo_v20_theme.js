@@ -363,6 +363,111 @@ html[data-theme="light"] .v23-option.active{
   box-shadow:0 0 0 2px rgba(121,185,0,.12);
 }
 
+/* GOVO UNIFIED GREEN CYAN OVERRIDE 2026-10-02 */
+:root{--bg:#031018;--bg2:#061a24;--card:#0b2230;--card2:#0f2d3a;--text:#f4fbff;--muted:#9fb5c1;--line:rgba(25,207,240,.22);--lime:#39E75F;--accent:#19CFF0;--brand:#39E75F;--brand2:#19CFF0;--brandDeep:#079dbf;--shadow:0 16px 44px rgba(0,0,0,.28)}
+html,body{background:radial-gradient(circle at 8% 0%,rgba(57,231,95,.11),transparent 30%),radial-gradient(circle at 92% 5%,rgba(25,207,240,.12),transparent 28%),linear-gradient(180deg,#031018,#020a0f 78%)}
+.v20-top{background:linear-gradient(180deg,rgba(3,16,24,.98),rgba(3,16,24,.90),rgba(3,16,24,0))}
+.v20-hero,.v20-hero.v22-hero{background:radial-gradient(circle at 86% 16%,rgba(25,207,240,.16),transparent 29%),radial-gradient(circle at 14% 0%,rgba(57,231,95,.13),transparent 32%),linear-gradient(145deg,#08262b,#061922 62%,#092d38);border-color:var(--line)}
+.v20-card,.v20-rowcard,.v22-shop-card,.v22-provider,.v22-popular,.v22-account-guest,.v22-group,.v22-trust,.v20-filter-panel,.v20-market-stats a,.v20-tabs a{border-color:var(--line);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),var(--card)}
+.v20-btn,.v22-auth-actions a{background:linear-gradient(135deg,var(--brand),var(--accent));color:#00151a}
+.v20-search,.v22-ai-search,.v20-form input,.v20-form textarea,.v20-form select,.v20-filter-field select{background:#061821;border-color:var(--line);color:var(--text)}
+.v20-nav.active,.v20-kicker,.v20-count,.v20-section>a,.v22-location svg,.v22-action .v22-iconbox,.v20-row-icon svg,.v22-popular svg{color:var(--brand)}
+.v20-nav.active{background:rgba(57,231,95,.10)}.v20-ai-orb{border-color:rgba(25,207,240,.46);background:#04131b}.v20-bottom{background:rgba(3,16,24,.96);border-color:rgba(25,207,240,.24)}
+html[data-theme="light"]{--bg:#F4F8FC;--bg2:#EAF2F7;--card:#fff;--card2:#F6FAFC;--text:#071827;--muted:#60717D;--line:rgba(7,24,39,.13);--lime:#20B94E;--accent:#0FA9C7;--brand:#20B94E;--brand2:#0FA9C7;--shadow:0 12px 30px rgba(7,24,39,.09)}
+html[data-theme="light"],html[data-theme="light"] body{background:radial-gradient(circle at 88% 2%,rgba(25,207,240,.09),transparent 28%),radial-gradient(circle at 5% 20%,rgba(57,231,95,.08),transparent 30%),linear-gradient(180deg,#F8FBFD,#F1F6F9 76%);color:var(--text)}
+html[data-theme="light"] .v20-top{background:linear-gradient(180deg,rgba(248,251,253,.99),rgba(248,251,253,.93),rgba(248,251,253,0))}
+html[data-theme="light"] .v20-hero,html[data-theme="light"] .v20-hero.v22-hero{background:radial-gradient(circle at 86% 14%,rgba(25,207,240,.14),transparent 29%),radial-gradient(circle at 12% 4%,rgba(57,231,95,.12),transparent 31%),linear-gradient(145deg,#fff,#F4FAFC 60%,#ECF8F6);color:var(--text)}
+html[data-theme="light"] .v20-card,html[data-theme="light"] .v20-rowcard,html[data-theme="light"] .v22-shop-card,html[data-theme="light"] .v22-provider,html[data-theme="light"] .v22-popular,html[data-theme="light"] .v22-account-guest,html[data-theme="light"] .v22-group,html[data-theme="light"] .v22-trust,html[data-theme="light"] .v20-filter-panel,html[data-theme="light"] .v20-market-stats a,html[data-theme="light"] .v20-tabs a,html[data-theme="light"] .v20-row-link{background:#fff;color:var(--text);border-color:var(--line)}
+html[data-theme="light"] .v20-search,html[data-theme="light"] .v22-ai-search,html[data-theme="light"] .v20-form input,html[data-theme="light"] .v20-form textarea,html[data-theme="light"] .v20-form select,html[data-theme="light"] .v20-filter-field select{background:#fff;color:var(--text);border-color:var(--line)}
+html[data-theme="light"] .v20-bottom{background:rgba(255,255,255,.96);border-color:rgba(15,169,199,.18);box-shadow:0 12px 35px rgba(7,24,39,.10)}
+.v20-brand>img{width:60px!important;height:42px!important;object-fit:contain!important;filter:drop-shadow(0 4px 10px rgba(25,207,240,.12))}
+.v20-ai-orb img,.v20-cta-art img{width:46px!important;height:auto!important;object-fit:contain!important}
+html[data-theme="light"] .v20-brand>img,html[data-theme="light"] .v20-ai-orb img{filter:drop-shadow(0 4px 9px rgba(7,24,39,.08))}
+
+/* GOVO UNIFIED ICON + CARD SYSTEM 2026-10-02 */
+.v22-action .v22-iconbox,.v22-category-strip span{
+  background:linear-gradient(145deg,rgba(57,231,95,.14),rgba(25,207,240,.12))!important;
+  border:1px solid rgba(25,207,240,.24)!important;
+  color:#39E75F!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 22px rgba(0,0,0,.14),0 0 18px rgba(25,207,240,.05)!important
+}
+.v22-action:nth-child(even) .v22-iconbox,.v22-category-strip a:nth-child(even) span{color:#19CFF0!important}
+.v22-action .v22-iconbox svg{width:25px!important;height:25px!important}
+.v22-category-strip span{border-radius:14px!important;width:46px!important;height:46px!important}
+.v22-category-strip span svg{width:22px!important;height:22px!important}
+.v22-shop-card,.v22-provider,.v22-popular,.v20-card,.v20-rowcard{
+  border-radius:18px!important;
+  border-color:rgba(25,207,240,.16)!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.10)!important
+}
+.v22-shop-card,.v22-provider,.v22-popular,.v20-rowcard{transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.v22-shop-card:hover,.v22-provider:hover,.v22-popular:hover,.v20-rowcard:hover{transform:translateY(-2px);border-color:rgba(25,207,240,.36)!important;box-shadow:0 14px 34px rgba(0,0,0,.14)!important}
+.v20-row-icon{border-radius:11px!important;background:linear-gradient(145deg,rgba(57,231,95,.10),rgba(25,207,240,.09))!important;border:1px solid rgba(25,207,240,.14)!important}
+.v20-row-icon svg{color:#19CFF0!important}
+html[data-theme="light"] .v22-action .v22-iconbox,html[data-theme="light"] .v22-category-strip span,html[data-theme="light"] .v20-row-icon{
+  background:linear-gradient(145deg,rgba(57,231,95,.10),rgba(25,207,240,.08))!important;
+  border-color:rgba(15,169,199,.18)!important;
+  box-shadow:0 8px 20px rgba(7,24,39,.06)!important
+}
+html[data-theme="light"] .v22-shop-card,html[data-theme="light"] .v22-provider,html[data-theme="light"] .v22-popular,html[data-theme="light"] .v20-card,html[data-theme="light"] .v20-rowcard{
+  border-color:rgba(7,24,39,.10)!important;
+  box-shadow:0 10px 28px rgba(7,24,39,.06)!important
+}
+
+/* GOVO DESKTOP CUSTOMER EXPERIENCE 2026-10-02 */
+.v20-desktop-nav{display:none}
+@media(min-width:1024px){
+  .v20-shell{max-width:1240px!important;padding:18px 24px 42px!important}
+  .v20-top{padding:10px 4px 14px!important}
+  .v20-brand>img{width:72px!important;height:50px!important}
+  .v20-brand strong{font-size:20px!important}.v20-brand small{font-size:9px!important;letter-spacing:.08em!important}
+  .v20-top-actions .v20-icon-btn{width:44px!important;height:44px!important}
+  .v20-desktop-nav{
+    display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;
+    padding:8px;margin:2px 0 18px;border:1px solid var(--line);border-radius:20px;
+    background:rgba(3,16,24,.78);backdrop-filter:blur(14px);box-shadow:0 14px 36px rgba(0,0,0,.12)
+  }
+  .v20-desktop-nav a{
+    min-height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:9px;
+    color:var(--text);font-size:12px;font-weight:850;border:1px solid transparent;background:rgba(255,255,255,.02)
+  }
+  .v20-desktop-nav a svg{width:19px;height:19px;color:#19CFF0}.v20-desktop-nav a:nth-child(odd) svg{color:#39E75F}
+  .v20-desktop-nav a img{width:38px;height:28px;object-fit:contain}
+  .v20-desktop-nav a.active{background:linear-gradient(135deg,rgba(57,231,95,.13),rgba(25,207,240,.11));border-color:rgba(25,207,240,.24)}
+  .v20-bottom{display:none!important}
+
+  .v20-page-home .v20-shell{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(340px,.6fr);column-gap:22px;align-items:start}
+  .v20-page-home .v20-top,.v20-page-home .v20-desktop-nav,.v20-page-home .v22-location,
+  .v20-page-home .v20-section,.v20-page-home .v22-category-strip,.v20-page-home .v22-card-scroll,
+  .v20-page-home .v22-provider-grid,.v20-page-home .v20-card,.v20-page-home .v22-banner,
+  .v20-page-home .v22-steps,.v20-page-home .v22-trust-grid{grid-column:1/-1}
+  .v20-page-home .v20-top{grid-row:1}.v20-page-home .v20-desktop-nav{grid-row:2}.v20-page-home .v22-location{grid-row:3}
+  .v20-page-home .v20-hero.v22-hero{grid-column:1;grid-row:4;min-height:250px;padding:32px!important;border-radius:26px!important;margin:0!important}
+  .v20-page-home .v22-hero h1{font-size:clamp(44px,4vw,62px)!important;max-width:650px}.v20-page-home .v22-hero p{font-size:15px!important;max-width:690px}
+  .v20-page-home .v20-search{min-height:52px!important}
+  .v20-page-home .v22-action-grid{grid-column:2;grid-row:4;grid-template-columns:repeat(4,1fr)!important;gap:9px!important;margin:0!important;padding:12px;border:1px solid var(--line);border-radius:24px;background:rgba(255,255,255,.025);align-self:stretch}
+  .v20-page-home .v22-action{min-height:118px;justify-content:center;border-radius:16px;background:linear-gradient(145deg,rgba(57,231,95,.045),rgba(25,207,240,.04));border:1px solid rgba(25,207,240,.10);padding:8px 4px}
+  .v20-page-home .v22-action .v22-iconbox{width:50px!important;height:48px!important}
+  .v20-page-home .v20-section{margin:24px 0 12px!important}.v20-page-home .v20-section h2{font-size:19px!important}
+  .v20-page-home .v22-category-strip{grid-template-columns:repeat(10,1fr)!important;gap:10px!important}
+  .v20-page-home .v22-category-strip a{padding:12px 6px;border:1px solid rgba(25,207,240,.09);border-radius:16px;background:rgba(255,255,255,.02)}
+  .v20-page-home .v22-card-scroll{grid-auto-flow:unset!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;overflow:visible!important;gap:12px!important}
+  .v20-page-home .v22-shop-cover{height:112px!important}.v20-page-home .v22-shop-card b{font-size:13px!important}.v20-page-home .v22-shop-card small{font-size:10px!important}
+  .v20-page-home .v22-provider-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
+  .v20-page-home .v22-provider{min-height:132px!important;padding:14px!important}.v20-page-home .v22-provider b{font-size:13px!important}.v20-page-home .v22-provider small{font-size:10px!important}
+
+  .v20-page-shops .v20-shell,.v20-page-services .v20-shell,.v20-page-account .v20-shell,.v20-page-ai .v20-shell{max-width:1180px!important}
+  .v20-page-shops .v20-filter-panel{grid-template-columns:2fr 1fr 1fr auto!important}
+  .v20-page-services .v20-service-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .v20-page-ai .v22-popular-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .v20-page-account .v22-group{padding:16px!important}
+}
+html[data-theme="light"] .v20-desktop-nav{background:rgba(255,255,255,.9);border-color:rgba(7,24,39,.10);box-shadow:0 14px 36px rgba(7,24,39,.07)}
+html[data-theme="light"] .v20-desktop-nav a{background:#fff;color:#071827}
+html[data-theme="light"] .v20-page-home .v22-action-grid,
+html[data-theme="light"] .v20-page-home .v22-action,
+html[data-theme="light"] .v20-page-home .v22-category-strip a{background:#fff;border-color:rgba(7,24,39,.09)}
+
 `;
 
 /* GOVO V22 PREMIUM CUSTOMER UI OVERRIDES */
