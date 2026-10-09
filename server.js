@@ -1262,6 +1262,28 @@ const imageUpload = multer({
   }
 });
 const productUpload = imageUpload;
+
+function govoBdPhone(value) {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('88') && digits.length === 13) digits = digits.slice(2);
+  return /^01\d{9}$/.test(digits) ? digits : '';
+}
+
+function govoValidNid(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return !digits || [10, 13, 17].includes(digits.length);
+}
+
+function govoCleanupUpload(file) {
+  try { if (file && file.path) fs.unlink(file.path, () => {}); } catch (_) {}
+}
+
+function govoJoinStatusLabel(value) {
+  const s = String(value || 'pending').trim().toLowerCase();
+  if (['approved','active','verified','trusted','confirmed'].includes(s)) return 'approved';
+  if (['rejected','declined'].includes(s)) return 'rejected';
+  return 'under_review';
+}
 /* GOVO PRODUCT UPLOAD FIX END */
 
 
@@ -3628,11 +3650,35 @@ app.get('/merchant', (req, res) => {
 
 app.post('/merchant', imageUpload.single('merchant_image'), async (req, res, next) => {
   try {
-    const lead = { shop_name: req.body.shop_name, owner_name: req.body.owner_name, phone: req.body.phone, location: req.body.location, category: req.body.category, delivery_needed: req.body.delivery_needed, nid_number: req.body.nid_number, trade_license: req.body.trade_license, image_url: req.file ? `/uploads/${req.file.filename}` : '' };
-    await pool.query(`INSERT INTO govo_merchant_leads (shop_name, owner_name, phone, location, category, delivery_needed, nid_number, trade_license, image_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending')`, [lead.shop_name, lead.owner_name, lead.phone, lead.location, lead.category, lead.delivery_needed, lead.nid_number, lead.trade_license, lead.image_url]);
-    sendTelegram(['New GOVO Merchant Lead', '', `Shop: ${lead.shop_name || ''}`, `Owner: ${lead.owner_name || ''}`, `Phone: ${lead.phone || ''}`, `Location: ${lead.location || ''}`, `Category: ${lead.category || ''}`, `Delivery: ${lead.delivery_needed || ''}`, `Photo: ${lead.image_url || 'not uploaded'}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
-    res.send(page('Merchant Submitted', `<section class="card"><h1>Merchant Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="https://merchant.govoexpress.com/merchant">Add Another</a></section>`, 'merchant'));
-  } catch (e) { next(e); }
+    const shopName = String(req.body.shop_name || '').trim().slice(0, 160);
+    const ownerName = String(req.body.owner_name || '').trim().slice(0, 120);
+    const phone = govoBdPhone(req.body.phone);
+    const location = String(req.body.location || '').trim().slice(0, 120);
+    const nidNumber = String(req.body.nid_number || '').replace(/\D/g, '').slice(0, 20);
+    if (!shopName || !ownerName || !location || !phone) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Check Merchant Details', '<section class="card"><h1>Check your details</h1><p>Shop name, owner name, valid Bangladesh phone and area are required.</p><a class="btn" href="/merchant">Back</a></section>', 'merchant'));
+    }
+    if (!govoValidNid(nidNumber)) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Check NID', '<section class="card"><h1>Invalid NID format</h1><p>Use a 10, 13 or 17 digit NID number, or leave it blank for later verification.</p><a class="btn" href="/merchant">Back</a></section>', 'merchant'));
+    }
+    if (!req.file) return res.status(400).send(page('Photo Required', '<section class="card"><h1>Shop / owner photo required</h1><a class="btn" href="/merchant">Back</a></section>', 'merchant'));
+    const existing = await pool.query(`SELECT id, application_code, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    if (existing.rows.length) {
+      govoCleanupUpload(req.file);
+      const ex = existing.rows[0];
+      const status = govoJoinStatusLabel(ex.status);
+      const code = ex.application_code || '';
+      return res.status(409).send(page('Merchant Already Registered', `<section class="card"><h1>Already registered</h1><p>This phone is already connected to a merchant application.</p><div class="detail-grid"><div><b>Status</b><span>${esc(status)}</span></div>${code ? `<div><b>Application</b><span>${esc(code)}</span></div>` : ''}</div><div class="actions">${code ? `<a class="btn" href="/join-status?code=${encodeURIComponent(code)}">Check Status</a>` : ''}<a class="btn secondary" href="/merchant/login">Merchant Login</a></div></section>`, 'merchant'));
+    }
+    const lead = { shop_name: shopName, owner_name: ownerName, phone, location, category: String(req.body.category || '').trim().slice(0, 120), delivery_needed: String(req.body.delivery_needed || '').trim().slice(0, 40), nid_number: nidNumber, trade_license: String(req.body.trade_license || '').trim().slice(0, 120), image_url: `/uploads/${req.file.filename}` };
+    const inserted = await pool.query(`INSERT INTO govo_merchant_leads (shop_name, owner_name, phone, location, category, delivery_needed, nid_number, trade_license, image_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') RETURNING id`, [lead.shop_name, lead.owner_name, lead.phone, lead.location, lead.category, lead.delivery_needed, lead.nid_number, lead.trade_license, lead.image_url]);
+    const code = `MRCH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(inserted.rows[0].id).padStart(5,'0')}`;
+    await pool.query(`UPDATE govo_merchant_leads SET application_code=$1 WHERE id=$2`, [code, inserted.rows[0].id]);
+    sendTelegram(['New GOVO Merchant Lead', '', `Application: ${code}`, `Shop: ${lead.shop_name}`, `Owner: ${lead.owner_name}`, `Phone: ${lead.phone}`, `Location: ${lead.location}`, `Category: ${lead.category}`, `Delivery: ${lead.delivery_needed}`, `Photo: ${lead.image_url}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
+    res.status(201).send(page('Merchant Submitted', `<section class="card app-hero"><span class="pill">Submitted</span><h1>Merchant application received</h1><p>Save this application code. GOVO will review the shop before account activation.</p><h2>${esc(code)}</h2><div class="actions"><a class="btn" href="/join-status?code=${encodeURIComponent(code)}">Check Status</a><a class="btn secondary" href="/merchant/login">Merchant Login</a></div></section>`, 'merchant'));
+  } catch (e) { govoCleanupUpload(req.file); next(e); }
 });
 
 app.get('/rider', (req, res) => {
@@ -3646,9 +3692,60 @@ app.get('/rider/register', (req, res) => {
 
 app.post('/rider', imageUpload.single('rider_image'), async (req, res, next) => {
   try {
-    await pool.query(`INSERT INTO govo_rider_leads (rider_name, phone, location, vehicle_type, experience, nid_number, driving_license, image_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending')`, [req.body.rider_name, req.body.phone, req.body.location, req.body.vehicle_type, req.body.experience, req.body.nid_number || '', req.body.driving_license || '', req.file ? `/uploads/${req.file.filename}` : '']);
-    sendTelegram(['New GOVO Rider Lead', '', `Name: ${req.body.rider_name || ''}`, `Phone: ${req.body.phone || ''}`, `Location: ${req.body.location || ''}`, `Vehicle: ${req.body.vehicle_type || ''}`, `Experience: ${req.body.experience || ''}`, `Photo: ${req.file ? `/uploads/${req.file.filename}` : 'not uploaded'}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
-    res.send(page('Rider Submitted', `<section class="card"><h1>Rider Submitted</h1><p>GOVO team info receive koreche.</p><a class="btn" href="https://rider.govoexpress.com/rider/register">Add Another</a></section>`, 'rider'));
+    const riderName = String(req.body.rider_name || '').trim().slice(0, 120);
+    const phone = govoBdPhone(req.body.phone);
+    const location = String(req.body.location || '').trim().slice(0, 120);
+    const nidNumber = String(req.body.nid_number || '').replace(/\D/g, '').slice(0, 20);
+    if (!riderName || !location || !phone) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Check Rider Details', '<section class="card"><h1>Check your details</h1><p>Rider name, valid Bangladesh phone and area are required.</p><a class="btn" href="/rider/register">Back</a></section>', 'rider'));
+    }
+    if (!govoValidNid(nidNumber)) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Check NID', '<section class="card"><h1>Invalid NID format</h1><p>Use a 10, 13 or 17 digit NID number, or leave it blank for later verification.</p><a class="btn" href="/rider/register">Back</a></section>', 'rider'));
+    }
+    if (!req.file) return res.status(400).send(page('Photo Required', '<section class="card"><h1>Rider photo required</h1><a class="btn" href="/rider/register">Back</a></section>', 'rider'));
+    const existing = await pool.query(`SELECT id, application_code, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
+    if (existing.rows.length) {
+      govoCleanupUpload(req.file);
+      const ex = existing.rows[0];
+      const status = govoJoinStatusLabel(ex.status);
+      const code = ex.application_code || '';
+      return res.status(409).send(page('Rider Already Registered', `<section class="card"><h1>Already registered</h1><p>This phone is already connected to a rider application.</p><div class="detail-grid"><div><b>Status</b><span>${esc(status)}</span></div>${code ? `<div><b>Application</b><span>${esc(code)}</span></div>` : ''}</div><div class="actions">${code ? `<a class="btn" href="/join-status?code=${encodeURIComponent(code)}">Check Status</a>` : ''}<a class="btn secondary" href="/rider/login">Rider Login</a></div></section>`, 'rider'));
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    const inserted = await pool.query(`INSERT INTO govo_rider_leads (rider_name, phone, location, vehicle_type, experience, nid_number, driving_license, image_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id`, [riderName, phone, location, String(req.body.vehicle_type || '').trim().slice(0, 60), String(req.body.experience || '').trim().slice(0, 500), nidNumber, String(req.body.driving_license || '').trim().slice(0, 120), imageUrl]);
+    const code = `RIDR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(inserted.rows[0].id).padStart(5,'0')}`;
+    await pool.query(`UPDATE govo_rider_leads SET application_code=$1 WHERE id=$2`, [code, inserted.rows[0].id]);
+    sendTelegram(['New GOVO Rider Lead', '', `Application: ${code}`, `Name: ${riderName}`, `Phone: ${phone}`, `Location: ${location}`, `Vehicle: ${String(req.body.vehicle_type || '').trim()}`, `Experience: ${String(req.body.experience || '').trim()}`, `Photo: ${imageUrl}`, `Time: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`].join('\n')).catch(() => {});
+    res.status(201).send(page('Rider Submitted', `<section class="card app-hero"><span class="pill">Submitted</span><h1>Rider application received</h1><p>Save this application code. GOVO will review the rider before account activation.</p><h2>${esc(code)}</h2><div class="actions"><a class="btn" href="/join-status?code=${encodeURIComponent(code)}">Check Status</a><a class="btn secondary" href="/rider/login">Rider Login</a></div></section>`, 'rider'));
+  } catch (e) { govoCleanupUpload(req.file); next(e); }
+});
+
+app.get('/join-status', async (req, res, next) => {
+  try {
+    const code = String(req.query.code || '').trim().toUpperCase().slice(0, 80);
+    if (!code) return res.send(page('Application Status', `<section class="card app-hero"><h1>Check Application Status</h1><form method="GET" action="/join-status"><label>Application Code</label><input name="code" placeholder="MRCH-... / RIDR-..." required><button>Check Status</button></form></section>`, 'app'));
+    let kind = '';
+    let row = null;
+    if (/^MRCH-/.test(code)) {
+      kind = 'merchant';
+      const r = await pool.query(`SELECT application_code, shop_name AS name, phone, location AS area, COALESCE(status,'pending') AS status, created_at FROM govo_merchant_leads WHERE application_code=$1 LIMIT 1`, [code]);
+      row = r.rows[0] || null;
+    } else if (/^RIDR-/.test(code)) {
+      kind = 'rider';
+      const r = await pool.query(`SELECT application_code, COALESCE(rider_name,name) AS name, phone, COALESCE(area,location) AS area, COALESCE(status,'pending') AS status, created_at FROM govo_rider_leads WHERE application_code=$1 LIMIT 1`, [code]);
+      row = r.rows[0] || null;
+    } else {
+      return res.status(400).send(page('Invalid Application Code', `<section class="card"><h1>Invalid application code</h1><p>Use a code beginning with MRCH- or RIDR-.</p><a class="btn" href="/join-status">Try Again</a></section>`, 'app'));
+    }
+    if (!row) return res.status(404).send(page('Application Not Found', `<section class="card"><h1>Application not found</h1><p>Check the code and try again.</p><a class="btn" href="/join-status">Try Again</a></section>`, 'app'));
+    const status = govoJoinStatusLabel(row.status);
+    const approved = status === 'approved';
+    const accountUrl = kind === 'merchant' ? `https://merchant.govoexpress.com/merchant/account/create?phone=${encodeURIComponent(row.phone || '')}` : `https://rider.govoexpress.com/rider/account/create?phone=${encodeURIComponent(row.phone || '')}`;
+    const loginUrl = kind === 'merchant' ? 'https://merchant.govoexpress.com/merchant/login' : 'https://rider.govoexpress.com/rider/login';
+    const registerUrl = kind === 'merchant' ? 'https://merchant.govoexpress.com/merchant' : 'https://rider.govoexpress.com/rider/register';
+    res.send(page('Application Status', `<section class="card app-hero"><span class="pill">${esc(status)}</span><h1>${esc(kind === 'merchant' ? 'Merchant' : 'Rider')} Application</h1><div class="detail-grid"><div><b>Application</b><span>${esc(row.application_code)}</span></div><div><b>Name</b><span>${esc(row.name || '')}</span></div><div><b>Area</b><span>${esc(row.area || '')}</span></div><div><b>Status</b><span>${esc(status)}</span></div></div><p>${approved ? 'Approved. You can create/login to your account.' : status === 'rejected' ? 'Application was not approved. Contact GOVO support if you need clarification.' : 'Application is under review. No need to submit again.'}</p><div class="actions">${approved ? `<a class="btn" href="${accountUrl}">Create Account</a><a class="btn secondary" href="${loginUrl}">Login</a>` : ''}<a class="btn secondary" href="/join-status">Check Another</a><a class="btn secondary" href="${registerUrl}">Registration Page</a></div></section>`, kind));
   } catch (e) { next(e); }
 });
 
@@ -3658,10 +3755,10 @@ app.get('/merchant/account/create', (req, res) => {
 
 app.post('/merchant/account/create', async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
+    const phone = govoBdPhone(req.body.phone);
     const password = String(req.body.password || '');
     const confirm = String(req.body.confirm_password || '');
-    if (!phone) return res.status(400).send(accountCreatePage('merchant', phone, 'Phone required.'));
+    if (!phone) return res.status(400).send(accountCreatePage('merchant', '', 'Enter a valid Bangladesh phone number.'));
     if (password.length < 6) return res.status(400).send(accountCreatePage('merchant', phone, 'Password minimum 6 characters.'));
     if (password !== confirm) return res.status(400).send(accountCreatePage('merchant', phone, 'Confirm password did not match.'));
     const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
@@ -3676,9 +3773,9 @@ app.post('/merchant/account/create', async (req, res, next) => {
 
 app.post('/merchant/login', async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
+    const phone = govoBdPhone(req.body.phone);
     const password = String(req.body.password || '');
-    if (!phone || !password) return res.status(400).send(merchantLoginPage(phone, 'Phone and password required.'));
+    if (!phone || !password) return res.status(400).send(merchantLoginPage(phone, 'Valid Bangladesh phone and password required.'));
     const r = await pool.query(`SELECT id, shop_name, phone, whatsapp, COALESCE(status,'pending') AS status, password_hash, password_salt FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     const m = r.rows[0];
     if (!m) return res.status(404).send(merchantLoginPage(phone, 'No registered merchant found. Use Register or Create Account.'));
@@ -3702,7 +3799,7 @@ app.get('/merchant/forgot-password', (req, res) => {
 
 app.post('/merchant/forgot-password', async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
+    const phone = govoBdPhone(req.body.phone);
     const note = String(req.body.reset_note || '').trim();
     const r = await pool.query(`UPDATE govo_merchant_leads SET reset_requested_at=NOW(), reset_note=$1, updated_at=NOW() WHERE id=(SELECT id FROM govo_merchant_leads WHERE phone=$2 OR whatsapp=$2 ORDER BY id DESC LIMIT 1) RETURNING id, shop_name, owner_name, phone`, [note, phone]);
     if (r.rows.length) {
@@ -3719,10 +3816,10 @@ app.get('/rider/account/create', (req, res) => {
 
 app.post('/rider/account/create', async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
+    const phone = govoBdPhone(req.body.phone);
     const password = String(req.body.password || '');
     const confirm = String(req.body.confirm_password || '');
-    if (!phone) return res.status(400).send(accountCreatePage('rider', phone, 'Phone required.'));
+    if (!phone) return res.status(400).send(accountCreatePage('rider', '', 'Enter a valid Bangladesh phone number.'));
     if (password.length < 6) return res.status(400).send(accountCreatePage('rider', phone, 'Password minimum 6 characters.'));
     if (password !== confirm) return res.status(400).send(accountCreatePage('rider', phone, 'Confirm password did not match.'));
     const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
@@ -3737,9 +3834,9 @@ app.post('/rider/account/create', async (req, res, next) => {
 
 app.post('/rider/login', async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
+    const phone = govoBdPhone(req.body.phone);
     const password = String(req.body.password || '');
-    if (!phone || !password) return res.status(400).send(riderLoginPage(phone, 'Phone and password required.'));
+    if (!phone || !password) return res.status(400).send(riderLoginPage(phone, 'Valid Bangladesh phone and password required.'));
     const r = await pool.query(`SELECT id, COALESCE(rider_name,name) AS rider_name, phone, COALESCE(status,'pending') AS status, password_hash, password_salt FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
     const rd = r.rows[0];
     if (!rd) return res.status(404).send(riderLoginPage(phone, 'No registered rider found. Use Register or Create Account.'));
@@ -3763,7 +3860,7 @@ app.get('/rider/forgot-password', (req, res) => {
 
 app.post('/rider/forgot-password', async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
+    const phone = govoBdPhone(req.body.phone);
     const note = String(req.body.reset_note || '').trim();
     const r = await pool.query(`UPDATE govo_rider_leads SET reset_requested_at=NOW(), reset_note=$1, updated_at=NOW() WHERE id=(SELECT id FROM govo_rider_leads WHERE phone=$2 ORDER BY id DESC LIMIT 1) RETURNING id, COALESCE(rider_name,name) AS rider_name, phone`, [note, phone]);
     if (r.rows.length) {
@@ -5331,7 +5428,7 @@ app.get('/merchant/dashboard', async (req, res, next) => {
     const prof = (await pool.query(`SELECT * FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone])).rows[0] || {};
     const orders = await pool.query(`SELECT * FROM govo_orders WHERE merchant_id=$1 OR merchant_lead_id=$1 OR (merchant_id IS NULL AND merchant_lead_id IS NULL AND (($2<>'' AND merchant_phone=$2) OR ($3<>'' AND merchant_phone=$3))) ORDER BY id DESC LIMIT 100`, [m.id, m.phone || '', m.whatsapp || '']);
     const orderActions = (x) => `<form method="POST" action="/merchant/order/status"><input type="hidden" name="phone" value="${esc(phone)}"><input type="hidden" name="id" value="${esc(x.id)}"><input name="merchant_note" value="${esc(x.merchant_note || '')}" placeholder="Merchant note"><div class="three"><button name="status" value="accepted">Accept</button><button name="status" value="preparing">Preparing</button><button name="status" value="ready">Ready</button></div><div class="actions"><button class="reject" name="status" value="rejected">Reject</button></div></form>`;
-    const orderCards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.customer_name || 'Customer')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Merchant Status</b><span>${esc(x.merchant_status || 'No update')}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${orderActions(x)}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track</a></div></div>`).join('');
+    const orderCards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.customer_name || 'Customer')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Merchant Status</b><span>${esc(x.merchant_status || 'No update')}<br>${esc(x.merchant_note || 'No merchant note')}</span></div><div><b>Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div></div>${orderActions(x)}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(x.order_code || orderCodeFromId(x.id))}">Track</a></div></div>`).join('');
     const items = await pool.query(`SELECT id, item_name, price, details FROM govo_shop_items WHERE merchant_phone=$1 AND COALESCE(is_active,true)=true ORDER BY id DESC LIMIT 50`, [phone]);
     const itemHtml = items.rows.map((i) => `<div class="item-box"><b>${esc(i.item_name || '')}</b><span>${esc(i.price || '')}</span><br><span>${esc(i.details || '')}</span><div class="actions"><a class="btn secondary" href="/merchant/item/${encodeURIComponent(i.id)}/delete?phone=${encodeURIComponent(phone)}">Remove</a></div></div>`).join('');
     const menuProducts = await pool.query(`SELECT id, name, category, price, stock_status, image_url FROM govo_products WHERE merchant_id=$1 ORDER BY CASE stock_status WHEN 'available' THEN 1 WHEN 'out_of_stock' THEN 2 ELSE 3 END, id DESC LIMIT 12`, [m.id]);
@@ -5365,13 +5462,19 @@ app.post(['/merchant/profile', '/merchant/profile/update'], imageUpload.single('
     const phone = String(req.body.phone || '').trim();
     const check = await approvedMerchantByPhone(phone);
     if (!check.lead) return res.status(404).send(page('Merchant Not Found', '<section class="card"><h1>Merchant not found</h1></section>', 'merchant'));
+    const whatsappRaw = String(req.body.whatsapp || '').trim();
+    const whatsapp = whatsappRaw ? govoBdPhone(whatsappRaw) : '';
+    if (whatsappRaw && !whatsapp) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Invalid WhatsApp', '<section class="card"><h1>Invalid WhatsApp number</h1><p>Use a valid Bangladesh mobile number.</p><a class="btn" href="/merchant/dashboard">Back Dashboard</a></section>', 'merchant'));
+    }
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : String(req.body.image_url || check.lead.image_url || '').trim();
     const existingProfile = await pool.query(`SELECT id FROM govo_merchant_profiles WHERE phone=$1 LIMIT 1`, [phone]);
-    await pool.query(`UPDATE govo_merchant_leads SET shop_name=$1, owner_name=$2, location=$3, category=$4, shop_description=$5, whatsapp=$6, image_url=$7, shop_address=$8, is_available=$9, delivery_available=$10, opening_hours=$11, updated_at=NOW() WHERE id=$12`, [keepValue(req.body.shop_name, check.lead.shop_name), keepValue(req.body.owner_name, check.lead.owner_name), keepValue(req.body.location, check.lead.location), keepValue(req.body.category, check.lead.category), keepValue(req.body.description, check.lead.shop_description), keepValue(req.body.whatsapp, check.lead.whatsapp), imageUrl, keepValue(req.body.shop_address, check.lead.shop_address), checkboxBool(req.body.is_available), checkboxBool(req.body.delivery_available), keepValue(req.body.opening_hours, check.lead.opening_hours), check.lead.id]);
+    await pool.query(`UPDATE govo_merchant_leads SET shop_name=$1, owner_name=$2, location=$3, category=$4, shop_description=$5, whatsapp=$6, image_url=$7, shop_address=$8, is_available=$9, delivery_available=$10, opening_hours=$11, updated_at=NOW() WHERE id=$12`, [keepValue(req.body.shop_name, check.lead.shop_name), keepValue(req.body.owner_name, check.lead.owner_name), keepValue(req.body.location, check.lead.location), keepValue(req.body.category, check.lead.category), keepValue(req.body.description, check.lead.shop_description), keepValue(whatsapp, check.lead.whatsapp), imageUrl, keepValue(req.body.shop_address, check.lead.shop_address), checkboxBool(req.body.is_available), checkboxBool(req.body.delivery_available), keepValue(req.body.opening_hours, check.lead.opening_hours), check.lead.id]);
     if (existingProfile.rows.length) {
-      await pool.query(`UPDATE govo_merchant_profiles SET merchant_lead_id=$1, shop_name=$2, owner_name=$3, location=$4, category=$5, description=$6, opening_hours=$7, delivery_area=$8, whatsapp=$9, logo_image=$10, status='published', updated_at=NOW() WHERE phone=$11`, [check.lead.id, req.body.shop_name, req.body.owner_name, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp, imageUrl, phone]);
+      await pool.query(`UPDATE govo_merchant_profiles SET merchant_lead_id=$1, shop_name=$2, owner_name=$3, location=$4, category=$5, description=$6, opening_hours=$7, delivery_area=$8, whatsapp=$9, logo_image=$10, status='published', updated_at=NOW() WHERE phone=$11`, [check.lead.id, req.body.shop_name, req.body.owner_name, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, whatsapp, imageUrl, phone]);
     } else {
-      await pool.query(`INSERT INTO govo_merchant_profiles (merchant_lead_id, shop_name, owner_name, phone, location, category, description, opening_hours, delivery_area, whatsapp, logo_image, status, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'published',NOW())`, [check.lead.id, req.body.shop_name, req.body.owner_name, phone, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, req.body.whatsapp, imageUrl]);
+      await pool.query(`INSERT INTO govo_merchant_profiles (merchant_lead_id, shop_name, owner_name, phone, location, category, description, opening_hours, delivery_area, whatsapp, logo_image, status, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'published',NOW())`, [check.lead.id, req.body.shop_name, req.body.owner_name, phone, req.body.location, req.body.category, req.body.description, req.body.opening_hours, req.body.delivery_area, whatsapp, imageUrl]);
     }
     res.redirect(`/merchant/dashboard?phone=${encodeURIComponent(phone)}`);
   } catch (e) { next(e); }
@@ -5564,7 +5667,7 @@ app.all('/rider/dashboard', async (req, res, next) => {
     }
     const orders = await pool.query(`SELECT * FROM govo_orders WHERE rider_id=$1 OR assigned_rider_id=$1 OR rider_phone=$2 OR assigned_rider_phone=$2 ORDER BY CASE COALESCE(status,'new') WHEN 'assigned' THEN 1 WHEN 'picked_up' THEN 2 WHEN 'on_the_way' THEN 3 WHEN 'delivered' THEN 4 ELSE 5 END, id DESC LIMIT 100`, [rd.id, phone]);
     const actionButtons = (x) => `<form method="POST" action="/rider/orders/update-status"><input type="hidden" name="id" value="${esc(x.id)}"><input name="rider_note" value="${esc(x.rider_note || '')}" placeholder="Rider note optional"><div class="three"><button name="status" value="picked_up">Picked Up</button><button name="status" value="on_the_way">On The Way</button><button name="status" value="delivered">Delivered</button></div></form>`;
-    const cards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Tracking</b><span>${esc(x.order_code || orderCodeFromId(x.id))}</span></div><div><b>Order Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div></div>${isApproved ? actionButtons(x) : '<p style="color:var(--muted);font-weight:900">Rider actions unlock after admin approval.</p>'}<div class="actions"><a class="btn secondary" href="/track/order/${encodeURIComponent(x.id)}">Track Order</a></div></div>`).join('');
+    const cards = orders.rows.map((x) => `<div class="card"><div class="section-head"><h2>#${esc(x.id)} ${esc(x.shop_name || 'GOVO Order')}</h2>${badge(x.status)}</div><div class="detail-grid"><div><b>Customer</b><span>${esc(x.customer_name)}<br>${esc(x.customer_phone)}</span></div><div><b>Pickup Address</b><span>${esc(x.pickup_location)}</span></div><div><b>Delivery Address</b><span>${esc(x.drop_location)}</span></div><div><b>Item Details</b><span>${esc(x.item_details)}</span></div><div><b>Customer Notes</b><span>${esc(x.customer_note || x.note || 'No note')}</span></div><div><b>Tracking</b><span>${esc(x.order_code || orderCodeFromId(x.id))}</span></div><div><b>Order Status</b><span>${esc(x.status || 'pending')}</span></div><div><b>Created</b><span>${esc(bdTime(x.created_at))}</span></div><div><b>Rider Note</b><span>${esc(x.rider_note || 'No rider note')}</span></div></div>${isApproved ? actionButtons(x) : '<p style="color:var(--muted);font-weight:900">Rider actions unlock after admin approval.</p>'}<div class="actions"><a class="btn secondary" href="/track?code=${encodeURIComponent(x.order_code || orderCodeFromId(x.id))}">Track Order</a></div></div>`).join('');
     res.send(page('Rider Dashboard', `<section class="card app-hero"><h1>Rider Dashboard</h1>${listingImage(rd.image_url, rd.rider_name, true)}<div class="detail-grid"><div><b>Name</b><span>${esc(rd.rider_name || 'Rider')}</span></div><div><b>Phone</b><span>${esc(rd.whatsapp || rd.phone)}</span></div><div><b>Area</b><span>${esc(rd.area || rd.location || 'Not set')}</span></div><div><b>Status</b><span>${badge(rd.status)}</span></div><div><b>Vehicle</b><span>${esc(rd.vehicle_type || 'Not set')}</span></div><div><b>Orders</b><span>${esc(orders.rows.length)}</span></div></div><div class="actions govo-role-quick"><a class="btn" href="/rider/jobs">Jobs</a><a class="btn secondary" href="/rider/active">Active</a><a class="btn secondary" href="/rider/history">History</a><a class="btn secondary" href="#profile">Profile</a><a class="btn secondary" href="/rider/support">Support</a><a class="btn secondary" href="/rider/logout">Logout</a><a class="btn secondary" href="https://app.govoexpress.com/app">Customer App</a></div></section><section class="card" id="profile"><h2>Rider Profile</h2><form method="POST" action="/rider/profile/update" enctype="multipart/form-data"><input type="hidden" name="phone" value="${esc(phone)}"><label>Rider Name</label><input name="rider_name" value="${esc(rd.rider_name || '')}"><label>WhatsApp</label><input name="whatsapp" value="${esc(rd.whatsapp || '')}"><label>Area</label><input name="area" value="${esc(rd.area || rd.location || '')}"><label>Address</label><textarea name="address">${esc(rd.address || '')}</textarea><label>Vehicle Type</label><input name="vehicle_type" value="${esc(rd.vehicle_type || '')}"><label>NID</label><input name="nid" value="${esc(rd.nid || '')}"><label><input type="checkbox" name="is_available" ${boolish(rd.is_available) ? 'checked' : ''}> Available</label><label>Profile Image</label><input type="file" name="rider_image" accept="image/jpeg,image/png,image/webp,image/gif"><label>Existing Image URL</label><input name="image_url" value="${esc(rd.image_url || '')}"><button>Save Profile</button></form></section><section class="card"><h2>Assigned Orders</h2><p style="color:var(--muted);font-weight:900">Next action: accept, pick up, deliver, or mark failed.</p></section><section class="cards">${cards || '<div class="card"><h2>No assigned orders</h2><p style="color:var(--muted);font-weight:900">New orders will appear here after admin dispatch.</p></div>'}</section>`, 'rider'));
   } catch (e) { next(e); }
 });
@@ -6040,13 +6143,32 @@ app.post('/provider/profile/update', imageUpload.single('provider_image'), async
 
 app.post('/rider/profile/update', imageUpload.single('rider_image'), async (req, res, next) => {
   try {
-    const phone = String(req.body.phone || '').trim();
-    const rider = await pool.query(`SELECT * FROM govo_rider_leads WHERE phone=$1 ORDER BY id DESC LIMIT 1`, [phone]);
-    if (!rider.rows.length) return res.status(404).send(page('Rider Not Found', '<section class="card"><h1>Rider Not Found</h1></section>', 'rider'));
+    const riderSessionId = readPortalSession(req, 'rider');
+    if (!riderSessionId) {
+      govoCleanupUpload(req.file);
+      return res.status(403).send(riderLoginPage('', 'Please login first.'));
+    }
+    const rider = await pool.query(`SELECT * FROM govo_rider_leads WHERE id=$1 LIMIT 1`, [riderSessionId]);
+    if (!rider.rows.length) {
+      govoCleanupUpload(req.file);
+      clearPortalSession(req, res, 'rider');
+      return res.status(401).send(riderLoginPage('', 'Session expired. Please login again.'));
+    }
     const r = rider.rows[0];
+    const whatsappRaw = String(req.body.whatsapp || '').trim();
+    const whatsapp = whatsappRaw ? govoBdPhone(whatsappRaw) : '';
+    const nidRaw = String(req.body.nid || '').replace(/\D/g, '').slice(0, 20);
+    if (whatsappRaw && !whatsapp) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Invalid WhatsApp', '<section class="card"><h1>Invalid WhatsApp number</h1><p>Use a valid Bangladesh mobile number.</p><a class="btn" href="/rider/dashboard">Back Dashboard</a></section>', 'rider'));
+    }
+    if (!govoValidNid(nidRaw)) {
+      govoCleanupUpload(req.file);
+      return res.status(400).send(page('Invalid NID', '<section class="card"><h1>Invalid NID format</h1><p>Use a 10, 13 or 17 digit NID number, or leave the existing value unchanged.</p><a class="btn" href="/rider/dashboard">Back Dashboard</a></section>', 'rider'));
+    }
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : keepValue(req.body.image_url, r.image_url);
-    await pool.query(`UPDATE govo_rider_leads SET rider_name=$1, name=$1, whatsapp=$2, area=$3, location=$3, address=$4, vehicle_type=$5, nid=$6, image_url=$7, is_available=$8, updated_at=NOW() WHERE id=$9`, [keepValue(req.body.rider_name, r.rider_name || r.name), keepValue(req.body.whatsapp, r.whatsapp), keepValue(req.body.area, r.area || r.location), keepValue(req.body.address, r.address), keepValue(req.body.vehicle_type, r.vehicle_type), keepValue(req.body.nid, r.nid), imageUrl, checkboxBool(req.body.is_available), r.id]);
-    res.redirect(`/rider/dashboard?phone=${encodeURIComponent(phone)}`);
+    await pool.query(`UPDATE govo_rider_leads SET rider_name=$1, name=$1, whatsapp=$2, area=$3, location=$3, address=$4, vehicle_type=$5, nid=$6, image_url=$7, is_available=$8, updated_at=NOW() WHERE id=$9`, [keepValue(req.body.rider_name, r.rider_name || r.name), keepValue(whatsapp, r.whatsapp), keepValue(req.body.area, r.area || r.location), keepValue(req.body.address, r.address), keepValue(req.body.vehicle_type, r.vehicle_type), keepValue(nidRaw, r.nid), imageUrl, checkboxBool(req.body.is_available), r.id]);
+    res.redirect('/rider/dashboard');
   } catch (e) { next(e); }
 });
 

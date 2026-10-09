@@ -231,7 +231,7 @@ module.exports = function installGovoFlowApiV17(app, deps = {}) {
       const updated = await pool.query(`UPDATE govo_orders SET order_code=$1 WHERE id=$2 RETURNING *`, [code, inserted.rows[0].id]);
       await pool.query(`INSERT INTO govo_order_events (order_id, event_type, status, note, actor_type, actor_name) VALUES ($1,'created','phone_confirming','Customer request submitted','customer','Customer')`, [inserted.rows[0].id]);
       sendTelegram(['New GOVO Order', `Order: ${code}`, `Type: ${safe(b.order_type || 'delivery')}`, `Area: ${safe(b.customer_area || b.area)}`].join('\n')).catch(() => {});
-      res.status(201).json({ ok: true, dataSource: 'postgres:govo_orders+govo_order_events', order: publicOrder(updated.rows[0], [{ status: 'phone_confirming', note: 'Customer request submitted', actor_type: 'customer', created_at: new Date().toISOString() }]), trackingUrl: `/orders/${encodeURIComponent(code)}` });
+      res.status(201).json({ ok: true, dataSource: 'postgres:govo_orders+govo_order_events', order: publicOrder(updated.rows[0], [{ status: 'phone_confirming', note: 'Customer request submitted', actor_type: 'customer', created_at: new Date().toISOString() }]), trackingUrl: `/track?code=${encodeURIComponent(code)}` });
     } catch (e) { next(e); }
   });
 
@@ -269,7 +269,7 @@ module.exports = function installGovoFlowApiV17(app, deps = {}) {
       const updated = await pool.query(`UPDATE govo_service_requests SET request_code=$1 WHERE id=$2 RETURNING *`, [code, inserted.rows[0].id]);
       await pool.query(`INSERT INTO govo_service_events (request_id, event_type, status, note, actor_type, actor_name) VALUES ($1,'created','phone_confirming','Customer service request submitted','customer','Customer')`, [inserted.rows[0].id]);
       sendTelegram(['New GOVO Service Request', `Request: ${code}`, `Service: ${serviceType}`, `Area: ${safe(b.customer_area || b.area)}`].join('\n')).catch(() => {});
-      res.status(201).json({ ok: true, dataSource: 'postgres:govo_service_requests+govo_service_events', request: { code, status: 'phone_confirming' }, trackingUrl: `/orders/${encodeURIComponent(code)}` });
+      res.status(201).json({ ok: true, dataSource: 'postgres:govo_service_requests+govo_service_events', request: { code, status: 'phone_confirming' }, trackingUrl: `/track?code=${encodeURIComponent(code)}` });
     } catch (e) { next(e); }
   });
 
@@ -285,7 +285,7 @@ module.exports = function installGovoFlowApiV17(app, deps = {}) {
       const updated = await pool.query(`UPDATE govo_support_tickets SET ticket_code=$1 WHERE id=$2 RETURNING *`, [code, inserted.rows[0].id]);
       await pool.query(`INSERT INTO govo_support_events (ticket_id, event_type, status, note, actor_type, actor_name) VALUES ($1,'created','open','Customer support ticket submitted','customer','Customer')`, [inserted.rows[0].id]);
       sendTelegram(['New GOVO Support Ticket', `Ticket: ${code}`, `Subject: ${safe(b.subject || 'Support request')}`].join('\n')).catch(() => {});
-      res.status(201).json({ ok: true, dataSource: 'postgres:govo_support_tickets+govo_support_events', ticket: { code: updated.rows[0].ticket_code, status: updated.rows[0].status }, trackingUrl: `/orders/${encodeURIComponent(code)}` });
+      res.status(201).json({ ok: true, dataSource: 'postgres:govo_support_tickets+govo_support_events', ticket: { code: updated.rows[0].ticket_code, status: updated.rows[0].status }, trackingUrl: `/track?code=${encodeURIComponent(code)}` });
     } catch (e) { next(e); }
   });
 
@@ -423,7 +423,7 @@ module.exports = function installGovoFlowApiV17(app, deps = {}) {
         const updated = await pool.query(`UPDATE govo_orders SET order_code=$1 WHERE id=$2 RETURNING *`, [code, inserted.rows[0].id]);
         await pool.query(`INSERT INTO govo_order_events (order_id, event_type, status, note, actor_type, actor_name) VALUES ($1,'created','phone_confirming',$2,'customer','Customer')`, [inserted.rows[0].id, `Customer request submitted via ${source}`]);
         sendTelegram(['New GOVO Request', `Request: ${code}`, `Source: ${source}`, `Type: ${requestType}`, `Area: ${customerArea}`].join('\n')).catch(() => {});
-        res.status(201).json({ ok: true, dataSource: 'postgres:govo_orders+govo_order_events', order: publicOrder(updated.rows[0], [{ status: 'phone_confirming', note: 'Customer request submitted', actor_type: 'customer', created_at: new Date().toISOString() }]), trackingUrl: `/orders/${encodeURIComponent(code)}` });
+        res.status(201).json({ ok: true, dataSource: 'postgres:govo_orders+govo_order_events', order: publicOrder(updated.rows[0], [{ status: 'phone_confirming', note: 'Customer request submitted', actor_type: 'customer', created_at: new Date().toISOString() }]), trackingUrl: `/track?code=${encodeURIComponent(code)}` });
       })().catch((e) => {
         // Clean up orphaned uploads if the DB write failed.
         try { (req.files ? [].concat(req.files.voice || [], req.files.images || []) : []).forEach((f) => fs.unlink(f.path, () => {})); } catch (_) {}
@@ -449,9 +449,20 @@ module.exports = function installGovoFlowApiV17(app, deps = {}) {
         if (!okPhone(ownerPhone)) return jsonError(res, 400, 'invalid_phone', 'Enter a valid Bangladeshi phone number');
         if (String(b.consent) !== 'true' && b.consent !== 'on') return jsonError(res, 400, 'consent_required', 'Consent is required');
         const docFile = req.files && req.files.document && req.files.document[0] ? `/uploads/${req.files.document[0].filename}` : null;
+        const altPhoneRaw = safe(b.alt_phone, 40);
+        const altPhone = phone(altPhoneRaw);
+        if (altPhoneRaw && !okPhone(altPhone)) {
+          try { if (req.files && req.files.document) req.files.document.forEach((f) => fs.unlink(f.path, () => {})); } catch (_) {}
+          return jsonError(res, 400, 'invalid_alt_phone', 'Enter a valid alternate Bangladesh phone number');
+        }
+        const existing = await pool.query(`SELECT id, application_code, COALESCE(status,'pending') AS status FROM govo_merchant_leads WHERE phone=$1 OR whatsapp=$1 OR alt_phone=$1 ORDER BY id DESC LIMIT 1`, [ownerPhone]);
+        if (existing.rows.length) {
+          try { if (req.files && req.files.document) req.files.document.forEach((f) => fs.unlink(f.path, () => {})); } catch (_) {}
+          return jsonError(res, 409, 'already_registered', 'This phone already has a merchant application', { application: { code: existing.rows[0].application_code || null, status: joinStatusLabel(existing.rows[0].status) } });
+        }
         const inserted = await pool.query(
-          `INSERT INTO govo_merchant_leads (owner_name, shop_name, phone, whatsapp, location, category, shop_address, shop_description, opening_hours, delivery_available, delivery_needed, status, alt_phone, document_file, contact_method, consent_at, public_visible, is_demo, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'submitted',$12,$13,$14,CASE WHEN $15 THEN NOW() ELSE NULL END,false,false,NOW(),NOW()) RETURNING id`,
-          [ownerName, shopName, ownerPhone, phone(b.alt_phone) || ownerPhone, safe(b.location || b.area, 80), safe(b.category, 120), safe(b.address || b.shop_address, 240), safe(b.description || b.shop_description, 600), safe(b.opening_hours, 120), String(b.delivery_available) === 'true', safe(b.delivery_available, 10), phone(b.alt_phone), docFile, safe(b.contact_method || 'phone', 40), true]
+          `INSERT INTO govo_merchant_leads (owner_name, shop_name, phone, whatsapp, location, category, shop_address, shop_description, opening_hours, delivery_available, delivery_needed, status, alt_phone, document_file, contact_method, consent_at, public_visible, is_demo, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$13,$14,CASE WHEN $15 THEN NOW() ELSE NULL END,false,false,NOW(),NOW()) RETURNING id`,
+          [ownerName, shopName, ownerPhone, altPhone || ownerPhone, safe(b.location || b.area, 80), safe(b.category, 120), safe(b.address || b.shop_address, 240), safe(b.description || b.shop_description, 600), safe(b.opening_hours, 120), String(b.delivery_available) === 'true', safe(b.delivery_available, 10), altPhone, docFile, safe(b.contact_method || 'phone', 40), true]
         );
         const code = `MRCH-${today()}-${String(inserted.rows[0].id).padStart(5, '0')}`;
         await pool.query(`UPDATE govo_merchant_leads SET application_code=$1 WHERE id=$2`, [code, inserted.rows[0].id]);
@@ -480,9 +491,20 @@ module.exports = function installGovoFlowApiV17(app, deps = {}) {
         if (!okPhone(riderPhone)) return jsonError(res, 400, 'invalid_phone', 'Enter a valid Bangladeshi phone number');
         if (String(b.consent) !== 'true' && b.consent !== 'on') return jsonError(res, 400, 'consent_required', 'Consent is required');
         const docFile = req.files && req.files.document && req.files.document[0] ? `/uploads/${req.files.document[0].filename}` : null;
+        const emergencyRaw = safe(b.emergency_contact, 40);
+        const emergencyPhone = phone(emergencyRaw);
+        if (emergencyRaw && !okPhone(emergencyPhone)) {
+          try { if (req.files && req.files.document) req.files.document.forEach((f) => fs.unlink(f.path, () => {})); } catch (_) {}
+          return jsonError(res, 400, 'invalid_emergency_phone', 'Enter a valid emergency Bangladesh phone number');
+        }
+        const existing = await pool.query(`SELECT id, application_code, COALESCE(status,'pending') AS status FROM govo_rider_leads WHERE phone=$1 OR whatsapp=$1 ORDER BY id DESC LIMIT 1`, [riderPhone]);
+        if (existing.rows.length) {
+          try { if (req.files && req.files.document) req.files.document.forEach((f) => fs.unlink(f.path, () => {})); } catch (_) {}
+          return jsonError(res, 409, 'already_registered', 'This phone already has a rider application', { application: { code: existing.rows[0].application_code || null, status: joinStatusLabel(existing.rows[0].status) } });
+        }
         const inserted = await pool.query(
-          `INSERT INTO govo_rider_leads (rider_name, name, phone, whatsapp, location, area, address, vehicle_type, experience, availability, emergency_contact, document_file, status, consent_at, public_visible, is_demo, created_at, updated_at) VALUES ($1,$1,$2,$3,$4,$4,$5,$6,$7,$8,$9,$10,'submitted',NOW(),false,false,NOW(),NOW()) RETURNING id`,
-          [riderName, riderPhone, phone(b.emergency_contact) || riderPhone, safe(b.location || b.area, 80), safe(b.address, 240), safe(b.vehicle_type, 60), safe(b.experience, 240), safe(b.availability, 120), phone(b.emergency_contact), docFile]
+          `INSERT INTO govo_rider_leads (rider_name, name, phone, whatsapp, location, area, address, vehicle_type, experience, availability, emergency_contact, document_file, status, consent_at, public_visible, is_demo, created_at, updated_at) VALUES ($1,$1,$2,$3,$4,$4,$5,$6,$7,$8,$9,$10,'pending',NOW(),false,false,NOW(),NOW()) RETURNING id`,
+          [riderName, riderPhone, emergencyPhone || riderPhone, safe(b.location || b.area, 80), safe(b.address, 240), safe(b.vehicle_type, 60), safe(b.experience, 240), safe(b.availability, 120), emergencyPhone, docFile]
         );
         const code = `RIDR-${today()}-${String(inserted.rows[0].id).padStart(5, '0')}`;
         await pool.query(`UPDATE govo_rider_leads SET application_code=$1 WHERE id=$2`, [code, inserted.rows[0].id]);
