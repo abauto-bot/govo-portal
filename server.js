@@ -6220,6 +6220,8 @@ async function serviceTrackingByCode(codeOrId) {
     return { ...request, _events: govoMemoryState.serviceEvents.get(String(request.id)) || [] };
   }
   const isCode = /^SRV-/i.test(value);
+  const isNumericId = /^\d+$/.test(value);
+  if (!isCode && !isNumericId) return null;
   const r = await pool.query(isCode ? 'SELECT * FROM govo_service_requests WHERE request_code=$1 LIMIT 1' : 'SELECT * FROM govo_service_requests WHERE id=$1 LIMIT 1', [value]);
   const request = r.rows[0];
   if (!request) return null;
