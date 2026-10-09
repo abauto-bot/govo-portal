@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -u
+BASE="/home/abu/govo-control"
+LOG="$BASE/health-monitor.log"
+STATE="$BASE/health-status.env"
+mkdir -p "$BASE"
+TS="$(date -Is)"
+fail=0
+check_url(){
+  local name="$1" url="$2" expect="$3"
+  local code
+  code=$(curl -sS -L -o /dev/null --max-time 10 -w '%{http_code}' "$url" 2>/dev/null || echo 000)
+  [ "$code" = "$expect" ] || fail=1
+  printf '%s %-14s code=%s expected=%s %s\n' "$TS" "$name" "$code" "$expect" "$url" >> "$LOG"
+}
+check_body(){
+  local name="$1" url="$2" needle="$3"
+  local body
+  body=$(curl -sS --max-time 10 "$url" 2>/dev/null || true)
+  if printf '%s' "$body" | grep -Fq "$needle"; then
+    printf '%s %-14s body=PASS needle=%s %s\n' "$TS" "$name" "$needle" "$url" >> "$LOG"
+  else
+    fail=1
+    printf '%s %-14s body=FAIL needle=%s %s\n' "$TS" "$name" "$needle" "$url" >> "$LOG"
+  fi
+}
+check_url main https://govoexpress.com 200
+check_url app https://app.govoexpress.com/app 200
+check_url shops https://app.govoexpress.com/shops 200
+check_url services https://app.govoexpress.com/services 200
+check_url merchant https://merchant.govoexpress.com/merchant 200
+check_url rider https://rider.govoexpress.com/rider 200
+check_url admin https://add.govoexpress.com 401
+check_url api_health https://api.govoexpress.com/health 200
+check_url api_notfound 'https://api.govoexpress.com/api/requests?code=NO-SUCH' 404
+check_body theme_green https://app.govoexpress.com/app '#39E75F'
+check_body theme_cyan https://app.govoexpress.com/app '#19CFF0'
+
+docker exec govo_postgres pg_isready >/dev/null 2>&1 || fail=1
+docker exec govo_pay_postgres pg_isready >/dev/null 2>&1 || fail=1
+printf 'checked_at=%q\nstatus=%q\n' "$TS" "$([ "$fail" -eq 0 ] && echo PASS || echo FAIL)" > "$STATE"
+# keep log bounded without root/logrotate dependency
+if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 12000 ]; then tail -6000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"; fi
+exit "$fail"

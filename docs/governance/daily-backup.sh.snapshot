@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+BASE="/home/abu/govo-backups/daily"
+mkdir -p "$BASE"
+TS="$(date +%Y%m%d-%H%M%S)"
+OUT="$BASE/govo-postgres-$TS.dump"
+SUM="$OUT.sha256"
+docker exec govo_postgres sh -lc 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$OUT"
+sha256sum "$OUT" > "$SUM"
+cat "$OUT" | docker exec -i govo_postgres sh -lc 'cat > /tmp/govo-verify.dump && pg_restore -l /tmp/govo-verify.dump >/dev/null && rm -f /tmp/govo-verify.dump'
+find "$BASE" -type f \( -name 'govo-postgres-*.dump' -o -name 'govo-postgres-*.dump.sha256' \) -mtime +14 -delete
+printf '%s backup=%s status=PASS\n' "$(date -Is)" "$OUT" >> "$BASE/backup.log"
